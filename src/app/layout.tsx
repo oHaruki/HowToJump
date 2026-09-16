@@ -25,7 +25,7 @@ export default async function RootLayout({
     { href: "/ladder", label: "Ladder" },
     { href: "/info", label: "Info" },
   ];
-  if (session?.user) links.push({ href: "/me", label: "My progress" });
+  if (session?.userId) links.push({ href: "/me", label: "My progress" });
   if (isStaff(role)) links.push({ href: "/staff", label: "Staff" });
 
   return (
@@ -41,10 +41,10 @@ export default async function RootLayout({
             <div className="nav-tools">
               <AuthButton
                 user={
-                  session?.user
+                  session?.userId
                     ? {
-                        name: session.user.name ?? "",
-                        image: session.user.image ?? null,
+                        name: session.user?.name ?? "",
+                        image: session.user?.image ?? null,
                         role: session.role,
                       }
                     : null

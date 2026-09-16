@@ -12,7 +12,7 @@ export default async function StaffLayout({
 }) {
   const session = await auth();
   // Gated on the layout, so no staff route is reachable by URL alone.
-  if (!session?.user || !isStaff(session.role)) redirect("/");
+  if (!session?.userId || !isStaff(session.role)) redirect("/");
 
   const stats = await getStaffStats();
 

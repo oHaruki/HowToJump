@@ -10,9 +10,9 @@ import assert from "node:assert/strict";
 import {
   classify, drainToSeconds, extractBeatmapId, extractBeatmapsetId,
   normalizations, num, parsePaste, secondsToDrain, splitLine, splitTitle,
-} from "./parse.ts";
-import { normalizeMod, modsFromApi } from "../mods.ts";
-import { gradeFor } from "../grading.ts";
+} from "./parse";
+import { normalizeMod, modsFromApi } from "../mods";
+import { gradeFor } from "../grading";
 
 const T = "\t";
 const HEADER = [

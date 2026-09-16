@@ -23,7 +23,7 @@ function ago(d: Date | null) {
 
 export default async function MePage() {
   const session = await auth();
-  if (!session?.user) redirect("/");
+  if (!session?.userId) redirect("/");
 
   const [me] = await db.select().from(users).where(eq(users.id, session.userId));
   const [progress, scoreRows] = await Promise.all([
@@ -49,7 +49,7 @@ export default async function MePage() {
       <div className="row spread">
         <div className="section-head">
           <span className="lbl">Your progression</span>
-          <h1>{me?.username ?? session.user.name}</h1>
+          <h1>{me?.username ?? session.user?.name}</h1>
         </div>
         <div className="row">
           <span className="small">Last synced {ago(me?.lastSyncedAt ?? null)}</span>
