@@ -210,6 +210,38 @@ export async function fetchBeatmap(id: number): Promise<BeatmapFacts | null> {
   }
 }
 
+/**
+ * Mod adjusted star rating.
+ *
+ * Star rating needs the full difficulty calculator, so unlike AR, OD, CS and
+ * BPM it cannot be worked out locally. osu! exposes it through a POST, one
+ * beatmap and mod combination at a time.
+ */
+export async function fetchStarRating(
+  osuBeatmapId: number,
+  mods: string[],
+): Promise<number | null> {
+  const bearer = await appAccessToken();
+  const res = await limited(() =>
+    fetch(API + "/beatmaps/" + osuBeatmapId + "/attributes", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + bearer,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-api-version": "20220705",
+      },
+      body: JSON.stringify({ ruleset: "osu", mods }),
+      cache: "no-store",
+    }),
+  );
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    attributes?: { star_rating?: number; approach_rate?: number; overall_difficulty?: number };
+  };
+  return json.attributes?.star_rating ?? null;
+}
+
 /* ----------------------------------------------------------------- scores */
 
 type OsuScoreStatistics = {

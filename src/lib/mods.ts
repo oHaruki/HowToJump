@@ -72,3 +72,12 @@ export function modsFromApi(
 export function modLabel(m: string): string {
   return MOD_NAMES[m] ?? m;
 }
+
+/** Splits a canonical mod string into the acronyms the osu! API expects. */
+export function modAcronyms(mod: string): string[] {
+  const m = normalizeMod(mod);
+  if (m === "NM") return [];
+  const out: string[] = [];
+  for (let i = 0; i + 2 <= m.length; i += 2) out.push(m.slice(i, i + 2));
+  return out;
+}

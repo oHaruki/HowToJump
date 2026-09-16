@@ -13,6 +13,10 @@ import {
 } from "./parse";
 import { normalizeMod, modsFromApi } from "../mods";
 import { gradeFor } from "../grading";
+import {
+  applyMod, arToPreempt, preemptToAr, odToWindow, windowToOd,
+  lengthBucketFor, speedGuessFor,
+} from "../osu/modmath";
 
 const T = "\t";
 const HEADER = [
@@ -210,4 +214,83 @@ test("combo beats misscount", () => {
   assert.equal(gradeFor({ missCount: 0, isFc: true, isPerfect: false }), "SS");
   // Zero misses but a dropped combo is S, not SS.
   assert.equal(gradeFor({ missCount: 0, isFc: false, isPerfect: false }), "S");
+});
+
+/* ------------------------------------------------------------- mod math */
+
+test("DT shortens the approach and hit windows, not just the song", () => {
+  const base = { cs: 4, ar: 9.8, od: 9.2, bpm: 214, drainSeconds: 252 };
+  const dt = applyMod(base, "DT");
+  assert.equal(dt.cs, 4);          // a distance, so the rate leaves it alone
+  assert.equal(dt.ar, 10.87);
+  assert.equal(dt.od, 10.58);
+  assert.equal(dt.bpm, 321);       // 214 * 1.5
+  assert.equal(dt.drainSeconds, 168); // 252 / 1.5
+});
+
+test("HR scales the raw values and caps them at ten", () => {
+  const hr = applyMod({ cs: 4, ar: 9.8, od: 9.2, bpm: 214, drainSeconds: 252 }, "HR");
+  assert.equal(hr.cs, 5.2);        // 4 * 1.3
+  assert.equal(hr.ar, 10);         // 9.8 * 1.4 would be 13.72, capped
+  assert.equal(hr.od, 10);
+  assert.equal(hr.bpm, 214);       // no rate change
+  assert.equal(hr.drainSeconds, 252);
+});
+
+test("EZ halves, HT slows", () => {
+  const ez = applyMod({ cs: 4, ar: 9, od: 8, bpm: 200, drainSeconds: 200 }, "EZ");
+  assert.equal(ez.cs, 2);
+  assert.equal(ez.ar, 4.5);
+  assert.equal(ez.od, 4);
+  const ht = applyMod({ cs: 4, ar: 9, od: 8, bpm: 200, drainSeconds: 200 }, "HT");
+  assert.equal(ht.bpm, 150);
+  assert.equal(ht.drainSeconds, 267);
+  assert.ok(ht.ar! < 9 && ht.od! < 8);
+});
+
+test("NM changes nothing, and NC matches DT", () => {
+  const base = { cs: 4, ar: 9, od: 8, bpm: 180, drainSeconds: 180 };
+  assert.deepEqual(applyMod(base, "NM"), { ...base, hp: null });
+  const dt = applyMod(base, "DT");
+  const nc = applyMod(base, "NC");
+  assert.equal(nc.ar, dt.ar);
+  assert.equal(nc.bpm, dt.bpm);
+});
+
+test("combined mods apply the multiplier before the rate", () => {
+  // HR raises AR to 10, then DT converts that through the approach timing.
+  const hrdt = applyMod({ cs: 4, ar: 8, od: 8, bpm: 180, drainSeconds: 180 }, "HRDT");
+  const dtOnly = applyMod({ cs: 4, ar: 8, od: 8, bpm: 180, drainSeconds: 180 }, "DT");
+  assert.ok(hrdt.ar! > dtOnly.ar!);
+  assert.equal(hrdt.cs, 5.2);
+  assert.equal(hrdt.bpm, 270);
+});
+
+test("AR and OD conversions round trip", () => {
+  for (const ar of [0, 4.9, 5, 7.5, 9.8, 10]) {
+    assert.ok(Math.abs(preemptToAr(arToPreempt(ar)) - ar) < 1e-9);
+  }
+  for (const od of [0, 5, 8.4, 10]) {
+    assert.ok(Math.abs(windowToOd(odToWindow(od)) - od) < 1e-9);
+  }
+});
+
+test("length buckets match how the sheet already classifies its maps", () => {
+  assert.equal(lengthBucketFor(66), "TV Size");   // Firestarter 1:06
+  assert.equal(lengthBucketFor(80), "TV Size");   // Bonfire 1:20
+  assert.equal(lengthBucketFor(118), "Medium");   // FOSSIL 1:58
+  assert.equal(lengthBucketFor(132), "Medium");   // erase u 2:12
+  assert.equal(lengthBucketFor(190), "Long");     // Lunaticon 3:10
+  assert.equal(lengthBucketFor(252), "Long");     // When My Devil Rises 4:12
+  assert.equal(lengthBucketFor(400), "Marathon");
+  assert.equal(lengthBucketFor(null), "");
+});
+
+test("speed is only ever a suggestion", () => {
+  // The sheet marks 132 BPM maps as High because density, not tempo, decides
+  // it. The guess cannot know that, which is why staff can always override.
+  assert.equal(speedGuessFor(132), "Low");
+  assert.equal(speedGuessFor(214), "Medium");
+  assert.equal(speedGuessFor(255), "High");
+  assert.equal(speedGuessFor(null), "");
 });

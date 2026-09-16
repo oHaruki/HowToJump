@@ -1,6 +1,7 @@
 import { getBank, getFacets } from "@/lib/queries";
 import { TIERS, tierBySlug } from "@/lib/tiers";
-import { MapCell, ModChip, NONE, SectionHead, TierChip } from "@/components/ui";
+import { SectionHead } from "@/components/ui";
+import { MapList } from "@/components/MapList";
 import { BankFilters } from "@/components/BankFilters";
 
 export const dynamic = "force-dynamic";
@@ -51,61 +52,7 @@ export default async function MapsPage({
         }}
       />
 
-      <div className="table-wrap">
-        <table className="wide">
-          <thead>
-            <tr>
-              <th>Map</th>
-              <th>Mod</th>
-              <th>Pack</th>
-              <th>Category</th>
-              <th>Stars</th>
-              <th>BPM</th>
-              <th>Drain</th>
-              <th>CS / AR / OD</th>
-              <th>Pacing</th>
-              <th>Mapper</th>
-              <th>Judged</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((m) => (
-              <tr key={m.entryId}>
-                <td>
-                  <MapCell map={m} />
-                </td>
-                <td>
-                  <ModChip mod={m.mod} />
-                </td>
-                <td>
-                  <TierChip tier={m.tierOrder} />
-                </td>
-                <td>{m.category}</td>
-                <td className="num">
-                  {m.stars != null ? m.stars.toFixed(2) + "★" : NONE}
-                </td>
-                <td className="num">{m.bpm != null ? Math.round(m.bpm) : NONE}</td>
-                <td className="num">{m.drain || NONE}</td>
-                <td className="trio">
-                  <b>{m.cs ?? NONE}</b> / <b>{m.ar ?? NONE}</b> / <b>{m.od ?? NONE}</b>
-                </td>
-                <td className="small">
-                  {(m.lengthBucket || NONE) + " " + NONE + " " + (m.speedBucket || NONE)}
-                </td>
-                <td>{m.mapper || NONE}</td>
-                <td className="small">{m.judgedByName || NONE}</td>
-              </tr>
-            ))}
-            {!rows.length ? (
-              <tr>
-                <td colSpan={11} className="small">
-                  Nothing matches those filters yet.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      <MapList rows={rows} />
 
       <p className="small">
         {rows.length} {rows.length === 1 ? "entry" : "entries"}

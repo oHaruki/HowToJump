@@ -2,9 +2,14 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { importRows, previewPaste, type PreviewRow } from "@/lib/actions";
+import {
+  importRows, previewPaste, starRatingFor, type PreviewRow,
+} from "@/lib/actions";
 import { normalizations, secondsToDrain } from "@/lib/import/parse";
-import { TIERS, tierByName, tierByOrder, tierFill, CATEGORIES } from "@/lib/tiers";
+import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
+import {
+  TIERS, tierByName, tierByOrder, CATEGORIES, LENGTHS, SPEEDS,
+} from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
 import { Banner, NONE } from "@/components/ui";
 
@@ -34,6 +39,8 @@ export function Importer() {
   const [fileName, setFileName] = useState("");
   const [over, setOver] = useState(false);
   const [pending, start] = useTransition();
+  const rowsRef = useRef<Row[]>([]);
+  rowsRef.current = rows;
 
   const linkRef = useRef<HTMLTextAreaElement>(null);
   const [linkTier, setLinkTier] = useState("");
@@ -94,9 +101,46 @@ export function Importer() {
 
   /** Re-derives status locally so edits feel instant, without a round trip. */
   const patch = useCallback((uid: string, change: Partial<Row>) => {
-    setRows((prev) => {
-      const next = prev.map((r) => (r.uid === uid ? { ...r, ...change } : r));
-      return revalidate(next);
+    setRows((prev) => revalidate(prev.map((r) => (r.uid === uid ? { ...r, ...change } : r))));
+  }, []);
+
+  /**
+   * Mods change the values a player actually sees, so the row is recomputed
+   * from its nomod base. Everything but star rating is arithmetic and happens
+   * here; the rating needs osu!'s difficulty calculator, so it follows.
+   */
+  const changeMod = useCallback((uid: string, mod: string) => {
+    setRows((prev) =>
+      revalidate(
+        prev.map((r) => {
+          if (r.uid !== uid) return r;
+          const adj = applyMod(
+            {
+              cs: r.baseCs, ar: r.baseAr, od: r.baseOd,
+              bpm: r.baseBpm, drainSeconds: r.baseDrainSeconds,
+            },
+            mod,
+          );
+          return {
+            ...r,
+            mod,
+            ...adj,
+            drain: secondsToDrain(adj.drainSeconds),
+            length: lengthBucketFor(adj.drainSeconds),
+            speed: speedGuessFor(adj.bpm),
+            stars: mod === "NM" ? r.baseStars : r.stars,
+          };
+        }),
+      ),
+    );
+
+    const row = rowsRef.current.find((r) => r.uid === uid);
+    if (!row?.beatmapId) return;
+    if (mod === "NM") return;
+    start(async () => {
+      const sr = await starRatingFor(row.beatmapId!, mod);
+      if (sr == null) return;
+      setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, stars: sr } : r)));
     });
   }, []);
 
@@ -342,10 +386,34 @@ export function Importer() {
             <select
               className="mini"
               value=""
-              onChange={(e) => { if (e.target.value) bulk({ mod: e.target.value }); }}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                // Each row recalculates from its own nomod base.
+                rowsRef.current
+                  .filter((r) => r.selected && r.status !== "error")
+                  .forEach((r) => changeMod(r.uid, v));
+                e.target.value = "";
+              }}
             >
               <option value="">Set mod</option>
               {MODS.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select
+              className="mini"
+              value=""
+              onChange={(e) => { if (e.target.value) bulk({ length: e.target.value }); }}
+            >
+              <option value="">Set length</option>
+              {LENGTHS.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+            <select
+              className="mini"
+              value=""
+              onChange={(e) => { if (e.target.value) bulk({ speed: e.target.value }); }}
+            >
+              <option value="">Set speed</option>
+              {SPEEDS.map((sp) => <option key={sp} value={sp}>{sp}</option>)}
             </select>
             <button
               className="btn btn-sm"
@@ -370,6 +438,7 @@ export function Importer() {
                   <th>BPM</th>
                   <th>Length</th>
                   <th>CS / AR / OD</th>
+                  <th>Pacing</th>
                   <th>Normalized</th>
                 </tr>
               </thead>
@@ -427,7 +496,7 @@ export function Importer() {
                           <select
                             className="mini"
                             value={r.mod}
-                            onChange={(e) => patch(r.uid, { mod: e.target.value })}
+                            onChange={(e) => changeMod(r.uid, e.target.value)}
                           >
                             {MODS.concat(MODS.includes(r.mod) ? [] : [r.mod]).map((m) => (
                               <option key={m} value={m}>{m}</option>
@@ -472,6 +541,32 @@ export function Importer() {
                       <td className="num">{secondsToDrain(r.drainSeconds) || NONE}</td>
                       <td className="trio">
                         <b>{r.cs ?? NONE}</b> / <b>{r.ar ?? NONE}</b> / <b>{r.od ?? NONE}</b>
+                      </td>
+                      <td>
+                        {isErr ? <span className="small">{NONE}</span> : (
+                          <div className="row-tight" style={{ flexWrap: "nowrap" }}>
+                            <select
+                              className="mini"
+                              value={r.length}
+                              onChange={(e) => patch(r.uid, { length: e.target.value })}
+                            >
+                              <option value="">Length</option>
+                              {LENGTHS.map((l) => (
+                                <option key={l} value={l}>{l}</option>
+                              ))}
+                            </select>
+                            <select
+                              className="mini"
+                              value={r.speed}
+                              onChange={(e) => patch(r.uid, { speed: e.target.value })}
+                            >
+                              <option value="">Speed</option>
+                              {SPEEDS.map((sp) => (
+                                <option key={sp} value={sp}>{sp}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </td>
                       <td className="diffcol">
                         {norms.length

@@ -8,11 +8,16 @@ import {
   auditLog, beatmaps, entries, suggestionBatches, suggestions, users,
 } from "@/lib/schema";
 import { auth, requireAdmin, requireStaff } from "@/lib/auth";
-import { fetchBeatmaps, fetchUser, type BeatmapFacts } from "@/lib/osu/client";
+import {
+  fetchBeatmaps, fetchStarRating, fetchUser, type BeatmapFacts,
+} from "@/lib/osu/client";
 import { syncUser } from "@/lib/osu/sync";
-import { normalizeMod } from "@/lib/mods";
+import { modAcronyms, normalizeMod } from "@/lib/mods";
 import { tierByName } from "@/lib/tiers";
-import { classify, parsePaste, rowFromLink, type ParsedRow } from "@/lib/import/parse";
+import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
+import {
+  classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
+} from "@/lib/import/parse";
 import { getExistingEntryKeys } from "@/lib/queries";
 
 async function record(
@@ -45,14 +50,27 @@ function splitLines(text: string): string[] {
 
 export type PreviewRow = Omit<ParsedRow, "tierObj"> & {
   tierOrder: number | null;
-  apiStars: number | null;
-  apiTitle: string | null;
+  /**
+   * Nomod values straight from the osu! API. Kept so that changing the mod in
+   * the preview recalculates from the real base rather than compounding on
+   * figures that were already adjusted once.
+   */
+  baseCs: number | null;
+  baseAr: number | null;
+  baseOd: number | null;
+  baseBpm: number | null;
+  baseDrainSeconds: number | null;
+  baseStars: number | null;
 };
 
 /**
- * Parses a paste, then enriches every difficulty ID against the osu! API in
- * batches of 50, so the sheet's numbers get checked against the real ones and
- * mapper, cover art and ranked status fill themselves in.
+ * Parses a paste, enriches every difficulty ID against the osu! API in batches
+ * of 50, then applies the row's mod to the values so what staff see is what a
+ * player would see.
+ *
+ * The API's numbers win over the sheet's. The sheet cannot say which mod its
+ * figures were written for, so deriving from the nomod truth is the only way
+ * to avoid applying a mod twice.
  */
 export async function previewPaste(
   text: string,
@@ -83,29 +101,75 @@ export async function previewPaste(
     // A lookup failure must not lose the paste. Rows keep the sheet's values.
   }
 
-  const rows: PreviewRow[] = parsed.rows.map((r) => {
+  const rows: PreviewRow[] = [];
+  for (const r of parsed.rows) {
     const f = r.beatmapId ? facts.get(r.beatmapId) : undefined;
     const { tierObj, ...rest } = r;
-    return {
+
+    const base = {
+      cs: f?.cs ?? r.cs ?? null,
+      ar: f?.ar ?? r.ar ?? null,
+      od: f?.od ?? r.od ?? null,
+      bpm: f?.bpm ?? r.bpm ?? null,
+      drainSeconds: f?.drainSeconds ?? r.drainSeconds ?? null,
+    };
+    const adjusted = applyMod(base, r.mod);
+
+    // Star rating cannot be derived locally, so a modded row asks osu! for it.
+    let stars = f?.stars ?? r.stars ?? null;
+    if (r.beatmapId && r.mod !== "NM") {
+      try {
+        stars = (await fetchStarRating(r.beatmapId, modAcronyms(r.mod))) ?? stars;
+      } catch {
+        // Keep the nomod rating rather than dropping the row.
+      }
+    }
+
+    rows.push({
       ...rest,
       tierOrder: tierObj ? tierObj.order : null,
-      // Prefer what osu! says over what the sheet says.
       title: f?.title || r.title,
       version: f?.version || r.version,
       mapper: f?.mapper || r.mapper,
       beatmapsetId: f?.osuBeatmapsetId ?? r.beatmapsetId,
-      stars: r.stars ?? f?.stars ?? null,
-      bpm: r.bpm ?? f?.bpm ?? null,
-      drainSeconds: r.drainSeconds ?? f?.drainSeconds ?? null,
-      cs: r.cs ?? f?.cs ?? null,
-      ar: r.ar ?? f?.ar ?? null,
-      od: r.od ?? f?.od ?? null,
-      apiStars: f?.stars ?? null,
-      apiTitle: f?.title ?? null,
-    };
-  });
+      stars,
+      bpm: adjusted.bpm,
+      drainSeconds: adjusted.drainSeconds,
+      drain: secondsToDrain(adjusted.drainSeconds),
+      cs: adjusted.cs,
+      ar: adjusted.ar,
+      od: adjusted.od,
+      // Pacing is derived when the sheet did not say, so links get it too.
+      length: r.length || lengthBucketFor(adjusted.drainSeconds),
+      speed: r.speed || speedGuessFor(adjusted.bpm),
+      baseCs: base.cs,
+      baseAr: base.ar,
+      baseOd: base.od,
+      baseBpm: base.bpm,
+      baseDrainSeconds: base.drainSeconds,
+      baseStars: f?.stars ?? null,
+    });
+  }
 
   return { mode: parsed.mode, rows };
+}
+
+/**
+ * The mod adjusted star rating for one map, for when staff change the mod on
+ * a row already in the preview. Everything else recalculates in the browser.
+ */
+export async function starRatingFor(
+  osuBeatmapId: number,
+  mod: string,
+): Promise<number | null> {
+  await requireStaff();
+  const acronyms = modAcronyms(mod);
+  if (!acronyms.length) return null;
+  try {
+    return await fetchStarRating(osuBeatmapId, acronyms);
+  } catch {
+    return null;
+  }
 }
 
 /* ----------------------------------------------------------------- import */
