@@ -243,11 +243,20 @@ export async function getUserScores(userId: number) {
       entryId: entries.id,
       tierOrder: entries.tierOrder,
       mod: entries.mod,
+      category: entries.category,
+      lengthBucket: entries.lengthBucket,
+      speedBucket: entries.speedBucket,
+      stars: entries.stars,
+      bpm: entries.bpm,
+      drainSeconds: entries.drainSeconds,
+      cs: entries.cs,
+      ar: entries.ar,
+      od: entries.od,
       osuBeatmapId: beatmaps.osuBeatmapId,
       osuBeatmapsetId: beatmaps.osuBeatmapsetId,
       title: beatmaps.title,
       version: beatmaps.version,
-      listUrl: beatmaps.listUrl,
+      mapper: beatmaps.mapper,
     })
     .from(scores)
     .innerJoin(entries, eq(scores.entryId, entries.id))

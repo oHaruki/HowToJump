@@ -16,20 +16,27 @@ export function Cover({
   kind = "list",
   tierOrder,
   className = "thumb",
+  label = true,
 }: {
   setId: number | null | undefined;
   kind?: "list" | "card" | "cover";
   tierOrder?: number | null;
   className?: string;
+  /** Off for full bleed backgrounds, where a caption would be noise. */
+  label?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const tier = tierByOrder(tierOrder ?? null);
   const tint = "color-mix(in srgb, " + (tier ? tier.color : "#777") + " 22%, var(--bg-d))";
 
   if (!setId || failed) {
+    const fill = tier
+      ? "linear-gradient(120deg, color-mix(in srgb, " + tier.color +
+        " 26%, var(--bg-d)), var(--bg-d))"
+      : tint;
     return (
-      <div className={className + " art-none"} style={{ background: tint }}>
-        no bg
+      <div className={className + " art-none"} style={{ background: fill }}>
+        {label ? "no bg" : null}
       </div>
     );
   }

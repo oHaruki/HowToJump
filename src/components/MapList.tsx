@@ -12,11 +12,11 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 /**
- * The bank as cards rather than a table.
+ * The bank, one card per entry.
  *
- * Eleven columns of figures plus cover art does not fit on one screen, and a
- * horizontal scrollbar hides exactly the things people come here to compare.
- * The same shape as the review queue, minus the controls.
+ * Cover art fills the card and fades out to the right, so the map reads as
+ * itself while the figures sit on solid ground. Title and chips take the left,
+ * figures the right, which is what fills the width a table could not.
  */
 export function MapList({ rows }: { rows: BankRow[] }) {
   if (!rows.length) {
@@ -30,27 +30,45 @@ export function MapList({ rows }: { rows: BankRow[] }) {
           ? "https://osu.ppy.sh/beatmapsets/" + m.osuBeatmapsetId + "#osu/" + m.osuBeatmapId
           : "https://osu.ppy.sh/b/" + m.osuBeatmapId;
         return (
-          <div className="review-card map-card" key={m.entryId}>
+          <article className="mapcard" key={m.entryId}>
             <Cover
               setId={m.osuBeatmapsetId}
-              kind="card"
+              kind="cover"
               tierOrder={m.tierOrder}
-              className="review-art"
+              className="mapcard-art"
+              label={false}
             />
 
-            <div className="review-body">
-              <div>
-                <a className="t-title" href={url} target="_blank" rel="noopener noreferrer">
+            <div className="mapcard-inner">
+              <div className="mapcard-info">
+                <a
+                  className="mapcard-title"
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   {m.title}
                 </a>
-                <span className="t-diff">
+                <span className="mapcard-sub">
                   {[m.version ? "[" + m.version + "]" : "", m.mapper]
                     .filter(Boolean)
                     .join("  " + NONE + "  ")}
                 </span>
+                <div className="row-tight">
+                  <TierChip tier={m.tierOrder} />
+                  <ModChip mod={m.mod} />
+                  <span className="chip">{m.category}</span>
+                  {m.lengthBucket || m.speedBucket ? (
+                    <span className="chip">
+                      {[m.lengthBucket, m.speedBucket]
+                        .filter(Boolean)
+                        .join(" " + NONE + " ")}
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="statline">
+              <div className="mapcard-stats">
                 <Stat
                   label="Stars"
                   value={m.stars != null ? m.stars.toFixed(2) + "★" : NONE}
@@ -60,25 +78,9 @@ export function MapList({ rows }: { rows: BankRow[] }) {
                 <Stat label="CS" value={m.cs ?? NONE} />
                 <Stat label="AR" value={m.ar ?? NONE} />
                 <Stat label="OD" value={m.od ?? NONE} />
-                <Stat
-                  label="Pacing"
-                  value={
-                    [m.lengthBucket, m.speedBucket].filter(Boolean).join(" " + NONE + " ") ||
-                    NONE
-                  }
-                />
-              </div>
-
-              <div className="review-controls">
-                <TierChip tier={m.tierOrder} />
-                <ModChip mod={m.mod} />
-                <span className="chip">{m.category}</span>
-                {m.judgedByName ? (
-                  <span className="small">judged by {m.judgedByName}</span>
-                ) : null}
               </div>
             </div>
-          </div>
+          </article>
         );
       })}
     </div>
