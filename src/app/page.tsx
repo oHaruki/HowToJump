@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getBankStats, getHardestEntry, getRecentEntries, getTierCounts } from "@/lib/queries";
-import { LadderGrid, MapCell, ModChip, Stat, TierChip, beatmapUrl } from "@/components/ui";
+import {
+  LadderGrid, ModChip, NONE, Stat, TierChip, beatmapUrl,
+} from "@/components/ui";
+import { Cover } from "@/components/Cover";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +39,12 @@ export default async function OverviewPage() {
 
         {hardest ? (
           <div className="box feat">
-            {hardest.cardUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="feat-art" src={hardest.cardUrl} alt="" />
-            ) : null}
+            <Cover
+              setId={hardest.osuBeatmapsetId}
+              kind="card"
+              tierOrder={hardest.tierOrder}
+              className="feat-art"
+            />
             <div className="feat-body">
               <span className="lbl">Hardest on the ladder</span>
               <h3>
@@ -56,7 +61,15 @@ export default async function OverviewPage() {
               <div className="row-tight" style={{ marginTop: 2 }}>
                 <TierChip tier={hardest.tierOrder} />
                 <ModChip mod={hardest.mod} />
-                <span className="chip">{hardest.stars?.toFixed(2)}&#9733;</span>
+                <span className="chip">{hardest.category}</span>
+              </div>
+              <div className="statline">
+                <span><i>Stars</i><b>{hardest.stars?.toFixed(2)}&#9733;</b></span>
+                <span><i>BPM</i><b>{hardest.bpm != null ? Math.round(hardest.bpm) : NONE}</b></span>
+                <span><i>Length</i><b>{hardest.drain || NONE}</b></span>
+                <span><i>CS</i><b>{hardest.cs ?? NONE}</b></span>
+                <span><i>AR</i><b>{hardest.ar ?? NONE}</b></span>
+                <span><i>OD</i><b>{hardest.od ?? NONE}</b></span>
               </div>
             </div>
           </div>
@@ -105,18 +118,40 @@ export default async function OverviewPage() {
           <div className="grid-auto">
             {recent.map((m) => (
               <div className="box feat" key={m.entryId}>
-                {m.cardUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="feat-art" src={m.cardUrl} alt="" loading="lazy" />
-                ) : (
-                  <div className="feat-art" style={{ background: "var(--bg-d)" }} />
-                )}
+                <Cover
+                  setId={m.osuBeatmapsetId}
+                  kind="card"
+                  tierOrder={m.tierOrder}
+                  className="feat-art"
+                />
                 <div className="feat-body">
-                  <MapCell map={m} />
+                  <div>
+                    <a
+                      className="t-title"
+                      href={beatmapUrl(m)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {m.title}
+                    </a>
+                    <span className="t-diff">
+                      {[m.version ? "[" + m.version + "]" : "", m.mapper]
+                        .filter(Boolean)
+                        .join("  " + NONE + "  ")}
+                    </span>
+                  </div>
                   <div className="row-tight">
                     <TierChip tier={m.tierOrder} />
                     <ModChip mod={m.mod} />
-                    <span className="chip">{m.stars?.toFixed(2)}&#9733;</span>
+                    <span className="chip">{m.category}</span>
+                  </div>
+                  <div className="statline">
+                    <span><i>Stars</i><b>{m.stars?.toFixed(2)}&#9733;</b></span>
+                    <span><i>BPM</i><b>{m.bpm != null ? Math.round(m.bpm) : NONE}</b></span>
+                    <span><i>Length</i><b>{m.drain || NONE}</b></span>
+                    <span><i>CS</i><b>{m.cs ?? NONE}</b></span>
+                    <span><i>AR</i><b>{m.ar ?? NONE}</b></span>
+                    <span><i>OD</i><b>{m.od ?? NONE}</b></span>
                   </div>
                 </div>
               </div>

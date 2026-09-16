@@ -95,16 +95,33 @@ export async function previewPaste(
     .filter((n): n is number => typeof n === "number");
 
   let facts = new Map<number, BeatmapFacts>();
+  let lookupWorked = true;
   try {
     facts = await fetchBeatmaps(ids);
   } catch {
-    // A lookup failure must not lose the paste. Rows keep the sheet's values.
+    // A lookup failure must not lose the paste. Rows keep the sheet's values,
+    // and nothing is reported as missing on the strength of a failed call.
+    lookupWorked = false;
   }
 
   const rows: PreviewRow[] = [];
   for (const r of parsed.rows) {
     const f = r.beatmapId ? facts.get(r.beatmapId) : undefined;
     const { tierObj, ...rest } = r;
+
+    // osu! knew nothing about this ID. Saying "pick a pack" here would imply
+    // the row is one dropdown away from importable, when it is a dead ID.
+    if (r.beatmapId && lookupWorked && !f) {
+      rows.push({
+        ...rest,
+        tierOrder: tierObj ? tierObj.order : null,
+        status: "error",
+        notes: ["No beatmap with ID " + r.beatmapId + " on osu!"],
+        baseCs: null, baseAr: null, baseOd: null,
+        baseBpm: null, baseDrainSeconds: null, baseStars: null,
+      });
+      continue;
+    }
 
     const base = {
       cs: f?.cs ?? r.cs ?? null,

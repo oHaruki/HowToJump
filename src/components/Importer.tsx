@@ -11,7 +11,8 @@ import {
   TIERS, tierByName, tierByOrder, CATEGORIES, LENGTHS, SPEEDS,
 } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
-import { Banner, NONE } from "@/components/ui";
+import { NONE } from "@/components/ui";
+import { Cover } from "@/components/Cover";
 
 type Row = PreviewRow & { selected: boolean };
 
@@ -424,165 +425,132 @@ export function Importer() {
             </button>
           </div>
 
-          <div className="table-wrap">
-            <table className="wide">
-              <thead>
-                <tr>
-                  <th style={{ width: 30 }} />
-                  <th>Status</th>
-                  <th>Map</th>
-                  <th>Mod</th>
-                  <th>Pack</th>
-                  <th>Category</th>
-                  <th>Stars</th>
-                  <th>BPM</th>
-                  <th>Length</th>
-                  <th>CS / AR / OD</th>
-                  <th>Pacing</th>
-                  <th>Normalized</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const isErr = r.status === "error";
-                  const bg =
-                    r.status === "error"
-                      ? "color-mix(in srgb, var(--danger) 7%, transparent)"
-                      : r.status === "attention"
-                        ? "color-mix(in srgb, var(--warning) 7%, transparent)"
-                        : undefined;
-                  const norms = normalizations(r as never);
-                  return (
-                    <tr key={r.uid} style={{ background: bg }}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={r.selected}
-                          onChange={(e) => patch(r.uid, { selected: e.target.checked })}
-                        />
-                      </td>
-                      <td>
-                        <span className={"chip " + STATUS_CHIP[r.status][0]}>
-                          {STATUS_CHIP[r.status][1]}
+          <div className="review-list">
+            {rows.map((r) => {
+              const isErr = r.status === "error";
+              const norms = normalizations(r as never);
+              return (
+                <div className="prev-card" key={r.uid} data-status={r.status}>
+                  <input
+                    type="checkbox"
+                    checked={r.selected}
+                    onChange={(e) => patch(r.uid, { selected: e.target.checked })}
+                    aria-label={"Select " + (r.title || "row")}
+                  />
+
+                  <Cover
+                    setId={r.beatmapsetId}
+                    kind="card"
+                    tierOrder={r.tierOrder}
+                    className="review-art"
+                  />
+
+                  <div className="review-body">
+                    <div>
+                      <span className="t-title">
+                        {r.title || "beatmap " + (r.beatmapId ?? "?")}
+                      </span>
+                      <span className="t-diff">
+                        {r.notes.length
+                          ? r.notes[0]
+                          : [r.version ? "[" + r.version + "]" : "", r.mapper]
+                              .filter(Boolean)
+                              .join("  " + NONE + "  ") || "metadata will be fetched"}
+                      </span>
+                    </div>
+
+                    {isErr ? null : (
+                      <div className="statline">
+                        <span>
+                          <i>Stars</i>
+                          <b>{r.stars != null ? r.stars.toFixed(2) + "★" : NONE}</b>
                         </span>
-                      </td>
-                      <td>
-                        <div className="map-cell">
-                          <Banner
-                            map={{
-                              osuBeatmapId: r.beatmapId ?? 0,
-                              osuBeatmapsetId: r.beatmapsetId,
-                              title: r.title,
-                              version: r.version,
-                              tierOrder: r.tierOrder,
-                            }}
-                          />
-                          <div style={{ minWidth: 0 }}>
-                            <span className="t-title">
-                              {r.title || "beatmap " + (r.beatmapId ?? "?")}
-                            </span>
-                            <span className="t-diff">
-                              {r.notes.length
-                                ? r.notes[0]
-                                : [r.version ? "[" + r.version + "]" : "", r.mapper]
-                                    .filter(Boolean)
-                                    .join("  " + NONE + "  ") || "metadata will be fetched"}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        {isErr ? <span className="small">{NONE}</span> : (
-                          <select
-                            className="mini"
-                            value={r.mod}
-                            onChange={(e) => changeMod(r.uid, e.target.value)}
-                          >
-                            {MODS.concat(MODS.includes(r.mod) ? [] : [r.mod]).map((m) => (
-                              <option key={m} value={m}>{m}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {isErr ? <span className="small">{NONE}</span> : (
-                          <select
-                            className="mini"
-                            value={tierByOrder(r.tierOrder)?.name ?? ""}
-                            onChange={(e) => patch(r.uid, { tier: e.target.value })}
-                          >
-                            <option value="">Pick a pack</option>
-                            {TIERS.map((t) => (
-                              <option key={t.slug} value={t.name}>{t.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {isErr ? <span className="small">{NONE}</span> : (
-                          <select
-                            className="mini"
-                            value={r.category}
-                            onChange={(e) => patch(r.uid, { category: e.target.value })}
-                          >
-                            <option value="">Pick a category</option>
-                            {CATEGORIES.concat(
-                              r.category && !CATEGORIES.includes(r.category) ? [r.category] : [],
-                            ).map((c) => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td className="num">
-                        {r.stars != null ? r.stars.toFixed(2) + "★" : NONE}
-                      </td>
-                      <td className="num">{r.bpm != null ? Math.round(r.bpm) : NONE}</td>
-                      <td className="num">{secondsToDrain(r.drainSeconds) || NONE}</td>
-                      <td className="trio">
-                        <b>{r.cs ?? NONE}</b> / <b>{r.ar ?? NONE}</b> / <b>{r.od ?? NONE}</b>
-                      </td>
-                      <td>
-                        {isErr ? <span className="small">{NONE}</span> : (
-                          <div className="row-tight" style={{ flexWrap: "nowrap" }}>
-                            <select
-                              className="mini"
-                              value={r.length}
-                              onChange={(e) => patch(r.uid, { length: e.target.value })}
-                            >
-                              <option value="">Length</option>
-                              {LENGTHS.map((l) => (
-                                <option key={l} value={l}>{l}</option>
+                        <span>
+                          <i>BPM</i>
+                          <b>{r.bpm != null ? Math.round(r.bpm) : NONE}</b>
+                        </span>
+                        <span>
+                          <i>Length</i>
+                          <b>{secondsToDrain(r.drainSeconds) || NONE}</b>
+                        </span>
+                        <span><i>CS</i><b>{r.cs ?? NONE}</b></span>
+                        <span><i>AR</i><b>{r.ar ?? NONE}</b></span>
+                        <span><i>OD</i><b>{r.od ?? NONE}</b></span>
+                        {norms.length ? (
+                          <span>
+                            <i>Normalized</i>
+                            <b className="diffcol">
+                              {norms.slice(0, 2).map((pair, i) => (
+                                <span key={i}>
+                                  {i ? "   " : ""}
+                                  <s>{pair[0]}</s> &rarr; {pair[1]}
+                                </span>
                               ))}
-                            </select>
-                            <select
-                              className="mini"
-                              value={r.speed}
-                              onChange={(e) => patch(r.uid, { speed: e.target.value })}
-                            >
-                              <option value="">Speed</option>
-                              {SPEEDS.map((sp) => (
-                                <option key={sp} value={sp}>{sp}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </td>
-                      <td className="diffcol">
-                        {norms.length
-                          ? norms.slice(0, 2).map((p, i) => (
-                              <span key={i}>
-                                {i ? "   " : ""}
-                                <s>{p[0]}</s> &rarr; <b>{p[1]}</b>
-                              </span>
-                            ))
-                          : NONE}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            </b>
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {isErr ? null : (
+                      <div className="review-controls">
+                        <select
+                          className="mini"
+                          value={r.mod}
+                          onChange={(e) => changeMod(r.uid, e.target.value)}
+                        >
+                          {MODS.concat(MODS.includes(r.mod) ? [] : [r.mod]).map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="mini"
+                          value={tierByOrder(r.tierOrder)?.name ?? ""}
+                          onChange={(e) => patch(r.uid, { tier: e.target.value })}
+                        >
+                          <option value="">Pick a pack</option>
+                          {TIERS.map((t) => (
+                            <option key={t.slug} value={t.name}>{t.name}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="mini"
+                          value={r.category}
+                          onChange={(e) => patch(r.uid, { category: e.target.value })}
+                        >
+                          <option value="">Pick a category</option>
+                          {CATEGORIES.concat(
+                            r.category && !CATEGORIES.includes(r.category) ? [r.category] : [],
+                          ).map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="mini"
+                          value={r.length}
+                          onChange={(e) => patch(r.uid, { length: e.target.value })}
+                        >
+                          <option value="">Length</option>
+                          {LENGTHS.map((l) => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                        <select
+                          className="mini"
+                          value={r.speed}
+                          onChange={(e) => patch(r.uid, { speed: e.target.value })}
+                        >
+                          <option value="">Speed</option>
+                          {SPEEDS.map((sp) => <option key={sp} value={sp}>{sp}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <span className={"chip prev-status " + STATUS_CHIP[r.status][0]}>
+                    {STATUS_CHIP[r.status][1]}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="row spread">
