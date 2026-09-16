@@ -35,7 +35,7 @@ the only real colour on the site. Dark only for now.
 ### 1. Register an osu! OAuth app
 
 At <https://osu.ppy.sh/home/account/edit#oauth>, with callback URL
-`http://localhost:3000/api/auth/callback/osu` for development. The same client
+`http://localhost:6500/api/auth/callback/osu` for development. The same client
 ID and secret cover both user login and beatmap lookups.
 
 ### 2. Configure
@@ -53,7 +53,7 @@ your first sign in lands as an admin.
 ```bash
 docker run -d --name htj-pg \
   -e POSTGRES_USER=howtojump -e POSTGRES_PASSWORD=howtojump -e POSTGRES_DB=howtojump \
-  -p 5432:5432 postgres:16-alpine
+  -p 5435:5432 postgres:16-alpine
 ```
 
 ### 4. Create the schema and seed

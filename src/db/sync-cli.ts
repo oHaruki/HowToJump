@@ -2,7 +2,7 @@
  * One sync pass from the command line, for cron or a manual run.
  * Usage: npm run sync
  */
-import "dotenv/config";
+import "./env";
 import { sql } from "@/lib/db";
 import { syncDueUsers } from "@/lib/osu/sync";
 

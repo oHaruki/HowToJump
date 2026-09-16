@@ -7,7 +7,7 @@
  * the API. Without them the sheet's own numbers are used, so the seed still
  * works offline.
  */
-import "dotenv/config";
+import "./env";
 import { sql as raw } from "drizzle-orm";
 import { db, sql } from "@/lib/db";
 import { beatmaps, entries, gradeRules, siteConfig } from "@/lib/schema";
