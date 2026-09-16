@@ -4,7 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { approveSuggestions, rejectSuggestions, setSuggestionTier } from "@/lib/actions";
 import { TIERS, tierByOrder } from "@/lib/tiers";
-import { Banner, ModChip, NONE } from "@/components/ui";
+import { ModChip, NONE } from "@/components/ui";
+import { Cover } from "@/components/Cover";
 import { secondsToDrain } from "@/lib/import/parse";
 
 export type QueueRow = {
@@ -29,6 +30,15 @@ export type QueueRow = {
   createdAt: string;
   submittedBy: string | null;
 };
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <span>
+      <i>{label}</i>
+      <b>{value}</b>
+    </span>
+  );
+}
 
 export function QueueTable({ rows }: { rows: QueueRow[] }) {
   const router = useRouter();
@@ -76,9 +86,10 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
 
       <div className="row spread">
         <span className="small">
-          {selected.size} selected
+          {rows.length} pending
+          {selected.size ? ", " + selected.size + " selected" : ""}
           {selected.size && approvable.length < selected.size
-            ? ", " + (selected.size - approvable.length) + " without a pack"
+            ? " (" + (selected.size - approvable.length) + " without a pack)"
             : ""}
         </span>
         <div className="row">
@@ -110,77 +121,67 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
         </div>
       </div>
 
-      <div className="table-wrap">
-        <table className="mid">
-          <thead>
-            <tr>
-              <th style={{ width: 30 }} />
-              <th>Map</th>
-              <th>Mod</th>
-              <th>Proposed pack</th>
-              <th>Category</th>
-              <th>Stars</th>
-              <th>BPM</th>
-              <th>Length</th>
-              <th>CS / AR / OD</th>
-              <th>Pacing</th>
-              <th>Batch</th>
-              <th>By</th>
-              <th style={{ textAlign: "right" }}>Review</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(r.id)}
-                    onChange={() => toggle(r.id)}
+      <div className="review-list">
+        {rows.map((r) => {
+          const url = r.osuBeatmapsetId
+            ? "https://osu.ppy.sh/beatmapsets/" + r.osuBeatmapsetId + "#osu/" + r.osuBeatmapId
+            : "https://osu.ppy.sh/b/" + r.osuBeatmapId;
+          return (
+            <div className="review-card" key={r.id} data-nopack={String(r.tierOrder == null)}>
+              <input
+                type="checkbox"
+                checked={selected.has(r.id)}
+                onChange={() => toggle(r.id)}
+                aria-label={"Select " + (r.title ?? "map")}
+              />
+
+              <Cover
+                setId={r.osuBeatmapsetId}
+                kind="card"
+                tierOrder={r.tierOrder}
+                className="review-art"
+              />
+
+              <div className="review-body">
+                <div>
+                  <a className="t-title" href={url} target="_blank" rel="noopener noreferrer">
+                    {r.title}
+                  </a>
+                  <span className="t-diff">
+                    {[r.version ? "[" + r.version + "]" : "", r.mapper]
+                      .filter(Boolean)
+                      .join("  " + NONE + "  ")}
+                  </span>
+                </div>
+
+                <div className="statline">
+                  <Stat
+                    label="Stars"
+                    value={r.stars != null ? r.stars.toFixed(2) + "★" : NONE}
                   />
-                </td>
-                <td>
-                  <div className="map-cell">
-                    <Banner
-                      map={{
-                        osuBeatmapId: r.osuBeatmapId,
-                        osuBeatmapsetId: r.osuBeatmapsetId,
-                        title: r.title,
-                        version: r.version,
-                        tierOrder: r.tierOrder,
-                      }}
-                    />
-                    <div style={{ minWidth: 0 }}>
-                    <a
-                      className="t-title"
-                      href={
-                        r.osuBeatmapsetId
-                          ? "https://osu.ppy.sh/beatmapsets/" +
-                            r.osuBeatmapsetId +
-                            "#osu/" +
-                            r.osuBeatmapId
-                          : "https://osu.ppy.sh/b/" + r.osuBeatmapId
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {r.title}
-                    </a>
-                    <span className="t-diff">
-                      {[r.version ? "[" + r.version + "]" : "", r.mapper]
-                        .filter(Boolean)
-                        .join("  " + NONE + "  ")}
-                    </span>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <ModChip mod={r.mod} />
-                </td>
-                <td>
+                  <Stat label="BPM" value={r.bpm != null ? Math.round(r.bpm) : NONE} />
+                  <Stat label="Length" value={secondsToDrain(r.drainSeconds) || NONE} />
+                  <Stat label="CS" value={r.cs ?? NONE} />
+                  <Stat label="AR" value={r.ar ?? NONE} />
+                  <Stat label="OD" value={r.od ?? NONE} />
+                  <Stat
+                    label="Pacing"
+                    value={
+                      [r.lengthBucket, r.speedBucket].filter(Boolean).join(" " + NONE + " ") ||
+                      NONE
+                    }
+                  />
+                  <span>
+                    <i>Mod</i>
+                    <ModChip mod={r.mod} />
+                  </span>
+                </div>
+
+                <div className="review-controls">
                   <select
                     className="mini"
                     defaultValue={tierByOrder(r.tierOrder)?.name ?? ""}
+                    disabled={pending}
                     onChange={(e) => run(() => setSuggestionTier(r.id, e.target.value))}
                   >
                     <option value="">Pick a pack</option>
@@ -190,56 +191,39 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
                       </option>
                     ))}
                   </select>
-                </td>
-                <td>{r.category ?? NONE}</td>
-                <td className="num">
-                  {r.stars != null ? r.stars.toFixed(2) + "★" : NONE}
-                </td>
-                <td className="num">{r.bpm != null ? Math.round(r.bpm) : NONE}</td>
-                <td className="num">{secondsToDrain(r.drainSeconds) || NONE}</td>
-                <td className="trio">
-                  <b>{r.cs ?? NONE}</b> / <b>{r.ar ?? NONE}</b> / <b>{r.od ?? NONE}</b>
-                </td>
-                <td className="small">
-                  {(r.lengthBucket || NONE) + " " + NONE + " " + (r.speedBucket || NONE)}
-                </td>
-                <td className="small">{r.batchId ? "#" + r.batchId : NONE}</td>
-                <td className="small">{r.submittedBy ?? NONE}</td>
-                <td style={{ textAlign: "right" }}>
-                  <div
-                    className="row-tight"
-                    style={{ justifyContent: "flex-end", flexWrap: "nowrap" }}
-                  >
-                    <button
-                      className="btn btn-sm btn-ok"
-                      type="button"
-                      disabled={pending || r.tierOrder == null}
-                      title={r.tierOrder == null ? "Set a pack first" : undefined}
-                      onClick={() => run(() => approveSuggestions([r.id]))}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="btn btn-sm btn-no"
-                      type="button"
-                      disabled={pending}
-                      onClick={() => run(() => rejectSuggestions([r.id]))}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!rows.length ? (
-              <tr>
-                <td colSpan={13} className="small">
-                  Nothing pending. Add maps and they land here.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+                  <span className="chip">{r.category ?? "no category"}</span>
+                  <span className="small">
+                    {"batch #" + (r.batchId ?? NONE) + "  " + NONE + "  " + (r.submittedBy ?? NONE)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="review-actions">
+                <button
+                  className="btn btn-sm btn-ok"
+                  type="button"
+                  disabled={pending || r.tierOrder == null}
+                  title={r.tierOrder == null ? "Set a pack first" : undefined}
+                  onClick={() => run(() => approveSuggestions([r.id]))}
+                >
+                  Approve
+                </button>
+                <button
+                  className="btn btn-sm btn-no"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => run(() => rejectSuggestions([r.id]))}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {!rows.length ? (
+          <p className="small">Nothing pending. Add maps and they land here.</p>
+        ) : null}
       </div>
     </>
   );
