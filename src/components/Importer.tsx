@@ -10,6 +10,12 @@ import { NONE } from "@/components/ui";
 
 type Row = PreviewRow & { selected: boolean };
 
+const PLACEHOLDER_LINKS = [
+  "https://osu.ppy.sh/beatmapsets/2353663#osu/5066679",
+  "https://osu.ppy.sh/beatmapsets/2377969#osu/5137765",
+  "5309916",
+];
+
 const STATUS_CHIP: Record<string, [string, string]> = {
   new: ["ok", "Ready"],
   exists: ["", "On ladder"],
@@ -20,7 +26,7 @@ const STATUS_CHIP: Record<string, [string, string]> = {
 
 export function Importer() {
   const router = useRouter();
-  const [source, setSource] = useState<"paste" | "link">("paste");
+  const [source, setSource] = useState<"link" | "paste">("link");
   const [text, setText] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [mode, setMode] = useState<string | null>(null);
@@ -29,7 +35,7 @@ export function Importer() {
   const [over, setOver] = useState(false);
   const [pending, start] = useTransition();
 
-  const linkRef = useRef<HTMLInputElement>(null);
+  const linkRef = useRef<HTMLTextAreaElement>(null);
   const [linkTier, setLinkTier] = useState("");
   const [linkCat, setLinkCat] = useState("");
   const [linkMod, setLinkMod] = useState("NM");
@@ -54,18 +60,21 @@ export function Importer() {
     });
   }, []);
 
-  const addLink = useCallback(() => {
+  const addLinks = useCallback(() => {
     const v = linkRef.current?.value.trim();
     if (!v) return;
     setError(null);
     start(async () => {
       try {
+        // One request for the whole list, so twenty links are one API batch.
         const res = await previewPaste(
           v,
           { tier: linkTier, category: linkCat, mod: linkMod },
           true,
         );
-        setRows((prev) => [...prev, ...res.rows.map((r) => ({ ...r, selected: false }))]);
+        setRows((prev) =>
+          revalidate([...prev, ...res.rows.map((r) => ({ ...r, selected: false }))]),
+        );
         if (linkRef.current) linkRef.current.value = "";
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -147,17 +156,17 @@ export function Importer() {
       <div className="seg" role="tablist">
         <button
           type="button" role="tab"
+          aria-selected={source === "link"}
+          onClick={() => setSource("link")}
+        >
+          Add links
+        </button>
+        <button
+          type="button" role="tab"
           aria-selected={source === "paste"}
           onClick={() => setSource("paste")}
         >
           Paste or upload
-        </button>
-        <button
-          type="button" role="tab"
-          aria-selected={source === "link"}
-          onClick={() => setSource("link")}
-        >
-          Single link
         </button>
       </div>
 
@@ -231,17 +240,19 @@ export function Importer() {
         </div>
       ) : (
         <div className="box stack">
-          <span className="lbl">Add one entry at a time</span>
+          <div className="row spread">
+            <span className="lbl">Paste links, one per line</span>
+            <span className="small">Pack, category and mod apply to all of them</span>
+          </div>
+          <textarea
+            ref={linkRef}
+            rows={6}
+            spellCheck={false}
+            aria-label="Beatmap links or IDs, one per line"
+            placeholder={PLACEHOLDER_LINKS.join(String.fromCharCode(10))}
+          />
           <div className="row" style={{ alignItems: "flex-end" }}>
-            <label className="field" style={{ flex: "3 1 300px" }}>
-              <span className="lbl">Beatmap link or ID</span>
-              <input
-                ref={linkRef}
-                type="text"
-                placeholder="https://osu.ppy.sh/beatmapsets/2353663#osu/5066679"
-              />
-            </label>
-            <label className="field" style={{ flex: "1 1 140px" }}>
+            <label className="field" style={{ flex: "1 1 150px" }}>
               <span className="lbl">Pack</span>
               <select value={linkTier} onChange={(e) => setLinkTier(e.target.value)}>
                 <option value="">Pick a pack</option>
@@ -250,7 +261,7 @@ export function Importer() {
                 ))}
               </select>
             </label>
-            <label className="field" style={{ flex: "1 1 160px" }}>
+            <label className="field" style={{ flex: "1 1 170px" }}>
               <span className="lbl">Category</span>
               <select value={linkCat} onChange={(e) => setLinkCat(e.target.value)}>
                 <option value="">Pick a category</option>
@@ -259,7 +270,7 @@ export function Importer() {
                 ))}
               </select>
             </label>
-            <label className="field" style={{ flex: "1 1 110px" }}>
+            <label className="field" style={{ flex: "1 1 120px" }}>
               <span className="lbl">Mod</span>
               <select value={linkMod} onChange={(e) => setLinkMod(e.target.value)}>
                 {MODS.map((m) => (
@@ -267,13 +278,19 @@ export function Importer() {
                 ))}
               </select>
             </label>
-            <button className="btn btn-primary" type="button" disabled={pending} onClick={addLink}>
-              Add to preview
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={pending}
+              onClick={addLinks}
+            >
+              {pending ? "Looking up" : "Add to preview"}
             </button>
           </div>
           <p className="small">
-            Paste the link with the difficulty selected. Everything else gets filled
-            in from the osu! API.
+            Copy the link with the difficulty selected. Titles, mappers and
+            difficulty values all come from the osu! API. Anything needing a
+            different pack can be changed per row in the preview below.
           </p>
         </div>
       )}

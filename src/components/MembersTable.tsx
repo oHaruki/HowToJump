@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setUserRole } from "@/lib/actions";
+import { addStaffMember, setUserRole } from "@/lib/actions";
 import { NONE } from "@/components/ui";
 
 export type MemberRow = {
@@ -15,12 +15,48 @@ export type MemberRow = {
   lastSyncedAt: string | null;
 };
 
-const ROLES = ["user", "helper", "admin"] as const;
-
-export function MembersTable({ rows }: { rows: MemberRow[] }) {
+/**
+ * Only staff are listed. Every player who ever signs in gets a row in the
+ * users table, so listing all of them would grow without bound and bury the
+ * handful of people this page is actually about.
+ */
+export function MembersTable({
+  rows,
+  playerCount,
+}: {
+  rows: MemberRow[];
+  playerCount: number;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [identifier, setIdentifier] = useState("");
+  const [newRole, setNewRole] = useState<"helper" | "admin">("helper");
+
+  const run = (fn: () => Promise<unknown>) => {
+    setError(null);
+    setNotice(null);
+    start(async () => {
+      try {
+        await fn();
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    });
+  };
+
+  const add = () =>
+    run(async () => {
+      const res = await addStaffMember(identifier, newRole);
+      setIdentifier("");
+      setNotice(
+        res.created
+          ? res.username + " added as " + newRole + ", before their first sign in"
+          : res.username + " is now " + newRole,
+      );
+    });
 
   return (
     <>
@@ -30,14 +66,62 @@ export function MembersTable({ rows }: { rows: MemberRow[] }) {
           <div>{error}</div>
         </div>
       ) : null}
+      {notice ? (
+        <div className="notice">
+          <span className="chip ok" style={{ flex: "none" }}>Done</span>
+          <div>{notice}</div>
+        </div>
+      ) : null}
+
+      <div className="box stack">
+        <span className="lbl">Add staff</span>
+        <div className="row" style={{ alignItems: "flex-end" }}>
+          <label className="field" style={{ flex: "3 1 280px" }}>
+            <span className="lbl">osu! user ID or username</span>
+            <input
+              type="text"
+              value={identifier}
+              placeholder="3673149 or -Haruki"
+              onChange={(e) => setIdentifier(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && identifier.trim() && !pending) add();
+              }}
+            />
+          </label>
+          <label className="field" style={{ flex: "1 1 140px" }}>
+            <span className="lbl">Role</span>
+            <select
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value as "helper" | "admin")}
+            >
+              <option value="helper">helper</option>
+              <option value="admin">admin</option>
+            </select>
+          </label>
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={pending || !identifier.trim()}
+            onClick={add}
+          >
+            {pending ? "Looking up" : "Add"}
+          </button>
+        </div>
+        <p className="small">
+          Looked up against osu!, so the name and avatar are correct. They do not
+          need to have signed in yet.
+        </p>
+      </div>
+
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Player</th>
+              <th>Staff member</th>
               <th>osu! rank</th>
               <th>Last sync</th>
               <th>Role</th>
+              <th style={{ textAlign: "right" }}>Remove</th>
             </tr>
           </thead>
           <tbody>
@@ -63,40 +147,51 @@ export function MembersTable({ rows }: { rows: MemberRow[] }) {
                   {u.globalRank ? "#" + u.globalRank.toLocaleString() : NONE}
                 </td>
                 <td className="small">
-                  {u.lastSyncedAt
-                    ? new Date(u.lastSyncedAt).toLocaleString()
-                    : "never"}
+                  {u.lastSyncedAt ? new Date(u.lastSyncedAt).toLocaleString() : "never"}
                 </td>
                 <td>
                   <select
                     className="mini"
                     defaultValue={u.role}
                     disabled={pending}
-                    onChange={(e) => {
-                      const role = e.target.value as (typeof ROLES)[number];
-                      setError(null);
-                      start(async () => {
-                        try {
-                          await setUserRole(u.id, role);
-                          router.refresh();
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : String(err));
-                        }
-                      });
-                    }}
+                    onChange={(e) =>
+                      run(() =>
+                        setUserRole(u.id, e.target.value as "user" | "helper" | "admin"),
+                      )
+                    }
                   >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
+                    <option value="helper">helper</option>
+                    <option value="admin">admin</option>
                   </select>
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  <button
+                    className="btn btn-sm btn-no"
+                    type="button"
+                    disabled={pending}
+                    title="Drops them back to an ordinary player"
+                    onClick={() => run(() => setUserRole(u.id, "user"))}
+                  >
+                    Remove
+                  </button>
                 </td>
               </tr>
             ))}
+            {!rows.length ? (
+              <tr>
+                <td colSpan={5} className="small">
+                  No staff yet.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
+
+      <p className="small">
+        {rows.length} staff {NONE} {playerCount.toLocaleString()} registered{" "}
+        {playerCount === 1 ? "player" : "players"} in total
+      </p>
     </>
   );
 }

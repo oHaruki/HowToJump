@@ -317,6 +317,24 @@ export type OsuMe = {
   statistics?: { global_rank: number | null };
 };
 
+/**
+ * Looks a player up by numeric ID or by username, so staff can be added
+ * before they have ever signed in.
+ */
+export async function fetchUser(identifier: string): Promise<OsuMe | null> {
+  const trimmed = identifier.trim();
+  if (!trimmed) return null;
+  const key = /^\d+$/.test(trimmed) ? "id" : "username";
+  try {
+    return await apiGet<OsuMe>(
+      "/users/" + encodeURIComponent(trimmed) + "/osu?key=" + key,
+    );
+  } catch (err) {
+    if (err instanceof NotFound) return null;
+    throw err;
+  }
+}
+
 export async function fetchMe(token: string): Promise<OsuMe> {
   return apiGet<OsuMe>("/me/osu", token);
 }

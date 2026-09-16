@@ -19,14 +19,13 @@ export default async function RootLayout({
   const session = await auth();
   const role = session?.role;
 
+  // Public destinations only. Personal and staff links live in the avatar menu.
   const links = [
     { href: "/", label: "Overview" },
     { href: "/maps", label: "Map bank" },
     { href: "/ladder", label: "Ladder" },
     { href: "/info", label: "Info" },
   ];
-  if (session?.userId) links.push({ href: "/me", label: "My progress" });
-  if (isStaff(role)) links.push({ href: "/staff", label: "Staff" });
 
   return (
     <html lang="en">
@@ -40,12 +39,14 @@ export default async function RootLayout({
             <NavLinks links={links} />
             <div className="nav-tools">
               <AuthButton
+                isStaff={isStaff(role)}
                 user={
                   session?.userId
                     ? {
                         name: session.user?.name ?? "",
                         image: session.user?.image ?? null,
                         role: session.role,
+                        osuUserId: session.osuUserId,
                       }
                     : null
                 }

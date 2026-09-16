@@ -1,14 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
   auditLog, beatmaps, entries, suggestionBatches, suggestions, users,
 } from "@/lib/schema";
 import { auth, requireAdmin, requireStaff } from "@/lib/auth";
-import { fetchBeatmaps, type BeatmapFacts } from "@/lib/osu/client";
+import { fetchBeatmaps, fetchUser, type BeatmapFacts } from "@/lib/osu/client";
 import { syncUser } from "@/lib/osu/sync";
 import { normalizeMod } from "@/lib/mods";
 import { tierByName } from "@/lib/tiers";
@@ -33,6 +33,14 @@ async function record(
   });
 }
 
+/** Splits a textarea into trimmed, non-empty lines. */
+function splitLines(text: string): string[] {
+  return String(text ?? '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 /* ---------------------------------------------------------------- preview */
 
 export type PreviewRow = Omit<ParsedRow, "tierObj"> & {
@@ -54,7 +62,11 @@ export async function previewPaste(
   await requireStaff();
 
   const parsed = asLinks
-    ? { mode: "links" as string | null, rows: [rowFromLink(text, defaults)] }
+    ? {
+        mode: "links" as string | null,
+        // One link per line, all sharing the pack, category and mod chosen above.
+        rows: splitLines(text).map((l) => rowFromLink(l, defaults)),
+      }
     : parsePaste(text);
 
   const existing = await getExistingEntryKeys();
@@ -325,9 +337,66 @@ export async function removeEntry(entryId: number) {
 
 export async function setUserRole(userId: number, role: "user" | "helper" | "admin") {
   const admin = await requireAdmin();
+  if (userId === admin.id && role !== "admin") {
+    // Stops the last admin locking themselves out of the staff area.
+    const [{ n }] = await db
+      .select({ n: rawSql<number>`count(*)::int` })
+      .from(users)
+      .where(eq(users.role, "admin"));
+    if (n <= 1) throw new Error("You are the only admin, promote someone else first");
+  }
   await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, userId));
   await record(admin.id, admin.name ?? undefined, "user.role", "user", userId, { role });
   revalidatePath("/staff/members");
+}
+
+/**
+ * Grants a role by osu! ID or username. Creates the local row when that
+ * player has never signed in, so staff can be set up ahead of time.
+ */
+export async function addStaffMember(
+  identifier: string,
+  role: "helper" | "admin",
+): Promise<{ username: string; created: boolean }> {
+  const admin = await requireAdmin();
+  const trimmed = identifier.trim();
+  if (!trimmed) throw new Error("Enter an osu! user ID or username");
+
+  const profile = await fetchUser(trimmed);
+  if (!profile) throw new Error("No osu! player found for " + trimmed);
+
+  const existing = await db.query.users.findFirst({
+    where: eq(users.osuUserId, profile.id),
+  });
+
+  if (existing) {
+    await db
+      .update(users)
+      .set({ role, username: profile.username, updatedAt: new Date() })
+      .where(eq(users.id, existing.id));
+    await record(admin.id, admin.name ?? undefined, "user.role", "user", existing.id, { role });
+    revalidatePath("/staff/members");
+    return { username: profile.username, created: false };
+  }
+
+  const [created] = await db
+    .insert(users)
+    .values({
+      osuUserId: profile.id,
+      username: profile.username,
+      avatarUrl: profile.avatar_url,
+      countryCode: profile.country_code,
+      globalRank: profile.statistics?.global_rank ?? null,
+      role,
+    })
+    .returning({ id: users.id });
+
+  await record(admin.id, admin.name ?? undefined, "user.add", "user", created.id, {
+    role,
+    osuUserId: profile.id,
+  });
+  revalidatePath("/staff/members");
+  return { username: profile.username, created: true };
 }
 
 /* ------------------------------------------------------------------- sync */
