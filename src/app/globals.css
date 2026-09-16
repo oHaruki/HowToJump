@@ -313,13 +313,15 @@ tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--bg-c); }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-focus); white-space: nowrap; }
 .map-cell { display: flex; align-items: center; gap: 11px; min-width: 0; }
-.thumb, .thumb-none {
-  width: 56px; height: 42px; flex: none;
+.thumb, .banner {
+  flex: none; object-fit: cover;
   border-radius: 6px; corner-shape: var(--corner-shape);
   outline: var(--border-width) solid var(--border);
 }
-.thumb { object-fit: cover; }
-.thumb-none {
+.thumb { width: 56px; height: 42px; }
+/* Card art, for screens where the background itself is being judged. */
+.banner { width: 132px; height: 46px; }
+.art-none {
   display: grid; place-items: center; font-family: var(--font-mono);
   font-size: 11px; color: var(--text-dark); background: var(--bg-d);
 }

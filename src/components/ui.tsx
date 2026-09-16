@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TIERS, tierByName, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
 import { modLabel } from "@/lib/mods";
+import { Cover } from "@/components/Cover";
 
 /** Middot stands in for an empty cell so a lone dash never reads as a minus. */
 export const NONE = "·";
@@ -66,33 +67,41 @@ export function beatmapUrl(m: MapLike) {
     : "https://osu.ppy.sh/b/" + m.osuBeatmapId;
 }
 
-/**
- * Cover art, with a pack tinted placeholder for sets that have none. Old sets
- * genuinely 404 on assets.ppy.sh, so this is a real case rather than a guard.
- */
+/** Cover art. The 404 fallback lives in Cover, which needs the client. */
 export function Thumb({ map }: { map: MapLike }) {
-  const t = tierByOrder(map.tierOrder ?? null);
-  if (!map.listUrl) {
-    return (
-      <div
-        className="thumb-none"
-        style={{
-          background:
-            "color-mix(in srgb, " + (t ? t.color : "#777") + " 22%, var(--bg-d))",
-        }}
-      >
-        no bg
-      </div>
-    );
-  }
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img className="thumb" src={map.listUrl} alt="" loading="lazy" />;
+  return (
+    <Cover
+      setId={map.osuBeatmapsetId}
+      tierOrder={map.tierOrder ?? null}
+      className="thumb"
+    />
+  );
 }
 
-export function MapCell({ map, plain }: { map: MapLike; plain?: boolean }) {
+/** Wider card art, used where the background itself is worth judging. */
+export function Banner({ map }: { map: MapLike }) {
+  return (
+    <Cover
+      setId={map.osuBeatmapsetId}
+      kind="card"
+      tierOrder={map.tierOrder ?? null}
+      className="banner"
+    />
+  );
+}
+
+export function MapCell({
+  map,
+  plain,
+  banner,
+}: {
+  map: MapLike;
+  plain?: boolean;
+  banner?: boolean;
+}) {
   return (
     <div className="map-cell">
-      <Thumb map={map} />
+      {banner ? <Banner map={map} /> : <Thumb map={map} />}
       <div style={{ minWidth: 0 }}>
         {plain ? (
           <span className="t-title">{map.title}</span>

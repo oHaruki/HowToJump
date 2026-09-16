@@ -3,10 +3,10 @@
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { importRows, previewPaste, type PreviewRow } from "@/lib/actions";
-import { normalizations } from "@/lib/import/parse";
+import { normalizations, secondsToDrain } from "@/lib/import/parse";
 import { TIERS, tierByName, tierByOrder, tierFill, CATEGORIES } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
-import { NONE } from "@/components/ui";
+import { Banner, NONE } from "@/components/ui";
 
 type Row = PreviewRow & { selected: boolean };
 
@@ -368,6 +368,7 @@ export function Importer() {
                   <th>Category</th>
                   <th>Stars</th>
                   <th>BPM</th>
+                  <th>Length</th>
                   <th>CS / AR / OD</th>
                   <th>Normalized</th>
                 </tr>
@@ -398,6 +399,15 @@ export function Importer() {
                       </td>
                       <td>
                         <div className="map-cell">
+                          <Banner
+                            map={{
+                              osuBeatmapId: r.beatmapId ?? 0,
+                              osuBeatmapsetId: r.beatmapsetId,
+                              title: r.title,
+                              version: r.version,
+                              tierOrder: r.tierOrder,
+                            }}
+                          />
                           <div style={{ minWidth: 0 }}>
                             <span className="t-title">
                               {r.title || "beatmap " + (r.beatmapId ?? "?")}
@@ -459,6 +469,7 @@ export function Importer() {
                         {r.stars != null ? r.stars.toFixed(2) + "★" : NONE}
                       </td>
                       <td className="num">{r.bpm != null ? Math.round(r.bpm) : NONE}</td>
+                      <td className="num">{secondsToDrain(r.drainSeconds) || NONE}</td>
                       <td className="trio">
                         <b>{r.cs ?? NONE}</b> / <b>{r.ar ?? NONE}</b> / <b>{r.od ?? NONE}</b>
                       </td>

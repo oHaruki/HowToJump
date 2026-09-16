@@ -4,7 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { approveSuggestions, rejectSuggestions, setSuggestionTier } from "@/lib/actions";
 import { TIERS, tierByOrder } from "@/lib/tiers";
-import { ModChip, NONE } from "@/components/ui";
+import { Banner, ModChip, NONE } from "@/components/ui";
+import { secondsToDrain } from "@/lib/import/parse";
 
 export type QueueRow = {
   id: number;
@@ -17,6 +18,13 @@ export type QueueRow = {
   tierOrder: number | null;
   category: string | null;
   stars: number | null;
+  bpm: number | null;
+  drainSeconds: number | null;
+  cs: number | null;
+  ar: number | null;
+  od: number | null;
+  lengthBucket: string | null;
+  speedBucket: string | null;
   batchId: number | null;
   createdAt: string;
   submittedBy: string | null;
@@ -112,6 +120,10 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
               <th>Proposed pack</th>
               <th>Category</th>
               <th>Stars</th>
+              <th>BPM</th>
+              <th>Length</th>
+              <th>CS / AR / OD</th>
+              <th>Pacing</th>
               <th>Batch</th>
               <th>By</th>
               <th style={{ textAlign: "right" }}>Review</th>
@@ -128,7 +140,17 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
                   />
                 </td>
                 <td>
-                  <div style={{ minWidth: 0 }}>
+                  <div className="map-cell">
+                    <Banner
+                      map={{
+                        osuBeatmapId: r.osuBeatmapId,
+                        osuBeatmapsetId: r.osuBeatmapsetId,
+                        title: r.title,
+                        version: r.version,
+                        tierOrder: r.tierOrder,
+                      }}
+                    />
+                    <div style={{ minWidth: 0 }}>
                     <a
                       className="t-title"
                       href={
@@ -149,6 +171,7 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
                         .filter(Boolean)
                         .join("  " + NONE + "  ")}
                     </span>
+                    </div>
                   </div>
                 </td>
                 <td>
@@ -171,6 +194,14 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
                 <td>{r.category ?? NONE}</td>
                 <td className="num">
                   {r.stars != null ? r.stars.toFixed(2) + "★" : NONE}
+                </td>
+                <td className="num">{r.bpm != null ? Math.round(r.bpm) : NONE}</td>
+                <td className="num">{secondsToDrain(r.drainSeconds) || NONE}</td>
+                <td className="trio">
+                  <b>{r.cs ?? NONE}</b> / <b>{r.ar ?? NONE}</b> / <b>{r.od ?? NONE}</b>
+                </td>
+                <td className="small">
+                  {(r.lengthBucket || NONE) + " " + NONE + " " + (r.speedBucket || NONE)}
                 </td>
                 <td className="small">{r.batchId ? "#" + r.batchId : NONE}</td>
                 <td className="small">{r.submittedBy ?? NONE}</td>
@@ -202,7 +233,7 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
             ))}
             {!rows.length ? (
               <tr>
-                <td colSpan={9} className="small">
+                <td colSpan={13} className="small">
                   Nothing pending. Add maps and they land here.
                 </td>
               </tr>
