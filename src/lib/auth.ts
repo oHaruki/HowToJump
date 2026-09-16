@@ -117,6 +117,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
+      // The role is read from the database rather than trusted from the token.
+      // It is stamped into the JWT at sign in, so a promotion made in the
+      // Members page would otherwise not apply until that person signed out
+      // and back in. One indexed lookup keeps role changes immediate.
+      let role: Role = token.role ?? "user";
+      if (token.userId) {
+        const row = await db.query.users.findFirst({
+          where: eq(users.id, token.userId),
+          columns: { role: true, bannedAt: true },
+        });
+        if (row) role = row.bannedAt ? "user" : (row.role as Role);
+      }
+
       // Returned as a new object rather than mutated: the callback's session
       // parameter is a union across session strategies, so writing to it is
       // rejected by the type checker.
@@ -124,7 +137,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         ...session,
         userId: token.userId,
         osuUserId: token.osuUserId,
-        role: token.role ?? "user",
+        role,
         osuAccessToken: token.osuAccessToken,
       };
     },
