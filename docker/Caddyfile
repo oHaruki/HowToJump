@@ -1,0 +1,5 @@
+# Caddy terminates TLS and proxies to the app. Set DOMAIN in .env.
+{$DOMAIN:localhost} {
+	encode gzip zstd
+	reverse_proxy app:3000
+}

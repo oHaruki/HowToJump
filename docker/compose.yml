@@ -1,0 +1,79 @@
+name: howtojump
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-howtojump}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-howtojump}
+      POSTGRES_DB: ${POSTGRES_DB:-howtojump}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-howtojump}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Published only so you can run migrations from the host. Drop this in
+    # production and exec into the container instead.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-howtojump}:${POSTGRES_PASSWORD:-howtojump}@postgres:5432/${POSTGRES_DB:-howtojump}
+      OSU_CLIENT_ID: ${OSU_CLIENT_ID}
+      OSU_CLIENT_SECRET: ${OSU_CLIENT_SECRET}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL}
+      AUTH_TRUST_HOST: "true"
+      BOOTSTRAP_ADMINS: ${BOOTSTRAP_ADMINS}
+      SYNC_TOKEN: ${SYNC_TOKEN}
+    expose:
+      - "3000"
+
+  # Calls the sync endpoint every 15 minutes. The endpoint itself decides who
+  # is actually due, so this timer only has to be more frequent than the
+  # shortest interval, never exact.
+  worker:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      SYNC_TOKEN: ${SYNC_TOKEN}
+    command: >
+      sh -c "apk add --no-cache curl >/dev/null &&
+      while true; do
+        curl -fsS -X POST http://app:3000/api/sync/run
+          -H \"Authorization: Bearer $$SYNC_TOKEN\" || echo 'sync call failed';
+        sleep 900;
+      done"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+
+volumes:
+  pgdata:
+  caddydata:
+  caddyconfig:

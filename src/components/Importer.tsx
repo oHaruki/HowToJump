@@ -1,0 +1,521 @@
+"use client";
+
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { importRows, previewPaste, type PreviewRow } from "@/lib/actions";
+import { normalizations } from "@/lib/import/parse";
+import { TIERS, tierByName, tierByOrder, tierFill, CATEGORIES } from "@/lib/tiers";
+import { MODS } from "@/lib/mods";
+import { NONE } from "@/components/ui";
+
+type Row = PreviewRow & { selected: boolean };
+
+const STATUS_CHIP: Record<string, [string, string]> = {
+  new: ["ok", "Ready"],
+  exists: ["", "On ladder"],
+  duplicate: ["warn", "Duplicate"],
+  attention: ["warn", "Needs info"],
+  error: ["bad", "Error"],
+};
+
+export function Importer() {
+  const router = useRouter();
+  const [source, setSource] = useState<"paste" | "link">("paste");
+  const [text, setText] = useState("");
+  const [rows, setRows] = useState<Row[]>([]);
+  const [mode, setMode] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [over, setOver] = useState(false);
+  const [pending, start] = useTransition();
+
+  const linkRef = useRef<HTMLInputElement>(null);
+  const [linkTier, setLinkTier] = useState("");
+  const [linkCat, setLinkCat] = useState("");
+  const [linkMod, setLinkMod] = useState("NM");
+
+  const detected = useMemo(() => {
+    if (!text.trim()) return "Nothing to read";
+    if (text.includes("\t")) return "Detected: spreadsheet rows";
+    if (text.includes(",")) return "Detected: comma separated";
+    return "Detected: links and IDs";
+  }, [text]);
+
+  const read = useCallback((payload: string) => {
+    setError(null);
+    start(async () => {
+      try {
+        const res = await previewPaste(payload);
+        setMode(res.mode);
+        setRows(res.rows.map((r) => ({ ...r, selected: false })));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    });
+  }, []);
+
+  const addLink = useCallback(() => {
+    const v = linkRef.current?.value.trim();
+    if (!v) return;
+    setError(null);
+    start(async () => {
+      try {
+        const res = await previewPaste(
+          v,
+          { tier: linkTier, category: linkCat, mod: linkMod },
+          true,
+        );
+        setRows((prev) => [...prev, ...res.rows.map((r) => ({ ...r, selected: false }))]);
+        if (linkRef.current) linkRef.current.value = "";
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    });
+  }, [linkTier, linkCat, linkMod]);
+
+  const readFile = useCallback(
+    (f: File) => {
+      setFileName(f.name);
+      const fr = new FileReader();
+      fr.onload = () => read(String(fr.result));
+      fr.readAsText(f);
+    },
+    [read],
+  );
+
+  /** Re-derives status locally so edits feel instant, without a round trip. */
+  const patch = useCallback((uid: string, change: Partial<Row>) => {
+    setRows((prev) => {
+      const next = prev.map((r) => (r.uid === uid ? { ...r, ...change } : r));
+      return revalidate(next);
+    });
+  }, []);
+
+  const bulk = useCallback((change: Partial<Row>) => {
+    setRows((prev) =>
+      revalidate(prev.map((r) => (r.selected && r.status !== "error" ? { ...r, ...change } : r))),
+    );
+  }, []);
+
+  const tally = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const r of rows) t[r.status] = (t[r.status] ?? 0) + 1;
+    return t;
+  }, [rows]);
+
+  const ready = rows.filter((r) => r.status === "new");
+  const blocked = rows.filter((r) => r.status === "attention").length;
+  const selectedCount = rows.filter((r) => r.selected).length;
+
+  const send = useCallback(() => {
+    if (!ready.length) return;
+    setError(null);
+    start(async () => {
+      try {
+        await importRows(
+          ready.map((r) => ({
+            beatmapId: r.beatmapId!,
+            beatmapsetId: r.beatmapsetId,
+            title: r.title,
+            version: r.version,
+            mapper: r.mapper,
+            mod: r.mod,
+            tierOrder: r.tierOrder!,
+            category: r.category,
+            length: r.length,
+            speed: r.speed,
+            stars: r.stars,
+            bpm: r.bpm,
+            drainSeconds: r.drainSeconds,
+            cs: r.cs,
+            ar: r.ar,
+            od: r.od,
+            raw: r.raw,
+          })),
+          fileName ? "upload" : source === "link" ? "link" : "paste",
+        );
+        setRows((prev) => prev.filter((r) => r.status !== "new"));
+        router.push("/staff/queue");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    });
+  }, [ready, fileName, source, router]);
+
+  return (
+    <>
+      <div className="seg" role="tablist">
+        <button
+          type="button" role="tab"
+          aria-selected={source === "paste"}
+          onClick={() => setSource("paste")}
+        >
+          Paste or upload
+        </button>
+        <button
+          type="button" role="tab"
+          aria-selected={source === "link"}
+          onClick={() => setSource("link")}
+        >
+          Single link
+        </button>
+      </div>
+
+      {error ? (
+        <div className="notice bad">
+          <span className="chip bad" style={{ flex: "none" }}>Error</span>
+          <div>{error}</div>
+        </div>
+      ) : null}
+
+      {source === "paste" ? (
+        <div className="stack-lg">
+          <div className="box stack">
+            <div className="row spread">
+              <span className="lbl">Paste rows from the spreadsheet</span>
+              <span className="small">{detected}</span>
+            </div>
+            <textarea
+              rows={8}
+              spellCheck={false}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              aria-label="Paste spreadsheet rows"
+            />
+            <div className="row">
+              <button
+                className="btn btn-primary"
+                type="button"
+                disabled={pending || !text.trim()}
+                onClick={() => read(text)}
+              >
+                {pending ? "Reading" : "Read rows"}
+              </button>
+            </div>
+            <p className="small">
+              Copying a range out of Google Sheets puts tab separated text on the
+              clipboard, so pasting straight in works. Headers are matched by name
+              and are optional.
+            </p>
+          </div>
+
+          <div
+            className="drop"
+            data-over={String(over)}
+            onDragEnter={(e) => { e.preventDefault(); setOver(true); }}
+            onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+            onDragLeave={(e) => { e.preventDefault(); setOver(false); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setOver(false);
+              const f = e.dataTransfer.files[0];
+              if (f) readFile(f);
+            }}
+          >
+            <strong style={{ color: "var(--text-focus)" }}>Or drop a CSV or TSV here</strong>
+            <span className="small">Exported from any spreadsheet</span>
+            <label className="btn" style={{ marginTop: 4 }}>
+              Choose a file
+              <input
+                type="file"
+                accept=".csv,.tsv,.txt,text/csv,text/plain"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) readFile(f);
+                }}
+              />
+            </label>
+            {fileName ? <span className="small">{fileName}</span> : null}
+          </div>
+        </div>
+      ) : (
+        <div className="box stack">
+          <span className="lbl">Add one entry at a time</span>
+          <div className="row" style={{ alignItems: "flex-end" }}>
+            <label className="field" style={{ flex: "3 1 300px" }}>
+              <span className="lbl">Beatmap link or ID</span>
+              <input
+                ref={linkRef}
+                type="text"
+                placeholder="https://osu.ppy.sh/beatmapsets/2353663#osu/5066679"
+              />
+            </label>
+            <label className="field" style={{ flex: "1 1 140px" }}>
+              <span className="lbl">Pack</span>
+              <select value={linkTier} onChange={(e) => setLinkTier(e.target.value)}>
+                <option value="">Pick a pack</option>
+                {TIERS.map((t) => (
+                  <option key={t.slug} value={t.name}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field" style={{ flex: "1 1 160px" }}>
+              <span className="lbl">Category</span>
+              <select value={linkCat} onChange={(e) => setLinkCat(e.target.value)}>
+                <option value="">Pick a category</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field" style={{ flex: "1 1 110px" }}>
+              <span className="lbl">Mod</span>
+              <select value={linkMod} onChange={(e) => setLinkMod(e.target.value)}>
+                {MODS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+            <button className="btn btn-primary" type="button" disabled={pending} onClick={addLink}>
+              Add to preview
+            </button>
+          </div>
+          <p className="small">
+            Paste the link with the difficulty selected. Everything else gets filled
+            in from the osu! API.
+          </p>
+        </div>
+      )}
+
+      {rows.length ? (
+        <div className="stack-lg">
+          <div className="row spread">
+            <span className="lbl">Preview{mode ? " (" + mode + ")" : ""}</span>
+            <span className="row-tight">
+              {(["new", "attention", "exists", "duplicate", "error"] as const).map((k) =>
+                tally[k] ? (
+                  <span key={k} className={"chip " + STATUS_CHIP[k][0]}>
+                    {tally[k]} {STATUS_CHIP[k][1].toLowerCase()}
+                  </span>
+                ) : null,
+              )}
+            </span>
+          </div>
+
+          <div className="bulkbar">
+            <label className="row-tight" style={{ cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={selectedCount > 0 && selectedCount === rows.length}
+                onChange={(e) =>
+                  setRows((prev) => prev.map((r) => ({ ...r, selected: e.target.checked })))
+                }
+              />
+              <span>{selectedCount} selected</span>
+            </label>
+            <span style={{ flex: "1 1 auto" }} />
+            <span className="small">Set for selected:</span>
+            <select
+              className="mini"
+              value=""
+              onChange={(e) => { if (e.target.value) bulk({ tier: e.target.value }); }}
+            >
+              <option value="">Set pack</option>
+              {TIERS.map((t) => <option key={t.slug} value={t.name}>{t.name}</option>)}
+            </select>
+            <select
+              className="mini"
+              value=""
+              onChange={(e) => { if (e.target.value) bulk({ category: e.target.value }); }}
+            >
+              <option value="">Set category</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select
+              className="mini"
+              value=""
+              onChange={(e) => { if (e.target.value) bulk({ mod: e.target.value }); }}
+            >
+              <option value="">Set mod</option>
+              {MODS.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <button
+              className="btn btn-sm"
+              type="button"
+              onClick={() => setRows((prev) => prev.filter((r) => !r.selected))}
+            >
+              Remove selected
+            </button>
+          </div>
+
+          <div className="table-wrap">
+            <table className="wide">
+              <thead>
+                <tr>
+                  <th style={{ width: 30 }} />
+                  <th>Status</th>
+                  <th>Map</th>
+                  <th>Mod</th>
+                  <th>Pack</th>
+                  <th>Category</th>
+                  <th>Stars</th>
+                  <th>BPM</th>
+                  <th>CS / AR / OD</th>
+                  <th>Normalized</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const isErr = r.status === "error";
+                  const bg =
+                    r.status === "error"
+                      ? "color-mix(in srgb, var(--danger) 7%, transparent)"
+                      : r.status === "attention"
+                        ? "color-mix(in srgb, var(--warning) 7%, transparent)"
+                        : undefined;
+                  const norms = normalizations(r as never);
+                  return (
+                    <tr key={r.uid} style={{ background: bg }}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={r.selected}
+                          onChange={(e) => patch(r.uid, { selected: e.target.checked })}
+                        />
+                      </td>
+                      <td>
+                        <span className={"chip " + STATUS_CHIP[r.status][0]}>
+                          {STATUS_CHIP[r.status][1]}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="map-cell">
+                          <div style={{ minWidth: 0 }}>
+                            <span className="t-title">
+                              {r.title || "beatmap " + (r.beatmapId ?? "?")}
+                            </span>
+                            <span className="t-diff">
+                              {r.notes.length
+                                ? r.notes[0]
+                                : [r.version ? "[" + r.version + "]" : "", r.mapper]
+                                    .filter(Boolean)
+                                    .join("  " + NONE + "  ") || "metadata will be fetched"}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        {isErr ? <span className="small">{NONE}</span> : (
+                          <select
+                            className="mini"
+                            value={r.mod}
+                            onChange={(e) => patch(r.uid, { mod: e.target.value })}
+                          >
+                            {MODS.concat(MODS.includes(r.mod) ? [] : [r.mod]).map((m) => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td>
+                        {isErr ? <span className="small">{NONE}</span> : (
+                          <select
+                            className="mini"
+                            value={tierByOrder(r.tierOrder)?.name ?? ""}
+                            onChange={(e) => patch(r.uid, { tier: e.target.value })}
+                          >
+                            <option value="">Pick a pack</option>
+                            {TIERS.map((t) => (
+                              <option key={t.slug} value={t.name}>{t.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td>
+                        {isErr ? <span className="small">{NONE}</span> : (
+                          <select
+                            className="mini"
+                            value={r.category}
+                            onChange={(e) => patch(r.uid, { category: e.target.value })}
+                          >
+                            <option value="">Pick a category</option>
+                            {CATEGORIES.concat(
+                              r.category && !CATEGORIES.includes(r.category) ? [r.category] : [],
+                            ).map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td className="num">
+                        {r.stars != null ? r.stars.toFixed(2) + "★" : NONE}
+                      </td>
+                      <td className="num">{r.bpm != null ? Math.round(r.bpm) : NONE}</td>
+                      <td className="trio">
+                        <b>{r.cs ?? NONE}</b> / <b>{r.ar ?? NONE}</b> / <b>{r.od ?? NONE}</b>
+                      </td>
+                      <td className="diffcol">
+                        {norms.length
+                          ? norms.slice(0, 2).map((p, i) => (
+                              <span key={i}>
+                                {i ? "   " : ""}
+                                <s>{p[0]}</s> &rarr; <b>{p[1]}</b>
+                              </span>
+                            ))
+                          : NONE}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="row spread">
+            <span className="small">
+              {ready.length
+                ? ready.length +
+                  " ready to send" +
+                  (blocked ? ", " + blocked + " still need a pack or category" : "")
+                : blocked
+                  ? "Fill in the missing packs and categories to continue."
+                  : "Nothing new here."}
+            </span>
+            <div className="row">
+              <button className="btn" type="button" onClick={() => setRows([])}>
+                Discard
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                disabled={pending || !ready.length}
+                onClick={send}
+              >
+                Send to queue
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Mirrors the server's checks so the preview updates the moment staff change a
+ * dropdown. The server re-validates on import, so this is purely for feel.
+ */
+function revalidate(rows: Row[]): Row[] {
+  const seen = new Set<string>();
+  return rows.map((r) => {
+    if (r.status === "error") return r;
+    const tier = tierByName(r.tier);
+    const notes: string[] = [];
+    if (!tier) notes.push(r.tier ? "Unknown pack: " + r.tier : "Pick a pack");
+    if (!r.category) notes.push("Pick a category");
+
+    const key = r.beatmapId + "|" + r.mod;
+    let status = notes.length ? "attention" : "new";
+    if (r.status === "exists") status = "exists";
+    else if (seen.has(key)) status = "duplicate";
+    seen.add(key);
+
+    return {
+      ...r,
+      tierOrder: tier ? tier.order : null,
+      notes: status === "duplicate" ? ["Same map and mod appears earlier"] : notes,
+      status: status as Row["status"],
+    };
+  });
+}
