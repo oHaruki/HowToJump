@@ -49,7 +49,6 @@ export function MapList({ rows }: { rows: BankRow[] }) {
               <div className="packtile">
                 <span className="packtile-gem" style={{ background: tierFill(tier) }} />
                 <span className="packtile-name">{tier ? tier.name : "unassigned"}</span>
-                {tier ? <span className="packtile-order">#{tier.order}</span> : null}
               </div>
 
               <div className="mapcard-info">
@@ -66,14 +65,12 @@ export function MapList({ rows }: { rows: BankRow[] }) {
                     .filter(Boolean)
                     .join("  " + NONE + "  ")}
                 </span>
-              </div>
 
-              <div className="mapcard-tags">
-                <div className="row-tight">
+                <div className="mapcard-tags">
                   <ModChip mod={m.mod} />
                   <span className="chip">{m.category}</span>
+                  {pacing ? <span className="chip">{pacing}</span> : null}
                 </div>
-                {pacing ? <span className="chip">{pacing}</span> : null}
               </div>
 
               <div className="mapcard-stats">

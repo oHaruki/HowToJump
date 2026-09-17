@@ -632,7 +632,7 @@ footer {
 .mapcard-inner {
   position: relative; z-index: 1;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center; gap: 26px;
   padding: 16px 24px;
   min-height: 108px;
@@ -653,11 +653,6 @@ footer {
   color: var(--text-focus); line-height: 1.2;
   text-shadow: 0 1px 3px var(--main-bg);
 }
-.packtile-order {
-  font-family: var(--font-mono); font-size: var(--font-size-small);
-  color: var(--text-dark); font-variant-numeric: tabular-nums;
-}
-
 .mapcard-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mapcard-title {
   color: var(--text-focus); text-decoration: none;
@@ -672,9 +667,10 @@ footer {
   text-shadow: 0 1px 3px var(--main-bg);
 }
 
+/* Sits under the difficulty name, not in a column of its own. */
 .mapcard-tags {
-  display: flex; flex-direction: column; gap: 6px;
-  align-items: flex-start; flex: none;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: center; margin-top: 3px;
 }
 
 .mapcard-stats { display: flex; gap: 22px; align-items: baseline; flex: none; }
@@ -690,16 +686,15 @@ footer {
   font-size: 18px;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1100px) {
   /* Figures drop to their own row rather than squeezing the title. */
-  .mapcard-inner { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 14px; }
+  .mapcard-inner { grid-template-columns: auto minmax(0, 1fr); row-gap: 14px; }
   .mapcard-stats { grid-column: 1 / -1; justify-content: flex-start; }
   .mapcard-stats > span { text-align: left; }
 }
 @media (max-width: 720px) {
   .mapcard-inner { grid-template-columns: 1fr; justify-items: start; }
   .packtile { flex-direction: row; width: auto; }
-  .mapcard-tags { flex-direction: row; flex-wrap: wrap; }
   .mapcard-stats { flex-wrap: wrap; gap: 8px 18px; }
   .mapcard::after {
     background: linear-gradient(180deg,
