@@ -1,4 +1,6 @@
-import { and, asc, desc, eq, ilike, or, sql as raw } from "drizzle-orm";
+import {
+  and, asc, desc, eq, ilike, notInArray, or, sql as raw,
+} from "drizzle-orm";
 import { db } from "@/lib/db";
 import { beatmaps, entries, scores, suggestions, users } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
@@ -27,7 +29,16 @@ export type BankRow = {
   ar: number | null;
   od: number | null;
   judgedByName: string | null;
+  /** False once staff take an entry off the ladder. Staff surfaces only. */
+  isActive: boolean;
 };
+
+/**
+ * Which side of `isActive` to read. Public pages only ever see "listed";
+ * staff can look at what they have taken off the ladder, which is otherwise
+ * invisible and so unrecoverable.
+ */
+export type BankStatus = "listed" | "removed" | "all";
 
 export type BankFilters = {
   q?: string;
@@ -36,6 +47,28 @@ export type BankFilters = {
   mod?: string;
   length?: string;
   speed?: string;
+  /** Staff only. Defaults to "listed" everywhere else. */
+  status?: BankStatus;
+  /**
+   * Staff only: just the entries whose category is not one the team still
+   * judges. Labels are left alone in the database when the scale is renamed
+   * and fixed as staff touch the rows, so this is the queue of rows that
+   * never got touched.
+   */
+  staleLabels?: boolean;
+};
+
+/** One screen of the bank. Enough to scroll, few enough to stay cheap. */
+export const BANK_PAGE_SIZE = 48;
+
+export type BankPage = {
+  rows: BankRow[];
+  /** Every entry matching the filters, not just the ones on this page. */
+  total: number;
+  /** Clamped into range, so a hand typed page never shows an empty list. */
+  page: number;
+  pageCount: number;
+  pageSize: number;
 };
 
 const bankSelection = {
@@ -59,6 +92,7 @@ const bankSelection = {
   ar: entries.ar,
   od: entries.od,
   judgedByName: entries.judgedByName,
+  isActive: entries.isActive,
 };
 
 function shape(rows: Array<Record<string, unknown>>): BankRow[] {
@@ -68,8 +102,17 @@ function shape(rows: Array<Record<string, unknown>>): BankRow[] {
   })) as BankRow[];
 }
 
-export async function getBank(filters: BankFilters = {}): Promise<BankRow[]> {
-  const where = [eq(entries.isActive, true)];
+/** The active/removed half of a filter set, shared by the count queries. */
+function statusWhere(status: BankStatus = "listed") {
+  if (status === "all") return undefined;
+  return eq(entries.isActive, status !== "removed");
+}
+
+function bankWhere(filters: BankFilters) {
+  const where = [];
+  const status = statusWhere(filters.status);
+  if (status) where.push(status);
+  if (filters.staleLabels) where.push(notInArray(entries.category, CATEGORIES));
   if (filters.pack) where.push(eq(entries.tierOrder, filters.pack));
   if (filters.category) where.push(eq(entries.category, filters.category));
   if (filters.mod) where.push(eq(entries.mod, filters.mod));
@@ -86,24 +129,82 @@ export async function getBank(filters: BankFilters = {}): Promise<BankRow[]> {
       )!,
     );
   }
+  return and(...where);
+}
 
+/*
+ * Hardest pack first, hardest map within it. The entry ID is a tiebreak
+ * rather than a preference: two entries on the same stars would otherwise be
+ * free to swap places between two queries, and a paged list that reorders
+ * under itself shows one of them twice and drops the other.
+ */
+const bankOrder = [desc(entries.tierOrder), desc(entries.stars), desc(entries.id)];
+
+/** The whole filtered bank. Staff screens only; public pages take a page. */
+export async function getBank(filters: BankFilters = {}): Promise<BankRow[]> {
   const rows = await db
     .select(bankSelection)
     .from(entries)
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
-    .where(and(...where))
-    .orderBy(desc(entries.tierOrder), desc(entries.stars))
+    .where(bankWhere(filters))
+    .orderBy(...bankOrder)
     .limit(1000);
 
   return shape(rows);
 }
 
-/** Entry counts per pack, for the ladder grid. */
-export async function getTierCounts(): Promise<Map<number, number>> {
+/**
+ * One page of the bank, plus how many entries the filters match.
+ *
+ * The count comes first because it decides which page is actually being
+ * asked for: a stale link or a hand typed number past the end shows the last
+ * page rather than an empty list, and clamping after fetching would mean
+ * fetching the wrong rows. Both queries are indexed and narrow.
+ */
+export async function getBankPage(
+  filters: BankFilters = {},
+  page = 1,
+): Promise<BankPage> {
+  const where = bankWhere(filters);
+
+  const [counted] = await db
+    .select({ n: raw<number>`count(*)::int` })
+    .from(entries)
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .where(where);
+
+  const total = counted?.n ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / BANK_PAGE_SIZE));
+  const current = Math.min(Math.max(1, Math.trunc(page) || 1), pageCount);
+
+  const rows = total
+    ? await db
+        .select(bankSelection)
+        .from(entries)
+        .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+        .where(where)
+        .orderBy(...bankOrder)
+        .limit(BANK_PAGE_SIZE)
+        .offset((current - 1) * BANK_PAGE_SIZE)
+    : [];
+
+  return {
+    rows: shape(rows),
+    total,
+    page: current,
+    pageCount,
+    pageSize: BANK_PAGE_SIZE,
+  };
+}
+
+/** Entry counts per pack, for the ladder grid and the pack picker. */
+export async function getTierCounts(
+  status: BankStatus = "listed",
+): Promise<Map<number, number>> {
   const rows = await db
     .select({ tierOrder: entries.tierOrder, n: raw<number>`count(*)::int` })
     .from(entries)
-    .where(eq(entries.isActive, true))
+    .where(statusWhere(status))
     .groupBy(entries.tierOrder);
   return new Map(rows.map((r) => [r.tierOrder, r.n]));
 }
@@ -119,17 +220,23 @@ export async function getBankStats() {
   return { total: row?.total ?? 0, hardest: row?.hardest ?? null };
 }
 
-/** Distinct values actually present in the bank, for the filter dropdowns. */
-export async function getFacets() {
+/**
+ * Distinct values actually present in the bank, for the filter dropdowns.
+ *
+ * Distinct in SQL rather than in JS: the four columns are all short scales,
+ * so what comes back is a few dozen combinations however big the bank gets,
+ * where selecting the columns raw shipped one row per entry on every load.
+ */
+export async function getFacets(status: BankStatus = "listed") {
   const rows = await db
-    .select({
+    .selectDistinct({
       category: entries.category,
       mod: entries.mod,
       lengthBucket: entries.lengthBucket,
       speedBucket: entries.speedBucket,
     })
     .from(entries)
-    .where(eq(entries.isActive, true));
+    .where(statusWhere(status));
 
   const uniq = (xs: Array<string | null>) =>
     Array.from(new Set(xs.filter((x): x is string => Boolean(x)))).sort();

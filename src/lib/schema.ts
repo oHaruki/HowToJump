@@ -103,6 +103,15 @@ export const entries = pgTable(
     index("entries_tier_idx").on(t.tierOrder),
     index("entries_category_idx").on(t.category),
     index("entries_active_idx").on(t.isActive),
+    /*
+     * The public bank reads one page at a time, filtered to active rows and
+     * ordered by pack then stars. These three cover that: the sort index so
+     * the page can be read straight off it rather than sorting the whole
+     * bank first, the other two for the dropdowns that narrow it.
+     */
+    index("entries_bank_sort_idx").on(t.isActive, t.tierOrder, t.stars),
+    index("entries_bank_mod_idx").on(t.isActive, t.mod),
+    index("entries_bank_pacing_idx").on(t.isActive, t.lengthBucket, t.speedBucket),
   ],
 );
 

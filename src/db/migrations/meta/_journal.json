@@ -8,6 +8,13 @@
       "when": 1789595492545,
       "tag": "0000_worthless_nick_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789681270586,
+      "tag": "0001_jittery_magik",
+      "breakpoints": true
     }
   ]
 }

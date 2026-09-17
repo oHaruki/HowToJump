@@ -499,6 +499,25 @@ export async function removeEntry(entryId: number) {
   revalidatePath("/ladder");
 }
 
+/**
+ * Puts a removed entry back on the ladder.
+ *
+ * Removing only clears the flag, so the row and its scores were always still
+ * there; until the staff bank could filter to them there was just no way to
+ * reach one again.
+ */
+export async function restoreEntry(entryId: number) {
+  const staff = await requireStaff();
+  await db
+    .update(entries)
+    .set({ isActive: true, updatedAt: new Date() })
+    .where(eq(entries.id, entryId));
+  await record(staff.id, staff.name ?? undefined, "entry.restore", "entry", entryId);
+  revalidatePath("/staff/bank");
+  revalidatePath("/maps");
+  revalidatePath("/ladder");
+}
+
 export async function setUserRole(userId: number, role: "user" | "helper" | "admin") {
   const admin = await requireAdmin();
   if (userId === admin.id && role !== "admin") {

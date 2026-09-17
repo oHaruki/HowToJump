@@ -1,8 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useTransition } from "react";
+import {
+  useCallback, useEffect, useRef, useState, useTransition, type ReactNode,
+} from "react";
 import { PackPicker } from "@/components/PackPicker";
+import { tierBySlug, tierFill } from "@/lib/tiers";
 
 type Current = {
   q: string;
@@ -11,26 +14,79 @@ type Current = {
   mod: string;
   length: string;
   speed: string;
+  /** Staff only, empty on the public bank. */
+  status?: string;
+  stale?: string;
 };
+
+/** The order the chips read in, and the wording each filter gets. */
+const FIELDS: Array<{ key: keyof Current; label: string }> = [
+  { key: "q", label: "Search" },
+  { key: "pack", label: "Pack" },
+  { key: "category", label: "Category" },
+  { key: "mod", label: "Mod" },
+  { key: "length", label: "Length" },
+  { key: "speed", label: "Speed" },
+  { key: "status", label: "Status" },
+  { key: "stale", label: "Flagged" },
+];
+
+/* The staff filters are the only ones whose URL value is a key rather than
+   the words to show, so a chip reads "Removed only" and not "removed". */
+const VALUE_LABELS: Record<string, string> = {
+  removed: "Removed only",
+  all: "All entries",
+  labels: "Stale label",
+};
+
+/*
+ * Search is the only field that flexes. Every dropdown is sized to its own
+ * widest option and refuses to shrink, because a squeezed select shows
+ * "Any mo" with no sign it has been cut; the staff bar carries eight of them
+ * and wraps to a second line instead, where a field that could grow would
+ * stretch across the whole width on its own.
+ */
 
 /**
  * Filters live in the URL so a filtered bank can be linked and shared, and so
  * the server does the filtering rather than shipping the whole bank down.
+ *
+ * The bar sticks below the nav, because the list is now long enough that the
+ * controls would otherwise be a scroll away from whatever you were looking
+ * at. What is applied reads back as a row of chips underneath: six dropdowns
+ * sitting at their placeholder look the same as six with nothing set, so the
+ * chips are the only place that says what is actually narrowing the list, and
+ * each one comes off on its own rather than only all at once.
  */
 export function BankFilters({
+  basePath = "/maps",
   packCounts,
   categories,
   mods,
   lengths,
   speeds,
   current,
+  count,
+  staff,
 }: {
+  /** Which bank this bar filters. The staff one lives at its own route. */
+  basePath?: string;
   packCounts: Record<string, number>;
   categories: string[];
   mods: string[];
   lengths: string[];
   speeds: string[];
   current: Current;
+  /**
+   * How many entries the filters match, kept in view while scrolling.
+   *
+   * A node rather than a number because it comes from the same query as the
+   * list: the page hands over a suspended count so the bar can be on screen
+   * and usable while that query is still running.
+   */
+  count?: ReactNode;
+  /** Adds the two filters only staff have any use for. */
+  staff?: boolean;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -41,36 +97,53 @@ export function BankFilters({
       const next = new URLSearchParams(params.toString());
       if (value) next.set(key, value);
       else next.delete(key);
+      // A narrower list has different pages, so changing a filter starts the
+      // list over rather than landing on a page that no longer exists.
+      next.delete("page");
       startTransition(() => {
-        router.replace(next.toString() ? "/maps?" + next.toString() : "/maps");
+        router.replace(
+          next.toString() ? basePath + "?" + next.toString() : basePath,
+        );
       });
     },
-    [params, router],
+    [params, router, basePath],
   );
 
+  /*
+   * The search box is controlled rather than defaulted: removing its chip or
+   * pressing Clear changes the URL without a keystroke, and an uncontrolled
+   * input would sit there still showing the word that is no longer filtering
+   * anything.
+   */
+  const [draft, setDraft] = useState(current.q);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => setDraft(current.q), [current.q]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const search = (v: string) => {
+    setDraft(v);
+    // Let typing settle before hitting the server.
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setParam("q", v), 300);
+  };
+
+  const applied = FIELDS.filter((f) => current[f.key]);
+
   return (
-    <div className="box box-tight box-open">
+    <div className="bankbar box box-tight box-open">
       <div className="row" style={{ alignItems: "flex-end", opacity: pending ? 0.6 : 1 }}>
-        <label className="field" style={{ flex: "3 1 240px" }}>
+        <label className="field" style={{ flex: "3 1 200px" }}>
           <span className="lbl">Search</span>
           <input
             type="search"
             name="q"
-            defaultValue={current.q}
+            value={draft}
             placeholder="Title, difficulty or mapper"
-            onChange={(e) => {
-              const v = e.target.value;
-              // Let typing settle before hitting the server.
-              window.clearTimeout((window as never as { __htjT?: number }).__htjT);
-              (window as never as { __htjT?: number }).__htjT = window.setTimeout(
-                () => setParam("q", v),
-                300,
-              );
-            }}
+            onChange={(e) => search(e.target.value)}
           />
         </label>
 
-        <label className="field" style={{ flex: "1 1 190px" }}>
+        <label className="field" style={{ flex: "0 0 176px" }}>
           <span className="lbl">Pack</span>
           <PackPicker
             value={current.pack}
@@ -81,29 +154,99 @@ export function BankFilters({
 
         <Select label="Category" value={current.category} placeholder="All categories"
           options={categories.map((c) => ({ value: c, label: c }))}
-          onChange={(v) => setParam("category", v)} flex="1 1 160px" />
+          onChange={(v) => setParam("category", v)} flex="0 0 172px" />
 
         <Select label="Mod" value={current.mod} placeholder="Any mod"
           options={mods.map((m) => ({ value: m, label: m }))}
-          onChange={(v) => setParam("mod", v)} flex="1 1 110px" />
+          onChange={(v) => setParam("mod", v)} flex="0 0 128px" />
 
         <Select label="Length" value={current.length} placeholder="Any length"
           options={lengths.map((l) => ({ value: l, label: l }))}
-          onChange={(v) => setParam("length", v)} flex="1 1 120px" />
+          onChange={(v) => setParam("length", v)} flex="0 0 140px" />
 
         <Select label="Speed" value={current.speed} placeholder="Any speed"
           options={speeds.map((s) => ({ value: s, label: s }))}
-          onChange={(v) => setParam("speed", v)} flex="1 1 120px" />
+          onChange={(v) => setParam("speed", v)} flex="0 0 140px" />
 
-        <button
-          className="btn btn-sm"
-          type="button"
-          onClick={() => startTransition(() => router.replace("/maps"))}
-        >
-          Clear
-        </button>
+        {staff ? (
+          <>
+            <Select label="Status" value={current.status ?? ""} placeholder="Listed"
+              options={[
+                { value: "removed", label: "Removed only" },
+                { value: "all", label: "All entries" },
+              ]}
+              onChange={(v) => setParam("status", v)} flex="0 0 160px" />
+
+            <Select label="Flagged" value={current.stale ?? ""} placeholder="Anything"
+              options={[{ value: "labels", label: "Stale label" }]}
+              onChange={(v) => setParam("stale", v)} flex="0 0 148px" />
+          </>
+        ) : null}
+      </div>
+
+      <div className="bankbar-state">
+        <span className="small">{count}</span>
+
+        {applied.length ? (
+          <div className="fchips">
+            {applied.map((f) => (
+              <FilterChip
+                key={f.key}
+                label={f.label}
+                value={chipValue(f.key, current)}
+                fill={f.key === "pack" ? tierFill(tierBySlug(current.pack)) : undefined}
+                onRemove={() => setParam(f.key, "")}
+              />
+            ))}
+            <button
+              className="fchip-clear"
+              type="button"
+              onClick={() => startTransition(() => router.replace(basePath))}
+            >
+              Clear all
+            </button>
+          </div>
+        ) : (
+          <span className="small">No filters applied</span>
+        )}
       </div>
     </div>
+  );
+}
+
+/** What a chip shows: a pack name, a spelled out staff value, or the word itself. */
+function chipValue(key: keyof Current, current: Current): string {
+  if (key === "pack") return tierBySlug(current.pack)?.name ?? current.pack;
+  const v = current[key] ?? "";
+  return VALUE_LABELS[v] ?? v;
+}
+
+/** One applied filter. The whole chip removes it, so there is no small target. */
+function FilterChip({
+  label,
+  value,
+  fill,
+  onRemove,
+}: {
+  label: string;
+  value: string;
+  fill?: string;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      className="fchip"
+      type="button"
+      aria-label={"Remove the " + label.toLowerCase() + " filter"}
+      onClick={onRemove}
+    >
+      {fill ? <span className="dot" style={{ background: fill }} /> : null}
+      <i>{label}</i>
+      <b>{value}</b>
+      <span className="fchip-x" aria-hidden="true">
+        &times;
+      </span>
+    </button>
   );
 }
 

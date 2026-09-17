@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { removeEntry, updateEntry } from "@/lib/actions";
+import { removeEntry, restoreEntry, updateEntry } from "@/lib/actions";
 import {
   CATEGORIES, LENGTHS, SPEEDS, LENGTH_SCALE, SPEED_SCALE, scaleHint,
   tierByName, tierByOrder, tierBySlug,
@@ -34,6 +34,7 @@ export type BankAdminRow = {
   ar: number | null;
   od: number | null;
   judgedByName: string | null;
+  isActive: boolean;
 };
 
 type Draft = {
@@ -99,6 +100,11 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
               ar={r.ar}
               od={r.od}
               packEditable={isEditing}
+              status={
+                r.isActive ? null : (
+                  <span className="chip warn">Removed</span>
+                )
+              }
               pack={
                 isEditing ? (
                   <PackPicker
@@ -226,13 +232,24 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                     >
                       Edit
                     </button>
-                    <button
-                      className="btn btn-sm btn-no"
-                      type="button"
-                      onClick={() => setConfirming(r.entryId)}
-                    >
-                      Remove
-                    </button>
+                    {r.isActive ? (
+                      <button
+                        className="btn btn-sm btn-no"
+                        type="button"
+                        onClick={() => setConfirming(r.entryId)}
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-sm"
+                        type="button"
+                        disabled={pending}
+                        onClick={() => run(() => restoreEntry(r.entryId))}
+                      >
+                        Restore
+                      </button>
+                    )}
                   </>
                 )
               }
@@ -240,7 +257,9 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
           );
         })}
 
-        {!rows.length ? <p className="small">The ladder is empty.</p> : null}
+        {!rows.length ? (
+          <p className="small">Nothing matches those filters.</p>
+        ) : null}
       </div>
     </>
   );

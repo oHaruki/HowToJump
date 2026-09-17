@@ -58,6 +58,9 @@
   --dur-fast: 80ms;
   --dur: 0.4s;
 
+  /* Shared by the nav itself and by anything that sticks below it. */
+  --nav-height: 64px;
+
   color-scheme: dark;
 }
 
@@ -108,7 +111,7 @@ code { font-family: var(--font-mono); font-size: var(--font-size-mono); }
   backdrop-filter: blur(10px);
   border-bottom: var(--border-width) solid var(--border);
 }
-.nav-in { display: flex; align-items: center; gap: 16px; height: 64px; }
+.nav-in { display: flex; align-items: center; gap: 16px; height: var(--nav-height); }
 .brand {
   display: flex; align-items: center; gap: 9px; flex: none;
   text-decoration: none; color: var(--text-focus);
@@ -587,10 +590,27 @@ footer {
 }
 .mapcard[data-tone="muted"] { opacity: 0.6; }
 
+/* A layer holding the cover, over the pack tinted gradient that shows
+   through where a set has none. Both are dimmed together. */
 .mapcard-art {
   position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover; opacity: 0.5;
+  overflow: hidden; opacity: 0.5;
+  border-radius: inherit; corner-shape: var(--corner-shape);
+  background: var(--art-fill);
+}
+.mapcard-art img {
+  position: relative;
+  width: 100%; height: 100%; object-fit: cover;
+}
+/*
+ * The browser draws its own broken image icon in the corner of an image that
+ * failed, which no selector can match. A pseudo element is only generated
+ * for an image that failed, though, so this is painted over the icon and is
+ * absent whenever the cover actually loaded.
+ */
+.mapcard-art img::after {
+  content: ""; position: absolute; inset: 0;
+  background: var(--art-fill);
 }
 .mapcard::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -640,7 +660,6 @@ footer {
  */
 .mapcard:has(.packgrid-pop) { z-index: 70; }
 .mapcard-inner:has(.packgrid-pop) { z-index: 70; }
-.mapcard-art { border-radius: inherit; corner-shape: var(--corner-shape); }
 
 /* The pack, given the weight it carries in this project. */
 .packtile {
@@ -826,3 +845,162 @@ footer {
 }
 .rotator-dot:hover { background: var(--text); }
 .rotator-dot[data-active="true"] { background: var(--text-focus); transform: scale(1.35); }
+
+/* --------------------------------------------------------------- bank bar */
+
+/*
+ * The filter bar follows the list.
+ *
+ * A paged bank is still a tall page, and the controls used to scroll away
+ * with the first few rows. Sticking below the nav keeps them a click away
+ * wherever you are, and the entry count beside the chips means the size of
+ * what you are looking at is readable without going back to the top.
+ *
+ * The bar sits above the cards but below the nav, so the pack popup drops
+ * over the list while the nav still passes over the bar.
+ */
+.bankbar {
+  position: sticky; top: var(--nav-height); z-index: 30;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.bankbar-state {
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  padding-top: 11px;
+  border-top: var(--border-width) solid var(--border-soft);
+}
+
+/* ------------------------------------------------------- applied filters */
+
+.fchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+/*
+ * Six dropdowns resting on their placeholder look exactly like six with
+ * nothing set, so the chips are what actually says the list is narrowed.
+ * Each is its own button: the whole chip removes that one filter, which is a
+ * target the size of the label rather than of a cross.
+ */
+.fchip {
+  appearance: none; cursor: pointer; font: inherit;
+  display: inline-flex; align-items: center; gap: 0; flex: none;
+  overflow: hidden; padding: 0;
+  font-size: var(--font-size-small);
+  border-radius: var(--control-radius); corner-shape: var(--corner-shape);
+  border: var(--border-width) solid var(--border);
+  background: var(--bg-c); color: var(--text);
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.fchip .dot { margin-left: 8px; }
+.fchip i {
+  font-style: normal; font-family: var(--font-mono);
+  font-size: 11px; color: var(--text-dark);
+  text-transform: uppercase; letter-spacing: var(--letter-label);
+  align-self: stretch; display: inline-flex; align-items: center;
+  padding: 0 7px; background: var(--bg-d);
+  border-right: var(--border-width) solid var(--border);
+}
+/* The dot belongs to the pack, so the key cell starts after it. */
+.fchip:has(.dot) i { margin-left: 8px; }
+.fchip b { font-weight: 400; color: var(--text-focus); padding: 3px 8px; }
+.fchip-x {
+  align-self: stretch; display: inline-flex; align-items: center;
+  padding: 0 8px 1px; font-size: 15px; line-height: 1;
+  color: var(--text-dark);
+  border-left: var(--border-width) solid var(--border);
+}
+.fchip:hover {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-c));
+}
+.fchip:hover .fchip-x { color: var(--danger); }
+
+.fchip-clear {
+  appearance: none; cursor: pointer; font: inherit;
+  font-size: var(--font-size-small); color: var(--text-dark);
+  background: transparent; border: 0; padding: 3px 6px;
+  text-decoration: underline; text-decoration-color: var(--link-underline);
+}
+.fchip-clear:hover { color: var(--text-focus); text-decoration-color: currentColor; }
+
+/* ----------------------------------------------------------------- pager */
+
+.pager {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+}
+.pager-nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pager-page, .pager-step {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 36px; height: 36px; padding: 0 10px;
+  font-family: var(--font-mono); font-size: var(--font-size-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--text); text-decoration: none;
+  background: var(--bg-b);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--control-radius); corner-shape: var(--corner-shape);
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+a.pager-page:hover, a.pager-step:hover {
+  color: var(--text-focus);
+  border-color: color-mix(in srgb, var(--text-focus) 26%, var(--border));
+}
+/* The page you are on, and the ends of the range, are not links. Kept in
+   place rather than dropped, so the row does not shift as you page. */
+.pager-page[aria-current] {
+  color: var(--text-focus); background: var(--bg-d);
+  border-color: color-mix(in srgb, var(--text-focus) 34%, var(--border));
+}
+.pager-step[aria-disabled] { color: var(--text-dark); opacity: 0.45; }
+.pager-gap {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 36px; color: var(--text-dark);
+}
+
+/* --------------------------------------------------------------- loading */
+
+.loading {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 56px 0 48px;
+}
+/* Hugs the image rather than being given a width: the asset is twice the
+   drawn size, so any width stated here would centre the wrapper and leave
+   the figure sitting off to one side of it. */
+.loading-art { position: relative; display: inline-flex; }
+/* Height drives the size and the width follows, so she cannot stretch. */
+.loading-art img {
+  position: relative; z-index: 1;
+  width: auto; height: 92px;
+  animation: jump-bob 1.15s ease-in-out infinite;
+}
+/* A pool of light, not a shadow: the figure is mostly dark hair and a dark
+   uniform, and on this background a dark shape under a dark shape reads as
+   nothing at all. Lifting the page behind her separates the two and doubles
+   as the ground, tightening as she rises so the bob reads as height rather
+   than as a slide. */
+.loading-art::before {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 132px; height: 132px; margin: -66px 0 0 -66px;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--text-focus) 8%, transparent),
+    transparent
+  );
+}
+.loading-art::after {
+  content: ""; position: absolute; left: 50%; bottom: -6px; z-index: 0;
+  width: 54px; height: 9px; margin-left: -27px;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--text-focus) 26%, transparent),
+    transparent
+  );
+  animation: jump-shadow 1.15s ease-in-out infinite;
+}
+@keyframes jump-bob {
+  0%, 100% { transform: translateY(5px); }
+  50% { transform: translateY(-9px); }
+}
+@keyframes jump-shadow {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(0.68); opacity: 0.22; }
+}

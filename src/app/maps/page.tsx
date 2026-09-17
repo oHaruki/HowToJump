@@ -1,13 +1,16 @@
-import { getBank, getFacets, getTierCounts } from "@/lib/queries";
-import { TIERS, tierBySlug } from "@/lib/tiers";
-import { SectionHead } from "@/components/ui";
+import { Suspense } from "react";
+import { getBankPage, getFacets, getTierCounts, type BankPage } from "@/lib/queries";
+import {
+  bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
+} from "@/lib/bank-params";
+import { TIERS } from "@/lib/tiers";
+import { Loading, SectionHead } from "@/components/ui";
 import { MapList } from "@/components/MapList";
 import { BankFilters } from "@/components/BankFilters";
+import { BankPager } from "@/components/BankPager";
+import { BankCount } from "@/components/BankCount";
 
 export const dynamic = "force-dynamic";
-
-type Search = Record<string, string | string[] | undefined>;
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
 export default async function MapsPage({
   searchParams,
@@ -15,23 +18,23 @@ export default async function MapsPage({
   searchParams: Promise<Search>;
 }) {
   const sp = await searchParams;
-  const packSlug = one(sp.pack);
-  const pack = packSlug ? tierBySlug(packSlug) : null;
+  const query = bankQueryFrom(sp);
+  const page = bankPageFrom(sp);
 
-  const filters = {
-    q: one(sp.q) || undefined,
-    pack: pack?.order,
-    category: one(sp.category) || undefined,
-    mod: one(sp.mod) || undefined,
-    length: one(sp.length) || undefined,
-    speed: one(sp.speed) || undefined,
-  };
+  /*
+   * Started, deliberately not awaited.
+   *
+   * This is the expensive one: it reads the rows, and the forty eight cards
+   * it produces are most of what the page weighs. Handing the promise to a
+   * suspended child instead of awaiting it here means the heading and the
+   * filter bar are sent immediately and are usable while the rows are still
+   * being fetched, rather than the whole page waiting on them.
+   */
+  const bank = getBankPage(bankFiltersFrom(sp), page);
 
-  const [rows, facets, tierCounts] = await Promise.all([
-    getBank(filters),
-    getFacets(),
-    getTierCounts(),
-  ]);
+  // These two are aggregates over one table, and the bar cannot be drawn
+  // without them, so they are worth waiting for.
+  const [facets, tierCounts] = await Promise.all([getFacets(), getTierCounts()]);
 
   // Counts keyed by slug, so the picker can show how full each pack is.
   const packCounts: Record<string, number> = {};
@@ -50,21 +53,31 @@ export default async function MapsPage({
         mods={facets.mods}
         lengths={facets.lengths}
         speeds={facets.speeds}
-        current={{
-          q: one(sp.q),
-          pack: packSlug,
-          category: one(sp.category),
-          mod: one(sp.mod),
-          length: one(sp.length),
-          speed: one(sp.speed),
-        }}
+        current={bankCurrentFrom(sp)}
+        count={<Suspense fallback="…"><BankCount bank={bank} /></Suspense>}
       />
 
-      <MapList rows={rows} />
-
-      <p className="small">
-        {rows.length} {rows.length === 1 ? "entry" : "entries"}
-      </p>
+      {/* Keyed on the filters, so changing one shows the wait again rather
+          than leaving the previous page's maps sitting there. */}
+      <Suspense key={query + "#" + page} fallback={<Loading label="Loading maps" />}>
+        <Maps bank={bank} query={query} />
+      </Suspense>
     </div>
+  );
+}
+
+async function Maps({ bank, query }: { bank: Promise<BankPage>; query: string }) {
+  const b = await bank;
+  return (
+    <>
+      <MapList rows={b.rows} />
+      <BankPager
+        page={b.page}
+        pageCount={b.pageCount}
+        total={b.total}
+        pageSize={b.pageSize}
+        query={query}
+      />
+    </>
   );
 }

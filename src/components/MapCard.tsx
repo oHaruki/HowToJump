@@ -1,5 +1,4 @@
-import type { ReactNode } from "react";
-import { Cover } from "@/components/Cover";
+import type { CSSProperties, ReactNode } from "react";
 import { NONE } from "@/components/ui";
 import { tierByOrder, tierFill } from "@/lib/tiers";
 
@@ -68,13 +67,7 @@ export function MapCard({
 
   return (
     <article className="mapcard" data-tone={tone ?? ""}>
-      <Cover
-        setId={osuBeatmapsetId}
-        kind="cover"
-        tierOrder={tierOrder}
-        className="mapcard-art"
-        label={false}
-      />
+      <CardArt setId={osuBeatmapsetId} tierOrder={tierOrder} />
 
       <div className="mapcard-inner">
         {leading ? <div className="mapcard-lead">{leading}</div> : null}
@@ -128,6 +121,52 @@ export function MapCard({
         {actions ? <div className="mapcard-actions">{actions}</div> : null}
       </div>
     </article>
+  );
+}
+
+/**
+ * The art behind a card: a pack tinted gradient with the cover over it.
+ *
+ * osu! serves every set from a predictable URL, but old sets genuinely have
+ * no cover uploaded and 404 there, and nothing in the metadata says which.
+ * The gradient is painted underneath rather than swapped in, so a 404 just
+ * leaves it showing.
+ *
+ * Doing it this way, instead of with Cover's onError, fixes the case that
+ * matters and drops the client component. An image that 404s does so while
+ * the page is still loading, before React has attached anything, so the
+ * error never reaches a handler: the fallback only ever fired for a set with
+ * no ID at all, and a real 404 sat there showing the browser's broken image
+ * icon. The gradient under a failed image needs no JavaScript, and a bank
+ * page is forty eight cards that no longer wait on hydration to look right.
+ */
+function CardArt({
+  setId,
+  tierOrder,
+}: {
+  setId: number | null;
+  tierOrder: number | null;
+}) {
+  const tier = tierByOrder(tierOrder);
+  // Read by the layer and by the patch over a broken image, so one value
+  // cannot drift from the other.
+  const fill =
+    "linear-gradient(120deg, color-mix(in srgb, " +
+    (tier ? tier.color : "#777") +
+    " 26%, var(--bg-d)), var(--bg-d))";
+
+  return (
+    <div className="mapcard-art" style={{ "--art-fill": fill } as CSSProperties}>
+      {setId ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={"https://assets.ppy.sh/beatmaps/" + setId + "/covers/cover.jpg"}
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
+      ) : null}
+    </div>
   );
 }
 
