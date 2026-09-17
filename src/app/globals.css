@@ -601,9 +601,9 @@ footer {
 /* ------------------------------------------------------------- map cards */
 
 /*
- * The public bank card: cover art fills the whole card and fades out to the
- * right, so the figures sit on solid ground while the map still reads as
- * itself. The old layout left most of the width empty.
+ * Four bands across the card: the pack, the map, what it is banked as, and
+ * the figures. Cover art fills the whole card behind them, dimmed, and goes
+ * fully solid at the right so the figures stay crisp.
  */
 .mapcard {
   position: relative; overflow: hidden;
@@ -611,7 +611,6 @@ footer {
   border: var(--border-width) solid var(--border);
   border-radius: var(--surface-radius); corner-shape: var(--corner-shape);
   box-shadow: var(--box-shadow);
-  min-height: 118px;
   transition: border-color var(--dur-fast);
 }
 .mapcard:hover { border-color: color-mix(in srgb, var(--text-focus) 22%, var(--border)); }
@@ -619,36 +618,51 @@ footer {
 .mapcard-art {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
-  object-fit: cover;
-  opacity: 0.85;
+  object-fit: cover; opacity: 0.5;
 }
-/* The fade. Transparent over the art, solid where the figures begin. */
 .mapcard::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background:
-    linear-gradient(90deg,
-      color-mix(in srgb, var(--bg-b) 18%, transparent) 0%,
-      color-mix(in srgb, var(--bg-b) 62%, transparent) 26%,
-      color-mix(in srgb, var(--bg-b) 92%, transparent) 46%,
-      var(--bg-b) 60%),
-    linear-gradient(0deg,
-      color-mix(in srgb, var(--bg-b) 55%, transparent) 0%,
-      transparent 45%);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--bg-b) 62%, transparent) 0%,
+    color-mix(in srgb, var(--bg-b) 34%, transparent) 26%,
+    color-mix(in srgb, var(--bg-b) 78%, transparent) 60%,
+    var(--bg-b) 90%);
 }
 
 .mapcard-inner {
   position: relative; z-index: 1;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center; gap: 28px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center; gap: 26px;
   padding: 16px 24px;
-  min-height: 118px;
+  min-height: 108px;
 }
-.mapcard-info { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+
+/* The pack, given the weight it carries in this project. */
+.packtile {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; width: 104px; flex: none; text-align: center;
+}
+.packtile-gem {
+  width: 46px; height: 46px;
+  border-radius: 13px; corner-shape: var(--corner-shape);
+  outline: var(--border-width) solid var(--scrim);
+  box-shadow: 0 2px 12px var(--scrim);
+}
+.packtile-name {
+  color: var(--text-focus); line-height: 1.2;
+  text-shadow: 0 1px 3px var(--main-bg);
+}
+.packtile-order {
+  font-family: var(--font-mono); font-size: var(--font-size-small);
+  color: var(--text-dark); font-variant-numeric: tabular-nums;
+}
+
+.mapcard-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mapcard-title {
   color: var(--text-focus); text-decoration: none;
   font-size: var(--h3-size); line-height: 1.25; font-weight: 600;
   display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  /* Sits over the art at the left, so it carries its own contrast. */
   text-shadow: 0 1px 3px var(--main-bg), 0 0 14px var(--main-bg);
 }
 .mapcard-title:hover { text-decoration: underline; }
@@ -657,6 +671,12 @@ footer {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 0 1px 3px var(--main-bg);
 }
+
+.mapcard-tags {
+  display: flex; flex-direction: column; gap: 6px;
+  align-items: flex-start; flex: none;
+}
+
 .mapcard-stats { display: flex; gap: 22px; align-items: baseline; flex: none; }
 .mapcard-stats > span { display: flex; flex-direction: column; gap: 1px; text-align: right; }
 .mapcard-stats i {
@@ -670,14 +690,21 @@ footer {
   font-size: 18px;
 }
 
-@media (max-width: 1000px) {
-  .mapcard-inner { grid-template-columns: 1fr; gap: 14px; }
-  .mapcard-stats { flex-wrap: wrap; gap: 8px 18px; }
+@media (max-width: 1280px) {
+  /* Figures drop to their own row rather than squeezing the title. */
+  .mapcard-inner { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 14px; }
+  .mapcard-stats { grid-column: 1 / -1; justify-content: flex-start; }
   .mapcard-stats > span { text-align: left; }
+}
+@media (max-width: 720px) {
+  .mapcard-inner { grid-template-columns: 1fr; justify-items: start; }
+  .packtile { flex-direction: row; width: auto; }
+  .mapcard-tags { flex-direction: row; flex-wrap: wrap; }
+  .mapcard-stats { flex-wrap: wrap; gap: 8px 18px; }
   .mapcard::after {
     background: linear-gradient(180deg,
-      color-mix(in srgb, var(--bg-b) 30%, transparent) 0%,
-      color-mix(in srgb, var(--bg-b) 88%, transparent) 40%,
-      var(--bg-b) 70%);
+      color-mix(in srgb, var(--bg-b) 40%, transparent) 0%,
+      color-mix(in srgb, var(--bg-b) 88%, transparent) 45%,
+      var(--bg-b) 75%);
   }
 }

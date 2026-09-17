@@ -1,5 +1,6 @@
 import { Cover } from "@/components/Cover";
-import { ModChip, NONE, TierChip } from "@/components/ui";
+import { ModChip, NONE } from "@/components/ui";
+import { tierByOrder, tierFill } from "@/lib/tiers";
 import type { BankRow } from "@/lib/queries";
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -14,9 +15,9 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 /**
  * The bank, one card per entry.
  *
- * Cover art fills the card and fades out to the right, so the map reads as
- * itself while the figures sit on solid ground. Title and chips take the left,
- * figures the right, which is what fills the width a table could not.
+ * Four bands across: the pack, the map, what it is banked as, and the
+ * figures. Cover art fills the card behind all of it and goes solid at the
+ * right so the numbers stay readable.
  */
 export function MapList({ rows }: { rows: BankRow[] }) {
   if (!rows.length) {
@@ -26,9 +27,14 @@ export function MapList({ rows }: { rows: BankRow[] }) {
   return (
     <div className="review-list">
       {rows.map((m) => {
+        const tier = tierByOrder(m.tierOrder);
         const url = m.osuBeatmapsetId
           ? "https://osu.ppy.sh/beatmapsets/" + m.osuBeatmapsetId + "#osu/" + m.osuBeatmapId
           : "https://osu.ppy.sh/b/" + m.osuBeatmapId;
+        const pacing = [m.lengthBucket, m.speedBucket]
+          .filter(Boolean)
+          .join(" " + NONE + " ");
+
         return (
           <article className="mapcard" key={m.entryId}>
             <Cover
@@ -40,6 +46,12 @@ export function MapList({ rows }: { rows: BankRow[] }) {
             />
 
             <div className="mapcard-inner">
+              <div className="packtile">
+                <span className="packtile-gem" style={{ background: tierFill(tier) }} />
+                <span className="packtile-name">{tier ? tier.name : "unassigned"}</span>
+                {tier ? <span className="packtile-order">#{tier.order}</span> : null}
+              </div>
+
               <div className="mapcard-info">
                 <a
                   className="mapcard-title"
@@ -54,18 +66,14 @@ export function MapList({ rows }: { rows: BankRow[] }) {
                     .filter(Boolean)
                     .join("  " + NONE + "  ")}
                 </span>
+              </div>
+
+              <div className="mapcard-tags">
                 <div className="row-tight">
-                  <TierChip tier={m.tierOrder} />
                   <ModChip mod={m.mod} />
                   <span className="chip">{m.category}</span>
-                  {m.lengthBucket || m.speedBucket ? (
-                    <span className="chip">
-                      {[m.lengthBucket, m.speedBucket]
-                        .filter(Boolean)
-                        .join(" " + NONE + " ")}
-                    </span>
-                  ) : null}
                 </div>
+                {pacing ? <span className="chip">{pacing}</span> : null}
               </div>
 
               <div className="mapcard-stats">
