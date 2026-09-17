@@ -39,11 +39,10 @@ export const TIERS: Tier[] = [
     order: 16,
     name: "GOAT",
     slug: "goat",
-    color: "#e6e6e6",
-    // Translucent rather than a colour of its own, so whatever sits behind
-    // it shows through.
+    color: "#c7e9e4",
+    // The iridescent fill this ladder used to give pack 13.
     gradient:
-      "linear-gradient(140deg, rgba(255,255,255,0.58), rgba(255,255,255,0.10))",
+      "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",
   },
 ];
 
