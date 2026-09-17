@@ -14,8 +14,8 @@ export default function InfoPage() {
           <span className="lbl">Grading</span>
           <h2>One number decides it</h2>
           <p className="lede">
-            Your grade comes from your misscount and nothing else. Combo beats
-            misscount: hold it and you take SS, drop nothing at all and it is SSS.
+            Your grade comes from your misscount, with two exceptions at the top:
+            hold the combo and you take SS, and a 100% takes SSS.
             Thresholds are stored as data, so staff retune them without a deploy.
           </p>
         </div>

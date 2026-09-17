@@ -25,7 +25,7 @@ const miss = (
 });
 
 export const GRADE_RULES: GradeRule[] = [
-  { grade: "SSS", sortOrder: 1, label: "Perfect combo", minMiss: null, maxMiss: null, requiresFc: false, requiresPerfect: true },
+  { grade: "SSS", sortOrder: 1, label: "100%", minMiss: null, maxMiss: null, requiresFc: false, requiresPerfect: true },
   { grade: "SS", sortOrder: 2, label: "Full combo", minMiss: null, maxMiss: null, requiresFc: true, requiresPerfect: false },
   miss("S", 3, "0 miss", 0, 0),
   miss("A+", 4, "1 miss", 1, 1),
@@ -51,7 +51,11 @@ export type PlayShape = {
   isPerfect: boolean;
 };
 
-/** Combo beats misscount: a perfect run is SSS, a full combo is SS. */
+/**
+ * The top two grades are not about misses: a 100% is SSS and a full combo is
+ * SS. `requiresPerfect` is the flag for the first of those, named for the
+ * column it seeds; what it means is the run osu! ranks X.
+ */
 export function gradeFor(play: PlayShape, rules: GradeRule[] = GRADE_RULES): string {
   const sorted = rules.slice().sort((a, b) => a.sortOrder - b.sortOrder);
   if (play.isPerfect) {
