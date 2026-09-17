@@ -388,20 +388,99 @@ export async function setSuggestionTier(id: number, tierName: string) {
 
 /* ------------------------------------------------------------- bank admin */
 
-export async function moveEntryTier(entryId: number, tierName: string) {
+/**
+ * Edits everything staff assign on a banked entry.
+ *
+ * Changing the mod is the interesting case: it changes what the entry *is*,
+ * so the figures are recalculated from the beatmap's nomod values and the
+ * star rating is re-fetched. It can also collide, because a beatmap and mod
+ * pair is unique, so that is checked before anything is written.
+ */
+export async function updateEntry(
+  entryId: number,
+  patch: {
+    tier?: string;
+    category?: string;
+    mod?: string;
+    length?: string;
+    speed?: string;
+  },
+) {
   const staff = await requireStaff();
-  const t = tierByName(tierName);
-  if (!t) return;
-  await db
-    .update(entries)
-    .set({ tierOrder: t.order, updatedAt: new Date() })
+
+  const [current] = await db
+    .select({
+      id: entries.id,
+      beatmapId: entries.beatmapId,
+      mod: entries.mod,
+      osuBeatmapId: beatmaps.osuBeatmapId,
+      baseCs: beatmaps.cs,
+      baseAr: beatmaps.ar,
+      baseOd: beatmaps.od,
+      baseBpm: beatmaps.bpm,
+      baseDrain: beatmaps.drainSeconds,
+    })
+    .from(entries)
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
     .where(eq(entries.id, entryId));
-  await record(staff.id, staff.name ?? undefined, "entry.move", "entry", entryId, {
-    tier: t.name,
-  });
+  if (!current) throw new Error("That entry no longer exists");
+
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+
+  if (patch.tier) {
+    const t = tierByName(patch.tier);
+    if (!t) throw new Error("Unknown pack: " + patch.tier);
+    set.tierOrder = t.order;
+  }
+  if (patch.category) set.category = patch.category;
+  if (patch.length !== undefined) set.lengthBucket = patch.length || null;
+  if (patch.speed !== undefined) set.speedBucket = patch.speed || null;
+
+  const nextMod = patch.mod ? normalizeMod(patch.mod) : null;
+  if (nextMod && nextMod !== current.mod) {
+    const clash = await db.query.entries.findFirst({
+      where: and(eq(entries.beatmapId, current.beatmapId), eq(entries.mod, nextMod)),
+    });
+    if (clash) throw new Error("This map is already on the ladder under " + nextMod);
+
+    const adjusted = applyMod(
+      {
+        cs: current.baseCs,
+        ar: current.baseAr,
+        od: current.baseOd,
+        bpm: current.baseBpm,
+        drainSeconds: current.baseDrain,
+      },
+      nextMod,
+    );
+    set.mod = nextMod;
+    set.cs = adjusted.cs;
+    set.ar = adjusted.ar;
+    set.od = adjusted.od;
+    set.bpm = adjusted.bpm;
+    set.drainSeconds = adjusted.drainSeconds;
+
+    // Star rating needs osu!'s calculator, so it is asked for rather than derived.
+    try {
+      const sr = await fetchStarRating(current.osuBeatmapId, modAcronyms(nextMod));
+      if (sr != null) set.stars = sr;
+    } catch {
+      // Keep the previous rating rather than blanking it.
+    }
+
+    // Pacing follows the new length unless staff set it in the same edit.
+    if (patch.length === undefined) {
+      set.lengthBucket = lengthBucketFor(adjusted.drainSeconds) || null;
+    }
+  }
+
+  await db.update(entries).set(set).where(eq(entries.id, entryId));
+  await record(staff.id, staff.name ?? undefined, "entry.update", "entry", entryId, patch);
+
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
+  revalidatePath("/");
 }
 
 export async function removeEntry(entryId: number) {

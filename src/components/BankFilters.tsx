@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
+import { PackPicker } from "@/components/PackPicker";
 
 type Current = {
   q: string;
@@ -17,14 +18,14 @@ type Current = {
  * the server does the filtering rather than shipping the whole bank down.
  */
 export function BankFilters({
-  packs,
+  packCounts,
   categories,
   mods,
   lengths,
   speeds,
   current,
 }: {
-  packs: Array<{ slug: string; name: string }>;
+  packCounts: Record<string, number>;
   categories: string[];
   mods: string[];
   lengths: string[];
@@ -69,9 +70,14 @@ export function BankFilters({
           />
         </label>
 
-        <Select label="Pack" value={current.pack} placeholder="All packs"
-          options={packs.map((p) => ({ value: p.slug, label: p.name }))}
-          onChange={(v) => setParam("pack", v)} flex="1 1 140px" />
+        <label className="field" style={{ flex: "1 1 190px" }}>
+          <span className="lbl">Pack</span>
+          <PackPicker
+            value={current.pack}
+            counts={packCounts}
+            onChange={(v) => setParam("pack", v)}
+          />
+        </label>
 
         <Select label="Category" value={current.category} placeholder="All categories"
           options={categories.map((c) => ({ value: c, label: c }))}

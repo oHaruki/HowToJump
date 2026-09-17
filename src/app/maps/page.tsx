@@ -1,4 +1,4 @@
-import { getBank, getFacets } from "@/lib/queries";
+import { getBank, getFacets, getTierCounts } from "@/lib/queries";
 import { TIERS, tierBySlug } from "@/lib/tiers";
 import { SectionHead } from "@/components/ui";
 import { MapList } from "@/components/MapList";
@@ -27,7 +27,15 @@ export default async function MapsPage({
     speed: one(sp.speed) || undefined,
   };
 
-  const [rows, facets] = await Promise.all([getBank(filters), getFacets()]);
+  const [rows, facets, tierCounts] = await Promise.all([
+    getBank(filters),
+    getFacets(),
+    getTierCounts(),
+  ]);
+
+  // Counts keyed by slug, so the picker can show how full each pack is.
+  const packCounts: Record<string, number> = {};
+  for (const t of TIERS) packCounts[t.slug] = tierCounts.get(t.order) ?? 0;
 
   return (
     <div className="view">
@@ -37,7 +45,7 @@ export default async function MapsPage({
       </SectionHead>
 
       <BankFilters
-        packs={TIERS.map((t) => ({ slug: t.slug, name: t.name }))}
+        packCounts={packCounts}
         categories={facets.categories}
         mods={facets.mods}
         lengths={facets.lengths}
