@@ -46,6 +46,7 @@ export function MapList({ rows }: { rows: BankRow[] }) {
             />
 
             <div className="mapcard-inner">
+              <div className="mapcard-left">
               <div className="packtile">
                 <span className="packtile-gem" style={{ background: tierFill(tier) }} />
                 <span className="packtile-name">{tier ? tier.name : "unassigned"}</span>
@@ -65,12 +66,13 @@ export function MapList({ rows }: { rows: BankRow[] }) {
                     .filter(Boolean)
                     .join("  " + NONE + "  ")}
                 </span>
+              </div>
 
-                <div className="mapcard-tags">
-                  <ModChip mod={m.mod} />
-                  <span className="chip">{m.category}</span>
-                  {pacing ? <span className="chip">{pacing}</span> : null}
-                </div>
+              <div className="mapcard-tags">
+                <ModChip mod={m.mod} />
+                <span className="chip">{m.category}</span>
+                {pacing ? <span className="chip">{pacing}</span> : null}
+              </div>
               </div>
 
               <div className="mapcard-stats">

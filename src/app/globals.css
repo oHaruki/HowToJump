@@ -631,11 +631,19 @@ footer {
 
 .mapcard-inner {
   position: relative; z-index: 1;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center; gap: 26px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 26px;
   padding: 16px 24px;
   min-height: 108px;
+}
+/*
+ * Pack, map and chips travel together on the left. The title takes only the
+ * width it needs so the chips sit right beside it, and the empty space falls
+ * between that group and the figures instead of inside it.
+ */
+.mapcard-left {
+  display: flex; align-items: center; gap: 24px;
+  min-width: 0; flex: 1 1 auto;
 }
 
 /* The pack, given the weight it carries in this project. */
@@ -653,7 +661,10 @@ footer {
   color: var(--text-focus); line-height: 1.2;
   text-shadow: 0 1px 3px var(--main-bg);
 }
-.mapcard-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mapcard-info {
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 0; flex: 0 1 auto;
+}
 .mapcard-title {
   color: var(--text-focus); text-decoration: none;
   font-size: var(--h3-size); line-height: 1.25; font-weight: 600;
@@ -667,10 +678,10 @@ footer {
   text-shadow: 0 1px 3px var(--main-bg);
 }
 
-/* Sits under the difficulty name, not in a column of its own. */
+/* Beside the map, not beneath it. */
 .mapcard-tags {
   display: flex; flex-wrap: wrap; gap: 6px;
-  align-items: center; margin-top: 3px;
+  align-items: center; flex: none; max-width: 280px;
 }
 
 .mapcard-stats { display: flex; gap: 22px; align-items: baseline; flex: none; }
@@ -688,12 +699,13 @@ footer {
 
 @media (max-width: 1100px) {
   /* Figures drop to their own row rather than squeezing the title. */
-  .mapcard-inner { grid-template-columns: auto minmax(0, 1fr); row-gap: 14px; }
-  .mapcard-stats { grid-column: 1 / -1; justify-content: flex-start; }
+  .mapcard-inner { flex-wrap: wrap; row-gap: 14px; }
+  .mapcard-left { flex: 1 1 100%; }
+  .mapcard-stats { justify-content: flex-start; }
   .mapcard-stats > span { text-align: left; }
 }
 @media (max-width: 720px) {
-  .mapcard-inner { grid-template-columns: 1fr; justify-items: start; }
+  .mapcard-left { flex-wrap: wrap; gap: 14px; }
   .packtile { flex-direction: row; width: auto; }
   .mapcard-stats { flex-wrap: wrap; gap: 8px 18px; }
   .mapcard::after {
