@@ -49,7 +49,7 @@ export function BankFilters({
   );
 
   return (
-    <div className="box box-tight">
+    <div className="box box-tight box-open">
       <div className="row" style={{ alignItems: "flex-end", opacity: pending ? 0.6 : 1 }}>
         <label className="field" style={{ flex: "3 1 240px" }}>
           <span className="lbl">Search</span>

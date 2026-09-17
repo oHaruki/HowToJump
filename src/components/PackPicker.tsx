@@ -56,7 +56,7 @@ export function PackPicker({
         {selected ? (
           <span className="dot" style={{ background: tierFill(selected) }} />
         ) : null}
-        <span>{selected ? selected.name : "All packs"}</span>
+        <span className="packpick-label">{selected ? selected.name : "All packs"}</span>
         <span className="caret" aria-hidden="true" />
       </button>
 
