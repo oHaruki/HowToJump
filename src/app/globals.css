@@ -212,9 +212,17 @@ input[type="checkbox"] { accent-color: var(--text-focus); width: 15px; height: 1
 .box > * { position: relative; z-index: 1; }
 .box-tight { padding: 16px 18px; }
 /*
- * A box holding a popup cannot clip its own contents, and has to sit above
- * whatever follows it on the page.
+ * A box holding an open popup cannot clip its own contents, and has to sit
+ * above whatever follows it. Driven by :has so it applies wherever a picker
+ * is dropped in, rather than needing a class at every call site.
+ *
+ * .box > * is given position and z-index for the texture layer, which makes
+ * every child its own stacking context; the one holding the popup has to be
+ * raised too, or later siblings paint over it.
  */
+.box:has(.packgrid-pop) { overflow: visible; z-index: 40; }
+.box > *:has(.packgrid-pop) { z-index: 50; }
+/* Kept for boxes that should never clip, popup open or not. */
 .box-open { overflow: visible; z-index: 30; }
 
 /* ---------------------------------------------------------------- layout */

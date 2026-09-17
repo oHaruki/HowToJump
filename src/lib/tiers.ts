@@ -8,41 +8,50 @@ export type Tier = {
   slug: string;
   color: string;
   gradient?: string;
+  /** Former names, so older spreadsheet rows still resolve. */
+  aliases?: string[];
 };
 
 export const TIERS: Tier[] = [
-  { order: 1, name: "Stone", slug: "stone", color: "#8C8C8C" },
-  { order: 2, name: "Copper", slug: "copper", color: "#B87333" },
-  { order: 3, name: "Iron", slug: "iron", color: "#A8A9AD" },
-  { order: 4, name: "Bronze", slug: "bronze", color: "#CD7F32" },
-  { order: 5, name: "Silver", slug: "silver", color: "#C0C0C0" },
-  { order: 6, name: "Gold", slug: "gold", color: "#FFD24A" },
+  { order: 1, name: "Stone", slug: "stone", color: "#777777" },
+  { order: 2, name: "Copper", slug: "copper", color: "#d25907" },
+  { order: 3, name: "Iron", slug: "iron", color: "#555a5c" },
+  { order: 4, name: "Bronze", slug: "bronze", color: "#783f04" },
+  { order: 5, name: "Silver", slug: "silver", color: "#c0c0c0" },
+  { order: 6, name: "Gold", slug: "gold", color: "#f0d959" },
   { order: 7, name: "Platinum", slug: "platinum", color: "#E5E4E2" },
-  { order: 8, name: "Titanium", slug: "titanium", color: "#7C8A99" },
-  { order: 9, name: "Topaz", slug: "topaz", color: "#FFC24B" },
-  { order: 10, name: "Ruby", slug: "ruby", color: "#E0115F" },
-  { order: 11, name: "Sapphire", slug: "sapphire", color: "#2F6FE0" },
-  { order: 12, name: "Emerald", slug: "emerald", color: "#4FC978" },
+  { order: 8, name: "Titanium", slug: "titanium", color: "#708a99" },
+  { order: 9, name: "Topaz", slug: "topaz", color: "#ffb84d" },
+  { order: 10, name: "Ruby", slug: "ruby", color: "#d21f3c" },
+  { order: 11, name: "Sapphire", slug: "sapphire", color: "#5fa6ff" },
+  { order: 12, name: "Emerald", slug: "emerald", color: "#4ef399" },
   {
     order: 13,
-    name: "Opal",
-    slug: "opal",
-    color: "#9FE2D0",
-    gradient: "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",
+    name: "Rhodonite",
+    slug: "rhodonite",
+    color: "#f19bc2",
+    // The sheet still calls this pack Opal, so pasted rows keep resolving.
+    aliases: ["Opal"],
   },
-  { order: 14, name: "Amethyst", slug: "amethyst", color: "#9B6BD6" },
-  { order: 15, name: "Diamond", slug: "diamond", color: "#8FE3F5" },
+  { order: 14, name: "Amethyst", slug: "amethyst", color: "#8e44ad" },
+  { order: 15, name: "Diamond", slug: "diamond", color: "#a2f0ff" },
   {
     order: 16,
     name: "GOAT",
     slug: "goat",
-    color: "#FFD700",
+    color: "#e6e6e6",
+    // Translucent rather than a colour of its own, so whatever sits behind
+    // it shows through.
     gradient:
-      "conic-gradient(from 140deg,#FFD700,#E0115F,#9B6BD6,#2F6FE0,#4FC978,#FFD700)",
+      "linear-gradient(140deg, rgba(255,255,255,0.58), rgba(255,255,255,0.10))",
   },
 ];
 
-const byLower = new Map(TIERS.map((t) => [t.name.toLowerCase(), t]));
+const byLower = new Map<string, Tier>();
+for (const t of TIERS) {
+  byLower.set(t.name.toLowerCase(), t);
+  for (const a of t.aliases ?? []) byLower.set(a.toLowerCase(), t);
+}
 const bySlug = new Map(TIERS.map((t) => [t.slug, t]));
 const byOrder = new Map(TIERS.map((t) => [t.order, t]));
 
