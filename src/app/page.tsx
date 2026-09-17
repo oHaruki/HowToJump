@@ -19,6 +19,15 @@ export default async function OverviewPage() {
     <div className="view">
       <div className="hero">
         <div className="hero-copy">
+          {/* Decorative only, so it is hidden from assistive tech. */}
+          <img
+            className="hero-art"
+            src="/hero-render.webp"
+            alt=""
+            aria-hidden="true"
+            width={691}
+            height={900}
+          />
           <span className="lbl">osu! aim progression</span>
           <h1>Sixteen packs. Stone to GOAT.</h1>
           <p className="lede">

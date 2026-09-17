@@ -59,7 +59,12 @@ export default async function RootLayout({
 
         <footer className="wrap">
           <div className="row spread">
-            <span>HowToJump</span>
+            <span>
+              HowToJump
+              <span className="small" style={{ marginLeft: 10 }}>
+                art by MeiQuing
+              </span>
+            </span>
             <span>
               <a href="https://osu.ppy.sh" target="_blank" rel="noopener noreferrer">
                 osu!
