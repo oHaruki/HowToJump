@@ -294,6 +294,21 @@ main { padding-block: 34px 64px; }
 .chip-tier { color: var(--text-focus); }
 .chip-mod { font-family: var(--font-mono); letter-spacing: 0.03em; color: var(--text-focus); background: var(--bg-d); }
 .chip-mod[data-nm="true"] { color: var(--text-dark); background: var(--bg-c); }
+/* Length and speed read as words, not numbers, so each has to say which one
+   it is. The key sits in a recessed cell with a rule between: the site is
+   monochrome, so the split has to be structural rather than another shade. */
+.chip-keyed { gap: 0; padding: 0; overflow: hidden; }
+.chip-keyed i {
+  font-style: normal; font-family: var(--font-mono);
+  font-size: 11px; color: var(--text-dark);
+  text-transform: uppercase; letter-spacing: var(--letter-label);
+  align-self: stretch; display: inline-flex; align-items: center;
+  padding: 0 7px; background: var(--bg-d);
+  border-right: var(--border-width) solid var(--border);
+}
+.chip-keyed b {
+  font-weight: 400; color: var(--text-focus); padding: 3px 9px;
+}
 .chip.ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 32%, var(--border)); background: color-mix(in srgb, var(--success) 9%, var(--bg-c)); }
 .chip.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 32%, var(--border)); background: color-mix(in srgb, var(--warning) 9%, var(--bg-c)); }
 .chip.bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, var(--border)); background: color-mix(in srgb, var(--danger) 9%, var(--bg-c)); }
@@ -663,6 +678,10 @@ footer {
   display: flex; flex-wrap: wrap; gap: 6px;
   align-items: center; flex: none; max-width: 340px;
 }
+/* Length and speed always travel together on their own line. A basis of 100%
+   cannot share a row, so the break happens whatever the words are wide, and
+   every card ends up the same shape. */
+.mapcard-tags .pacing { display: flex; gap: 6px; flex: 1 0 100%; }
 
 .mapcard-stats { display: flex; gap: 22px; align-items: baseline; flex: none; }
 .mapcard-stats > span { display: flex; flex-direction: column; gap: 1px; text-align: right; }

@@ -12,6 +12,10 @@ import {
   normalizations, num, parsePaste, secondsToDrain, splitLine, splitTitle,
 } from "./parse";
 import { normalizeMod, modsFromApi } from "../mods";
+import {
+  CATEGORIES, LENGTHS, SPEEDS, isCategory, normalizeCategory, normalizeLength,
+  normalizeSpeed, orderByScale,
+} from "../tiers";
 import { gradeFor } from "../grading";
 import {
   applyMod, arToPreempt, preemptToAr, odToWindow, windowToOd,
@@ -169,7 +173,9 @@ test("normalisations are reported so staff can see what changed", () => {
   const { rows } = parsePaste(HEADER + "\n" + ROW_LUNATICON);
   const norms = normalizations(rows[0]);
   assert.ok(norms.some(([from, to]) => from === "9,92" && to === "9.92"));
-  assert.ok(norms.some(([from, to]) => from === "3:10" && to === "190s"));
+  // Drain time is stored in seconds too, but that conversion is bookkeeping
+  // and is not something staff are asked to check.
+  assert.ok(!norms.some(([from]) => from === "3:10"));
 });
 
 test("mod strings resolve to one canonical form", () => {
@@ -276,6 +282,7 @@ test("AR and OD conversions round trip", () => {
 });
 
 test("length buckets match how the sheet already classifies its maps", () => {
+  assert.equal(lengthBucketFor(45), "Cut Ver.");  // under a minute
   assert.equal(lengthBucketFor(66), "TV Size");   // Firestarter 1:06
   assert.equal(lengthBucketFor(80), "TV Size");   // Bonfire 1:20
   assert.equal(lengthBucketFor(118), "Medium");   // FOSSIL 1:58
@@ -286,11 +293,102 @@ test("length buckets match how the sheet already classifies its maps", () => {
   assert.equal(lengthBucketFor(null), "");
 });
 
+test("a pacing boundary belongs to the longer, faster bucket", () => {
+  assert.equal(lengthBucketFor(59), "Cut Ver.");
+  assert.equal(lengthBucketFor(60), "TV Size");   // 1:00
+  assert.equal(lengthBucketFor(89), "TV Size");
+  assert.equal(lengthBucketFor(90), "Medium");    // 1:30
+  assert.equal(lengthBucketFor(179), "Medium");
+  assert.equal(lengthBucketFor(180), "Long");     // 3:00
+  assert.equal(lengthBucketFor(299), "Long");
+  assert.equal(lengthBucketFor(300), "Marathon"); // 5:00
+});
+
+test("speed buckets follow the BPM scale", () => {
+  assert.equal(speedGuessFor(169), "Very low");
+  assert.equal(speedGuessFor(170), "Low");
+  assert.equal(speedGuessFor(199), "Low");
+  assert.equal(speedGuessFor(200), "Medium");
+  assert.equal(speedGuessFor(214), "Medium");
+  assert.equal(speedGuessFor(239), "Medium");
+  assert.equal(speedGuessFor(240), "High");
+  assert.equal(speedGuessFor(255), "High");
+  assert.equal(speedGuessFor(279), "High");
+  assert.equal(speedGuessFor(280), "Very high");
+  assert.equal(speedGuessFor(319), "Very high");
+  assert.equal(speedGuessFor(320), "Extreme");
+  assert.equal(speedGuessFor(360), "Extreme");
+  assert.equal(speedGuessFor(361), "Extreme+");
+  assert.equal(speedGuessFor(null), "");
+});
+
 test("speed is only ever a suggestion", () => {
   // The sheet marks 132 BPM maps as High because density, not tempo, decides
-  // it. The guess cannot know that, which is why staff can always override.
-  assert.equal(speedGuessFor(132), "Low");
-  assert.equal(speedGuessFor(214), "Medium");
-  assert.equal(speedGuessFor(255), "High");
-  assert.equal(speedGuessFor(null), "");
+  // it. The guess only sees BPM, so it says Very low and staff override it.
+  assert.equal(speedGuessFor(132), "Very low");
+});
+
+test("pacing labels resolve to one spelling", () => {
+  // The scale renamed Short to Cut Ver., so older sheet rows still land.
+  assert.equal(normalizeLength("Short"), "Cut Ver.");
+  assert.equal(normalizeLength("cut ver."), "Cut Ver.");
+  assert.equal(normalizeLength("tv size"), "TV Size");
+  assert.equal(normalizeLength("TV Size"), "TV Size");
+  assert.equal(normalizeLength(""), "");
+  assert.equal(normalizeSpeed("very high"), "Very high");
+  assert.equal(normalizeSpeed("v high"), "Very high");
+  assert.equal(normalizeSpeed("extreme"), "Extreme");
+  // The plus has to survive the match, or Extreme+ collapses into Extreme.
+  assert.equal(normalizeSpeed("extreme+"), "Extreme+");
+  // Anything off the scale is kept as pasted rather than silently reworded.
+  assert.equal(normalizeSpeed("Ludicrous"), "Ludicrous");
+});
+
+test("renamed categories resolve, dropped ones ask to be judged again", () => {
+  // The sheet's own wording, from before the list was rewritten.
+  assert.equal(normalizeCategory("Raw Aim"), "Aim - raw mechanic");
+  assert.equal(normalizeCategory("Consistency Aim"), "Aim - consistency");
+  assert.equal(normalizeCategory("anti-aim"), "Anti-aim");
+  assert.equal(normalizeCategory("Aim Control"), "Aim control");
+  assert.equal(normalizeCategory("Precision"), "Precision");
+  assert.equal(normalizeCategory(""), "");
+  // Flow Aim and Speed are gone, and folding them into a surviving category
+  // would be judging the map rather than reading the sheet.
+  assert.equal(normalizeCategory("Flow Aim"), "Flow Aim");
+  assert.ok(!isCategory("Flow Aim"));
+  assert.ok(!isCategory("Speed"));
+  assert.ok(isCategory("Raw Aim"));
+});
+
+test("a paste carrying a dropped category is held back", () => {
+  const dropped = ROW_LUNATICON.split(T);
+  dropped[1] = "Flow Aim";
+  const { rows } = parsePaste(HEADER + "\n" + dropped.join(T));
+  assert.equal(rows[0].status, "attention");
+  assert.match(rows[0].notes[0], /unknown category/i);
+
+  // The same row on the new list sails through.
+  const { rows: ok } = parsePaste(HEADER + "\n" + ROW_LUNATICON);
+  assert.equal(ok[0].category, "Aim - raw mechanic");
+  assert.equal(ok[0].status, "new");
+});
+
+test("filters read along their list, not the alphabet", () => {
+  assert.deepEqual(
+    orderByScale(["Medium", "Extreme+", "Very low", "High"], SPEEDS),
+    ["Very low", "Medium", "High", "Extreme+"],
+  );
+  assert.deepEqual(
+    orderByScale(["Marathon", "Medium", "Cut Ver."], LENGTHS),
+    ["Cut Ver.", "Medium", "Marathon"],
+  );
+  assert.deepEqual(
+    orderByScale(["Precision", "Anti-aim", "Aim - consistency"], CATEGORIES),
+    ["Aim - consistency", "Anti-aim", "Precision"],
+  );
+  // A label from an older list is not lost, it just sorts last.
+  assert.deepEqual(
+    orderByScale(["Flow Aim", "Precision"], CATEGORIES),
+    ["Precision", "Flow Aim"],
+  );
 });

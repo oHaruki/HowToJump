@@ -73,13 +73,138 @@ export function tierFill(t: Tier | null): string {
   return t.gradient ?? t.color;
 }
 
+/**
+ * The skills a map is judged on, as the grading team lists them. Flow Aim and
+ * Speed were dropped when Anti-aim and Aim control were added, so an entry
+ * still carrying one of those needs judging again rather than a rename.
+ */
 export const CATEGORIES = [
-  "Raw Aim",
-  "Consistency Aim",
-  "Flow Aim",
+  "Aim - consistency",
+  "Aim - raw mechanic",
+  "Anti-aim",
+  "Aim control",
   "Precision",
-  "Speed",
 ];
 
-export const LENGTHS = ["TV Size", "Short", "Medium", "Long", "Marathon"];
-export const SPEEDS = ["Low", "Medium", "High"];
+/* ------------------------------------------------------------ pacing scales */
+
+/**
+ * Length by drain time and speed by BPM, as the grading scale defines them.
+ *
+ * `upTo` is the highest value the bucket still covers, so a boundary belongs
+ * to the longer or faster bucket: 1:00 is TV Size rather than Cut Ver., and
+ * 170 BPM is Low rather than Very low. Keeping the bounds next to the names
+ * means the dropdowns and the auto fill cannot drift apart.
+ */
+export type Bucket = { name: string; upTo: number; range: string };
+
+export const LENGTH_SCALE: Bucket[] = [
+  { name: "Cut Ver.", upTo: 59, range: "0:30 - 1:00" },
+  { name: "TV Size", upTo: 89, range: "1:00 - 1:30" },
+  { name: "Medium", upTo: 179, range: "1:30 - 3:00" },
+  { name: "Long", upTo: 299, range: "3:00 - 5:00" },
+  { name: "Marathon", upTo: Infinity, range: "5:00+" },
+];
+
+export const SPEED_SCALE: Bucket[] = [
+  { name: "Very low", upTo: 169, range: "below 170" },
+  { name: "Low", upTo: 199, range: "170 - 199" },
+  { name: "Medium", upTo: 239, range: "200 - 239" },
+  { name: "High", upTo: 279, range: "240 - 279" },
+  { name: "Very high", upTo: 319, range: "280 - 319" },
+  { name: "Extreme", upTo: 360, range: "320 - 360" },
+  { name: "Extreme+", upTo: Infinity, range: "above 360" },
+];
+
+export const LENGTHS = LENGTH_SCALE.map((b) => b.name);
+export const SPEEDS = SPEED_SCALE.map((b) => b.name);
+
+/** One line spelling out the whole scale, for a dropdown's hover text. */
+export function scaleHint(scale: Bucket[], unit: string): string {
+  return unit + ": " + scale.map((b) => b.name + " " + b.range).join(", ");
+}
+
+/** The bucket a measured value falls in. */
+export function bucketFor(scale: Bucket[], v: number): string {
+  const rounded = Math.round(v);
+  for (const b of scale) if (rounded <= b.upTo) return b.name;
+  return scale[scale.length - 1].name;
+}
+
+/* Pasted cells arrive in whatever spelling the sheet used, and the scale has
+   been renamed before ("Short" is now "Cut Ver."), so both resolve to one
+   canonical label. A plus sign survives the key, or Extreme+ and Extreme
+   would collide. */
+const bucketKey = (s: string) =>
+  String(s ?? "").toLowerCase().replace(/[^a-z0-9+]/g, "");
+
+const LENGTH_ALIASES: Record<string, string> = {
+  short: "Cut Ver.", cut: "Cut Ver.", cutver: "Cut Ver.", cutversion: "Cut Ver.",
+  tv: "TV Size", tvsize: "TV Size", tvver: "TV Size",
+  normal: "Medium", med: "Medium",
+  extended: "Long",
+  marathon: "Marathon",
+};
+
+const SPEED_ALIASES: Record<string, string> = {
+  vlow: "Very low", verylow: "Very low",
+  vhigh: "Very high", veryhigh: "Very high",
+  extremeplus: "Extreme+", extremep: "Extreme+",
+};
+
+function canonical(
+  names: string[],
+  aliases: Record<string, string>,
+  input: string | null | undefined,
+): string {
+  const k = bucketKey(input ?? "");
+  if (!k) return "";
+  const hit = names.find((n) => bucketKey(n) === k);
+  if (hit) return hit;
+  // Anything unrecognised is kept verbatim, so a paste is never silently reworded.
+  return aliases[k] ?? String(input).trim();
+}
+
+export function normalizeLength(input: string | null | undefined): string {
+  return canonical(LENGTHS, LENGTH_ALIASES, input);
+}
+export function normalizeSpeed(input: string | null | undefined): string {
+  return canonical(SPEEDS, SPEED_ALIASES, input);
+}
+
+/* Two categories were only renamed, so older rows resolve to the new wording.
+   The two that were dropped are deliberately absent: silently folding them
+   into a surviving category would be a judgement call, not a rename. */
+const CATEGORY_ALIASES: Record<string, string> = {
+  rawaim: "Aim - raw mechanic",
+  rawmechanic: "Aim - raw mechanic",
+  rawmech: "Aim - raw mechanic",
+  consistencyaim: "Aim - consistency",
+  consistency: "Aim - consistency",
+  control: "Aim control",
+};
+
+export function normalizeCategory(input: string | null | undefined): string {
+  return canonical(CATEGORIES, CATEGORY_ALIASES, input);
+}
+
+/** Whether a category is one the grading team still judges on. */
+export function isCategory(input: string | null | undefined): boolean {
+  return CATEGORIES.includes(normalizeCategory(input));
+}
+
+/**
+ * Orders values the way the list they come from does rather than
+ * alphabetically, so a filter reads Very low to Extreme+ instead of Extreme
+ * to Very low. Values from outside the list sort last, keeping their own
+ * order, since those are the ones that need a staff eye.
+ */
+export function orderByScale(values: string[], order: string[]): string[] {
+  const rank = new Map(order.map((n, i) => [n, i]));
+  return values
+    .slice()
+    .sort(
+      (a, b) =>
+        (rank.get(a) ?? 99) - (rank.get(b) ?? 99) || a.localeCompare(b),
+    );
+}

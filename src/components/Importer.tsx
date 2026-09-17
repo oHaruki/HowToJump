@@ -9,9 +9,11 @@ import { normalizations, secondsToDrain } from "@/lib/import/parse";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   TIERS, tierByName, tierByOrder, tierBySlug, CATEGORIES, LENGTHS, SPEEDS,
+  LENGTH_SCALE, SPEED_SCALE, isCategory, scaleHint,
 } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
 import { MapCard } from "@/components/MapCard";
+import { PickSelect } from "@/components/ui";
 import { PackPicker } from "@/components/PackPicker";
 
 type Row = PreviewRow & { selected: boolean };
@@ -21,6 +23,9 @@ const PLACEHOLDER_LINKS = [
   "https://osu.ppy.sh/beatmapsets/2377969#osu/5137765",
   "5309916",
 ];
+
+const LENGTH_HINT = scaleHint(LENGTH_SCALE, "Drain time");
+const SPEED_HINT = scaleHint(SPEED_SCALE, "BPM");
 
 const STATUS_CHIP: Record<string, [string, string]> = {
   new: ["ok", "Ready"],
@@ -302,13 +307,14 @@ export function Importer() {
               <PackPicker
                 value={tierByName(linkTier)?.slug ?? ""}
                 placeholder="Pick a pack"
+                allowClear={false}
                 onChange={(slug) => setLinkTier(tierBySlug(slug)?.name ?? "")}
               />
             </label>
             <label className="field" style={{ flex: "1 1 170px" }}>
               <span className="lbl">Category</span>
               <select value={linkCat} onChange={(e) => setLinkCat(e.target.value)}>
-                <option value="">Pick a category</option>
+                <option value="" disabled>Pick a category</option>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -383,7 +389,7 @@ export function Importer() {
               value=""
               onChange={(e) => { if (e.target.value) bulk({ category: e.target.value }); }}
             >
-              <option value="">Set category</option>
+              <option value="" disabled>Set category</option>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
             <select
@@ -399,7 +405,7 @@ export function Importer() {
                 e.target.value = "";
               }}
             >
-              <option value="">Set mod</option>
+              <option value="" disabled>Set mod</option>
               {MODS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
             <select
@@ -407,7 +413,7 @@ export function Importer() {
               value=""
               onChange={(e) => { if (e.target.value) bulk({ length: e.target.value }); }}
             >
-              <option value="">Set length</option>
+              <option value="" disabled>Set length</option>
               {LENGTHS.map((l) => <option key={l} value={l}>{l}</option>)}
             </select>
             <select
@@ -415,7 +421,7 @@ export function Importer() {
               value=""
               onChange={(e) => { if (e.target.value) bulk({ speed: e.target.value }); }}
             >
-              <option value="">Set speed</option>
+              <option value="" disabled>Set speed</option>
               {SPEEDS.map((sp) => <option key={sp} value={sp}>{sp}</option>)}
             </select>
             <button
@@ -469,6 +475,8 @@ export function Importer() {
                     isErr ? undefined : (
                       <PackPicker
                         value={tierByOrder(r.tierOrder)?.slug ?? ""}
+                        placeholder="Pick a pack"
+                        allowClear={false}
                         onChange={(slug) => {
                           const t = tierBySlug(slug);
                           patch(r.uid, { tier: t ? t.name : "" });
@@ -488,34 +496,26 @@ export function Importer() {
                             <option key={m} value={m}>{m}</option>
                           ))}
                         </select>
-                        <select
-                          className="mini"
+                        <PickSelect
                           value={r.category}
-                          onChange={(e) => patch(r.uid, { category: e.target.value })}
-                        >
-                          <option value="">Pick a category</option>
-                          {CATEGORIES.concat(
-                            r.category && !CATEGORIES.includes(r.category) ? [r.category] : [],
-                          ).map((c) => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                        <select
-                          className="mini"
+                          options={CATEGORIES}
+                          placeholder="Pick a category"
+                          onChange={(v) => patch(r.uid, { category: v })}
+                        />
+                        <PickSelect
                           value={r.length}
-                          onChange={(e) => patch(r.uid, { length: e.target.value })}
-                        >
-                          <option value="">Length</option>
-                          {LENGTHS.map((l) => <option key={l} value={l}>{l}</option>)}
-                        </select>
-                        <select
-                          className="mini"
+                          options={LENGTHS}
+                          placeholder="Length"
+                          hint={LENGTH_HINT}
+                          onChange={(v) => patch(r.uid, { length: v })}
+                        />
+                        <PickSelect
                           value={r.speed}
-                          onChange={(e) => patch(r.uid, { speed: e.target.value })}
-                        >
-                          <option value="">Speed</option>
-                          {SPEEDS.map((sp) => <option key={sp} value={sp}>{sp}</option>)}
-                        </select>
+                          options={SPEEDS}
+                          placeholder="Speed"
+                          hint={SPEED_HINT}
+                          onChange={(v) => patch(r.uid, { speed: v })}
+                        />
                         {norms.length ? (
                           <span className="diffcol">
                             {norms.slice(0, 2).map((pair, i) => (
@@ -581,6 +581,7 @@ function revalidate(rows: Row[]): Row[] {
     const notes: string[] = [];
     if (!tier) notes.push(r.tier ? "Unknown pack: " + r.tier : "Pick a pack");
     if (!r.category) notes.push("Pick a category");
+    else if (!isCategory(r.category)) notes.push("Unknown category: " + r.category);
 
     const key = r.beatmapId + "|" + r.mod;
     let status = notes.length ? "attention" : "new";

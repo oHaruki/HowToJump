@@ -3,11 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { removeEntry, updateEntry } from "@/lib/actions";
-import { CATEGORIES, LENGTHS, SPEEDS, tierByName, tierByOrder, tierBySlug } from "@/lib/tiers";
+import {
+  CATEGORIES, LENGTHS, SPEEDS, LENGTH_SCALE, SPEED_SCALE, scaleHint,
+  tierByName, tierByOrder, tierBySlug,
+} from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
-import { ModChip, NONE } from "@/components/ui";
+import { ModChip, PacingChips, PickSelect } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
+
+const LENGTH_HINT = scaleHint(LENGTH_SCALE, "Drain time");
+const SPEED_HINT = scaleHint(SPEED_SCALE, "BPM");
 
 export type BankAdminRow = {
   entryId: number;
@@ -76,9 +82,6 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
       <div className="review-list">
         {rows.map((r) => {
           const isEditing = editing === r.entryId && draft !== null;
-          const pacing = [r.lengthBucket, r.speedBucket]
-            .filter(Boolean)
-            .join(" " + NONE + " ");
 
           return (
             <MapCard
@@ -100,6 +103,8 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                 isEditing ? (
                   <PackPicker
                     value={tierByName(draft.tier)?.slug ?? ""}
+                    placeholder="Pick a pack"
+                    allowClear={false}
                     onChange={(slug) => {
                       const t = tierBySlug(slug);
                       if (t) setDraft({ ...draft, tier: t.name });
@@ -122,38 +127,29 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <select
-                      className="mini"
+                    <PickSelect
                       value={draft.category}
+                      options={CATEGORIES}
+                      placeholder="Pick a category"
                       disabled={pending}
-                      onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                    >
-                      {CATEGORIES.concat(
-                        draft.category && !CATEGORIES.includes(draft.category)
-                          ? [draft.category]
-                          : [],
-                      ).map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="mini"
+                      onChange={(v) => setDraft({ ...draft, category: v })}
+                    />
+                    <PickSelect
                       value={draft.length}
+                      options={LENGTHS}
+                      placeholder="Length"
+                      hint={LENGTH_HINT}
                       disabled={pending}
-                      onChange={(e) => setDraft({ ...draft, length: e.target.value })}
-                    >
-                      <option value="">Length</option>
-                      {LENGTHS.map((l) => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                    <select
-                      className="mini"
+                      onChange={(v) => setDraft({ ...draft, length: v })}
+                    />
+                    <PickSelect
                       value={draft.speed}
+                      options={SPEEDS}
+                      placeholder="Speed"
+                      hint={SPEED_HINT}
                       disabled={pending}
-                      onChange={(e) => setDraft({ ...draft, speed: e.target.value })}
-                    >
-                      <option value="">Speed</option>
-                      {SPEEDS.map((sp) => <option key={sp} value={sp}>{sp}</option>)}
-                    </select>
+                      onChange={(v) => setDraft({ ...draft, speed: v })}
+                    />
                     {draft.mod !== r.mod ? (
                       <span className="small">Mod change recalculates the figures</span>
                     ) : null}
@@ -162,7 +158,7 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                   <>
                     <ModChip mod={r.mod} />
                     <span className="chip">{r.category}</span>
-                    {pacing ? <span className="chip">{pacing}</span> : null}
+                    <PacingChips length={r.lengthBucket} speed={r.speedBucket} />
                     {r.judgedByName ? (
                       <span className="small">by {r.judgedByName}</span>
                     ) : null}

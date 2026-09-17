@@ -13,7 +13,9 @@ import {
 } from "@/lib/osu/client";
 import { syncUser } from "@/lib/osu/sync";
 import { modAcronyms, normalizeMod } from "@/lib/mods";
-import { tierByName } from "@/lib/tiers";
+import {
+  CATEGORIES, normalizeCategory, normalizeLength, normalizeSpeed, tierByName,
+} from "@/lib/tiers";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
@@ -237,9 +239,9 @@ export async function importRows(
       mapper: r.mapper,
       mod: normalizeMod(r.mod),
       proposedTierOrder: r.tierOrder,
-      proposedCategory: r.category,
-      proposedLength: r.length || null,
-      proposedSpeed: r.speed || null,
+      proposedCategory: normalizeCategory(r.category),
+      proposedLength: normalizeLength(r.length) || null,
+      proposedSpeed: normalizeSpeed(r.speed) || null,
       stars: r.stars ?? null,
       bpm: r.bpm ?? null,
       drainSeconds: r.drainSeconds ?? null,
@@ -323,7 +325,9 @@ export async function approveSuggestions(ids: number[]) {
         beatmapId: beatmapRowId,
         mod: normalizeMod(s.mod),
         tierOrder: s.proposedTierOrder,
-        category: s.proposedCategory ?? "Raw Aim",
+        // The importer will not send a row without one, so this only stands in
+        // for a suggestion that somehow arrived with the field empty.
+        category: normalizeCategory(s.proposedCategory) || CATEGORIES[0],
         lengthBucket: s.proposedLength,
         speedBucket: s.proposedSpeed,
         stars: s.stars,
@@ -432,9 +436,9 @@ export async function updateEntry(
     if (!t) throw new Error("Unknown pack: " + patch.tier);
     set.tierOrder = t.order;
   }
-  if (patch.category) set.category = patch.category;
-  if (patch.length !== undefined) set.lengthBucket = patch.length || null;
-  if (patch.speed !== undefined) set.speedBucket = patch.speed || null;
+  if (patch.category) set.category = normalizeCategory(patch.category);
+  if (patch.length !== undefined) set.lengthBucket = normalizeLength(patch.length) || null;
+  if (patch.speed !== undefined) set.speedBucket = normalizeSpeed(patch.speed) || null;
 
   const nextMod = patch.mod ? normalizeMod(patch.mod) : null;
   if (nextMod && nextMod !== current.mod) {

@@ -30,6 +30,97 @@ export function ModChip({ mod }: { mod: string }) {
   );
 }
 
+/**
+ * Length and speed, one chip each.
+ *
+ * Both are graded words rather than numbers, so a single "Long - Medium" cell
+ * left no way to tell which of them was the time and which the tempo. Each
+ * now carries its own chip, and the key sits in a recessed cell of its own:
+ * styling them alike and trusting the words to carry the difference did not
+ * work, since a dim label and a bright value still read as one phrase.
+ *
+ * The pair also takes a line of its own, rather than wrapping wherever the
+ * mod and category happen to run out of room. A long title or a long category
+ * used to decide whether a card showed one row of chips or two, which left
+ * the list ragged; now every card reads the same way.
+ *
+ * The two keys are the only wording here, so renaming them is a one line job.
+ */
+export function PacingChips({
+  length,
+  speed,
+}: {
+  length: string | null;
+  speed: string | null;
+}) {
+  if (!length && !speed) return null;
+  return (
+    <span className="pacing">
+      {length ? <KeyedChip label="Length" value={length} /> : null}
+      {speed ? <KeyedChip label="Speed" value={speed} /> : null}
+    </span>
+  );
+}
+
+function KeyedChip({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="chip chip-keyed">
+      <i>{label}</i>
+      <b>{value}</b>
+    </span>
+  );
+}
+
+/**
+ * A dropdown whose first line is a label, not a choice.
+ *
+ * Pack, category, length and speed all have to end up with a real value, so
+ * "Pick a category" is there to say the field is still empty rather than to
+ * be selected; picking it would only undo the field. Disabling it leaves it
+ * visible while nothing is set and takes it out of the list once something is.
+ *
+ * A value the scale does not know, such as a label the sheet used before it
+ * was renamed, stays in the list so opening the dropdown cannot silently
+ * rewrite it.
+ */
+export function PickSelect({
+  value,
+  options,
+  placeholder,
+  onChange,
+  disabled,
+  hint,
+}: {
+  value: string;
+  options: string[];
+  placeholder: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  /** Hover text, used to spell out what the buckets mean. */
+  hint?: string;
+}) {
+  const all = value && !options.includes(value) ? options.concat(value) : options;
+  return (
+    <select
+      className="mini"
+      value={value}
+      disabled={disabled}
+      title={hint}
+      aria-label={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {all.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function GradeBadge({ grade }: { grade: string }) {
   return <span className="grade-badge">{grade}</span>;
 }

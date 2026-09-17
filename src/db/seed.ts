@@ -13,7 +13,9 @@ import { db, sql } from "@/lib/db";
 import { beatmaps, entries, gradeRules, siteConfig } from "@/lib/schema";
 import { GRADE_RULES } from "@/lib/grading";
 import { normalizeMod } from "@/lib/mods";
-import { tierByName } from "@/lib/tiers";
+import {
+  normalizeCategory, normalizeLength, normalizeSpeed, tierByName,
+} from "@/lib/tiers";
 import { drainToSeconds, num } from "@/lib/import/parse";
 import { fetchBeatmaps, type BeatmapFacts } from "@/lib/osu/client";
 
@@ -120,9 +122,9 @@ async function main() {
         beatmapId: bm.id,
         mod: normalizeMod(row[COL.mod]),
         tierOrder: tier.order,
-        category: row[COL.category],
-        lengthBucket: row[COL.length],
-        speedBucket: row[COL.speed],
+        category: normalizeCategory(row[COL.category]),
+        lengthBucket: normalizeLength(row[COL.length]),
+        speedBucket: normalizeSpeed(row[COL.speed]),
         // The sheet's numbers are mod adjusted, so they win over the nomod API values.
         stars: num(row[COL.stars]),
         bpm: num(row[COL.bpm]),

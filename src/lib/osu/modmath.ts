@@ -10,6 +10,8 @@
  * comes from the osu! API rather than from anything here.
  */
 
+import { bucketFor, LENGTH_SCALE, SPEED_SCALE } from "@/lib/tiers";
+
 export type Diff = {
   cs: number | null;
   ar: number | null;
@@ -95,28 +97,24 @@ export function applyMod(base: Diff, mod: string): Diff {
 /* ------------------------------------------------------------- pacing */
 
 /**
- * Length bucket from drain time. The boundaries come from how the sheet
- * already classifies its own maps: 1:06 and 1:20 are TV Size, 1:58 and 2:12
- * are Medium, and 3:10 upwards is Long.
+ * Length bucket from drain time, on the scale in `LENGTH_SCALE`: under a
+ * minute is a Cut Ver., up to 1:30 TV Size, up to 3:00 Medium, up to 5:00
+ * Long, and anything past that a Marathon. A map shorter than the 0:30 the
+ * scale starts at has nowhere else to go, so it counts as a Cut Ver. too.
  */
 export function lengthBucketFor(drainSeconds: number | null | undefined): string {
   if (drainSeconds == null) return "";
-  if (drainSeconds < 95) return "TV Size";
-  if (drainSeconds < 180) return "Medium";
-  if (drainSeconds < 300) return "Long";
-  return "Marathon";
+  return bucketFor(LENGTH_SCALE, drainSeconds);
 }
 
 /**
  * A suggestion only, never applied silently.
  *
- * BPM alone cannot decide this: the sheet marks two 132 BPM maps as High,
- * because what matters is note density rather than the song's tempo. Staff
- * pick the real value, this just gives the dropdown a sensible starting point.
+ * The scale reads BPM, which is all this can see, but what staff are grading
+ * is note density: the sheet marks two 132 BPM maps as High. So this gives
+ * the dropdown a sensible starting point and staff pick the real value.
  */
 export function speedGuessFor(bpm: number | null | undefined): string {
   if (bpm == null) return "";
-  if (bpm < 170) return "Low";
-  if (bpm < 220) return "Medium";
-  return "High";
+  return bucketFor(SPEED_SCALE, bpm);
 }

@@ -1,5 +1,8 @@
 import { normalizeMod } from "@/lib/mods";
-import { tierByName, type Tier } from "@/lib/tiers";
+import {
+  isCategory, normalizeCategory, normalizeLength, normalizeSpeed, tierByName,
+  type Tier,
+} from "@/lib/tiers";
 
 /**
  * Reads what staff paste: a range copied out of Google Sheets (which lands on
@@ -240,9 +243,9 @@ function rowFromCells(cells: string[], order: Array<string | null>): ParsedRow {
     title: t.title,
     version: t.version,
     mapper: g.mapper ?? "",
-    category: g.category ?? "",
-    length: g.length ?? "",
-    speed: g.speed ?? "",
+    category: normalizeCategory(g.category),
+    length: normalizeLength(g.length),
+    speed: normalizeSpeed(g.speed),
     mod: normalizeMod(g.mod),
     stars: num(g.stars),
     bpm: num(g.bpm),
@@ -269,6 +272,9 @@ function finish(r: ParsedRow): ParsedRow {
 export function recheck(r: ParsedRow): ParsedRow {
   r.notes = [];
   r.mod = normalizeMod(r.mod);
+  r.category = normalizeCategory(r.category);
+  r.length = normalizeLength(r.length);
+  r.speed = normalizeSpeed(r.speed);
   r.tierObj = tierByName(r.tier);
 
   if (!r.beatmapId) {
@@ -283,7 +289,13 @@ export function recheck(r: ParsedRow): ParsedRow {
   if (!r.tierObj) {
     r.notes.push(r.tier ? "Unknown pack: " + r.tier : "Pick a pack");
   }
-  if (!r.category) r.notes.push("Pick a category");
+  if (!r.category) {
+    r.notes.push("Pick a category");
+  } else if (!isCategory(r.category)) {
+    // A category that is no longer judged on has to be picked again rather
+    // than ridden back onto the ladder by a paste.
+    r.notes.push("Unknown category: " + r.category);
+  }
   r.status = r.notes.length ? "attention" : "new";
   return r;
 }
@@ -319,7 +331,11 @@ export function classify(rows: ParsedRow[], existingKeys: Set<string>): ParsedRo
   return rows;
 }
 
-/** Which normalisations fired, so staff can see the paste was read correctly. */
+/**
+ * Which normalisations fired, so staff can see the paste was read correctly.
+ * Only the figures staff read off the card count. Drain time is converted to
+ * seconds for storage as well, but that is bookkeeping and stays out of sight.
+ */
 export function normalizations(r: ParsedRow): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   const pairs: Array<[string, number | null]> = [
@@ -332,6 +348,5 @@ export function normalizations(r: ParsedRow): Array<[string, string]> {
     const raw = r.raw[pair[0]];
     if (raw && raw.includes(",")) out.push([raw, String(pair[1])]);
   }
-  if (r.drainSeconds != null && r.drain) out.push([r.drain, r.drainSeconds + "s"]);
   return out;
 }

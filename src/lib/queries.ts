@@ -2,6 +2,7 @@ import { and, asc, desc, eq, ilike, or, sql as raw } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { beatmaps, entries, scores, suggestions, users } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
+import { CATEGORIES, LENGTHS, SPEEDS, orderByScale } from "@/lib/tiers";
 
 /** One row of the map bank, flattened for display. */
 export type BankRow = {
@@ -133,11 +134,14 @@ export async function getFacets() {
   const uniq = (xs: Array<string | null>) =>
     Array.from(new Set(xs.filter((x): x is string => Boolean(x)))).sort();
 
+  // Each filter lists its values in the order its dropdown does, so pacing
+  // reads Very low to Extreme+ rather than Extreme to Very low. Anything left
+  // over from an older list sorts to the end instead of hiding mid-list.
   return {
-    categories: uniq(rows.map((r) => r.category)),
+    categories: orderByScale(uniq(rows.map((r) => r.category)), CATEGORIES),
     mods: uniq(rows.map((r) => r.mod)),
-    lengths: uniq(rows.map((r) => r.lengthBucket)),
-    speeds: uniq(rows.map((r) => r.speedBucket)),
+    lengths: orderByScale(uniq(rows.map((r) => r.lengthBucket)), LENGTHS),
+    speeds: orderByScale(uniq(rows.map((r) => r.speedBucket)), SPEEDS),
   };
 }
 
