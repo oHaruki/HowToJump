@@ -78,30 +78,10 @@ export function Thumb({ map }: { map: MapLike }) {
   );
 }
 
-/** Wider card art, used where the background itself is worth judging. */
-export function Banner({ map }: { map: MapLike }) {
-  return (
-    <Cover
-      setId={map.osuBeatmapsetId}
-      kind="card"
-      tierOrder={map.tierOrder ?? null}
-      className="banner"
-    />
-  );
-}
-
-export function MapCell({
-  map,
-  plain,
-  banner,
-}: {
-  map: MapLike;
-  plain?: boolean;
-  banner?: boolean;
-}) {
+export function MapCell({ map, plain }: { map: MapLike; plain?: boolean }) {
   return (
     <div className="map-cell">
-      {banner ? <Banner map={map} /> : <Thumb map={map} />}
+      <Thumb map={map} />
       <div style={{ minWidth: 0 }}>
         {plain ? (
           <span className="t-title">{map.title}</span>

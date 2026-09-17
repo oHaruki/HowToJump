@@ -5,8 +5,8 @@ import { db } from "@/lib/db";
 import { userTierProgress, users } from "@/lib/schema";
 import { getUserScores } from "@/lib/queries";
 import { TIERS, tierByOrder, tierFill } from "@/lib/tiers";
-import { GradeBadge, ModChip, NONE, StatCard, TierChip } from "@/components/ui";
-import { Cover } from "@/components/Cover";
+import { GradeBadge, ModChip, NONE, StatCard } from "@/components/ui";
+import { MapCard, PackTile } from "@/components/MapCard";
 import { secondsToDrain } from "@/lib/import/parse";
 import { SyncButton } from "@/components/SyncButton";
 
@@ -111,57 +111,32 @@ export default async function MePage() {
         </div>
         <div className="review-list">
           {scoreRows.map((sc) => (
-            <div className="review-card" key={sc.scoreId}>
-              <Cover
-                setId={sc.osuBeatmapsetId}
-                kind="card"
-                tierOrder={sc.tierOrder}
-                className="review-art"
-              />
-              <div className="review-body">
-                <div>
-                  <a
-                    className="t-title"
-                    href={
-                      sc.osuBeatmapsetId
-                        ? "https://osu.ppy.sh/beatmapsets/" +
-                          sc.osuBeatmapsetId +
-                          "#osu/" +
-                          sc.osuBeatmapId
-                        : "https://osu.ppy.sh/b/" + sc.osuBeatmapId
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {sc.title}
-                  </a>
-                  <span className="t-diff">
-                    {[sc.version ? "[" + sc.version + "]" : "", sc.mapper]
-                      .filter(Boolean)
-                      .join("  " + NONE + "  ")}
-                  </span>
-                </div>
-                <div className="statline">
-                  <span>
-                    <i>Stars</i>
-                    <b>{sc.stars != null ? sc.stars.toFixed(2) + "★" : NONE}</b>
-                  </span>
-                  <span><i>BPM</i><b>{sc.bpm != null ? Math.round(sc.bpm) : NONE}</b></span>
-                  <span>
-                    <i>Length</i>
-                    <b>{secondsToDrain(sc.drainSeconds) || NONE}</b>
-                  </span>
-                  <span><i>CS</i><b>{sc.cs ?? NONE}</b></span>
-                  <span><i>AR</i><b>{sc.ar ?? NONE}</b></span>
-                  <span><i>OD</i><b>{sc.od ?? NONE}</b></span>
+            <MapCard
+              key={sc.scoreId}
+              osuBeatmapId={sc.osuBeatmapId}
+              osuBeatmapsetId={sc.osuBeatmapsetId}
+              title={sc.title}
+              version={sc.version}
+              mapper={sc.mapper}
+              tierOrder={sc.tierOrder}
+              stars={sc.stars}
+              bpm={sc.bpm}
+              drain={secondsToDrain(sc.drainSeconds)}
+              cs={sc.cs}
+              ar={sc.ar}
+              od={sc.od}
+              pack={<PackTile tierOrder={sc.tierOrder} />}
+              extraStats={
+                <>
                   <span><i>Miss</i><b>{sc.missCount}</b></span>
                   <span>
                     <i>Accuracy</i>
                     <b>{sc.accuracy != null ? sc.accuracy.toFixed(2) + "%" : NONE}</b>
                   </span>
-                </div>
-                <div className="review-controls">
-                  <TierChip tier={sc.tierOrder} />
+                </>
+              }
+              tags={
+                <>
                   <ModChip mod={sc.mod} />
                   <span className="chip">{sc.category}</span>
                   {sc.playedAt ? (
@@ -169,12 +144,10 @@ export default async function MePage() {
                       {new Date(sc.playedAt).toLocaleDateString()}
                     </span>
                   ) : null}
-                </div>
-              </div>
-              <div className="review-actions">
-                <GradeBadge grade={sc.grade} />
-              </div>
-            </div>
+                </>
+              }
+              actions={<GradeBadge grade={sc.grade} />}
+            />
           ))}
           {!scoreRows.length ? (
             <p className="small">

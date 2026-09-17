@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { removeEntry, updateEntry } from "@/lib/actions";
-import { CATEGORIES, LENGTHS, SPEEDS, TIERS, tierByOrder } from "@/lib/tiers";
+import { CATEGORIES, LENGTHS, SPEEDS, tierByName, tierByOrder, tierBySlug } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
-import { ModChip, NONE, TierChip } from "@/components/ui";
-import { Cover } from "@/components/Cover";
+import { ModChip, NONE } from "@/components/ui";
+import { MapCard, PackTile } from "@/components/MapCard";
+import { PackPicker } from "@/components/PackPicker";
 
 export type BankAdminRow = {
   entryId: number;
@@ -37,25 +38,6 @@ type Draft = {
   speed: string;
 };
 
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <span>
-      <i>{label}</i>
-      <b>{value}</b>
-    </span>
-  );
-}
-
-function draftOf(r: BankAdminRow): Draft {
-  return {
-    tier: tierByOrder(r.tierOrder)?.name ?? "",
-    category: r.category ?? "",
-    mod: r.mod,
-    length: r.lengthBucket ?? "",
-    speed: r.speedBucket ?? "",
-  };
-}
-
 export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -77,13 +59,6 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
     });
   };
 
-  const beginEdit = (r: BankAdminRow) => {
-    setError(null);
-    setConfirming(null);
-    setEditing(r.entryId);
-    setDraft(draftOf(r));
-  };
-
   const closeEdit = () => {
     setEditing(null);
     setDraft(null);
@@ -101,58 +76,42 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
       <div className="review-list">
         {rows.map((r) => {
           const isEditing = editing === r.entryId && draft !== null;
-          const url = r.osuBeatmapsetId
-            ? "https://osu.ppy.sh/beatmapsets/" + r.osuBeatmapsetId + "#osu/" + r.osuBeatmapId
-            : "https://osu.ppy.sh/b/" + r.osuBeatmapId;
           const pacing = [r.lengthBucket, r.speedBucket]
             .filter(Boolean)
             .join(" " + NONE + " ");
 
           return (
-            <div className="review-card" key={r.entryId}>
-              <Cover
-                setId={r.osuBeatmapsetId}
-                kind="card"
-                tierOrder={r.tierOrder}
-                className="review-art"
-              />
-
-              <div className="review-body">
-                <div>
-                  <a className="t-title" href={url} target="_blank" rel="noopener noreferrer">
-                    {r.title}
-                  </a>
-                  <span className="t-diff">
-                    {[r.version ? "[" + r.version + "]" : "", r.mapper]
-                      .filter(Boolean)
-                      .join("  " + NONE + "  ")}
-                  </span>
-                </div>
-
-                <div className="statline">
-                  <Stat
-                    label="Stars"
-                    value={r.stars != null ? r.stars.toFixed(2) + "★" : NONE}
+            <MapCard
+              key={r.entryId}
+              osuBeatmapId={r.osuBeatmapId}
+              osuBeatmapsetId={r.osuBeatmapsetId}
+              title={r.title}
+              version={r.version}
+              mapper={r.mapper}
+              tierOrder={r.tierOrder}
+              stars={r.stars}
+              bpm={r.bpm}
+              drain={r.drain}
+              cs={r.cs}
+              ar={r.ar}
+              od={r.od}
+              packEditable={isEditing}
+              pack={
+                isEditing ? (
+                  <PackPicker
+                    value={tierByName(draft.tier)?.slug ?? ""}
+                    onChange={(slug) => {
+                      const t = tierBySlug(slug);
+                      if (t) setDraft({ ...draft, tier: t.name });
+                    }}
                   />
-                  <Stat label="BPM" value={r.bpm != null ? Math.round(r.bpm) : NONE} />
-                  <Stat label="Length" value={r.drain || NONE} />
-                  <Stat label="CS" value={r.cs ?? NONE} />
-                  <Stat label="AR" value={r.ar ?? NONE} />
-                  <Stat label="OD" value={r.od ?? NONE} />
-                </div>
-
-                {isEditing ? (
-                  <div className="review-controls">
-                    <select
-                      className="mini"
-                      value={draft.tier}
-                      disabled={pending}
-                      onChange={(e) => setDraft({ ...draft, tier: e.target.value })}
-                    >
-                      {TIERS.map((t) => (
-                        <option key={t.slug} value={t.name}>{t.name}</option>
-                      ))}
-                    </select>
+                ) : (
+                  <PackTile tierOrder={r.tierOrder} />
+                )
+              }
+              tags={
+                isEditing ? (
+                  <>
                     <select
                       className="mini"
                       value={draft.mod}
@@ -196,26 +155,22 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                       {SPEEDS.map((sp) => <option key={sp} value={sp}>{sp}</option>)}
                     </select>
                     {draft.mod !== r.mod ? (
-                      <span className="small">
-                        Changing the mod recalculates the figures
-                      </span>
+                      <span className="small">Mod change recalculates the figures</span>
                     ) : null}
-                  </div>
+                  </>
                 ) : (
-                  <div className="review-controls">
-                    <TierChip tier={r.tierOrder} />
+                  <>
                     <ModChip mod={r.mod} />
                     <span className="chip">{r.category}</span>
                     {pacing ? <span className="chip">{pacing}</span> : null}
                     {r.judgedByName ? (
-                      <span className="small">judged by {r.judgedByName}</span>
+                      <span className="small">by {r.judgedByName}</span>
                     ) : null}
-                  </div>
-                )}
-              </div>
-
-              <div className="review-actions">
-                {isEditing ? (
+                  </>
+                )
+              }
+              actions={
+                isEditing ? (
                   <>
                     <button
                       className="btn btn-sm btn-primary"
@@ -236,7 +191,6 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                   </>
                 ) : confirming === r.entryId ? (
                   <>
-                    <span className="small">Take it off?</span>
                     <button
                       className="btn btn-sm btn-no"
                       type="button"
@@ -246,7 +200,7 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                         run(() => removeEntry(r.entryId));
                       }}
                     >
-                      Yes, remove
+                      Confirm
                     </button>
                     <button
                       className="btn btn-sm"
@@ -261,7 +215,18 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                     <button
                       className="btn btn-sm"
                       type="button"
-                      onClick={() => beginEdit(r)}
+                      onClick={() => {
+                        setError(null);
+                        setConfirming(null);
+                        setEditing(r.entryId);
+                        setDraft({
+                          tier: tierByOrder(r.tierOrder)?.name ?? "",
+                          category: r.category ?? "",
+                          mod: r.mod,
+                          length: r.lengthBucket ?? "",
+                          speed: r.speedBucket ?? "",
+                        });
+                      }}
                     >
                       Edit
                     </button>
@@ -273,9 +238,9 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                       Remove
                     </button>
                   </>
-                )}
-              </div>
-            </div>
+                )
+              }
+            />
           );
         })}
 

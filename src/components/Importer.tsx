@@ -8,11 +8,11 @@ import {
 import { normalizations, secondsToDrain } from "@/lib/import/parse";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
-  TIERS, tierByName, tierByOrder, CATEGORIES, LENGTHS, SPEEDS,
+  TIERS, tierByName, tierByOrder, tierBySlug, CATEGORIES, LENGTHS, SPEEDS,
 } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
-import { NONE } from "@/components/ui";
-import { Cover } from "@/components/Cover";
+import { MapCard } from "@/components/MapCard";
+import { PackPicker } from "@/components/PackPicker";
 
 type Row = PreviewRow & { selected: boolean };
 
@@ -429,71 +429,54 @@ export function Importer() {
             {rows.map((r) => {
               const isErr = r.status === "error";
               const norms = normalizations(r as never);
+              const tone =
+                r.status === "error"
+                  ? ("error" as const)
+                  : r.status === "attention"
+                    ? ("attention" as const)
+                    : r.status === "exists" || r.status === "duplicate"
+                      ? ("muted" as const)
+                      : undefined;
               return (
-                <div className="prev-card" key={r.uid} data-status={r.status}>
-                  <input
-                    type="checkbox"
-                    checked={r.selected}
-                    onChange={(e) => patch(r.uid, { selected: e.target.checked })}
-                    aria-label={"Select " + (r.title || "row")}
-                  />
-
-                  <Cover
-                    setId={r.beatmapsetId}
-                    kind="card"
-                    tierOrder={r.tierOrder}
-                    className="review-art"
-                  />
-
-                  <div className="review-body">
-                    <div>
-                      <span className="t-title">
-                        {r.title || "beatmap " + (r.beatmapId ?? "?")}
-                      </span>
-                      <span className="t-diff">
-                        {r.notes.length
-                          ? r.notes[0]
-                          : [r.version ? "[" + r.version + "]" : "", r.mapper]
-                              .filter(Boolean)
-                              .join("  " + NONE + "  ") || "metadata will be fetched"}
-                      </span>
-                    </div>
-
-                    {isErr ? null : (
-                      <div className="statline">
-                        <span>
-                          <i>Stars</i>
-                          <b>{r.stars != null ? r.stars.toFixed(2) + "★" : NONE}</b>
-                        </span>
-                        <span>
-                          <i>BPM</i>
-                          <b>{r.bpm != null ? Math.round(r.bpm) : NONE}</b>
-                        </span>
-                        <span>
-                          <i>Length</i>
-                          <b>{secondsToDrain(r.drainSeconds) || NONE}</b>
-                        </span>
-                        <span><i>CS</i><b>{r.cs ?? NONE}</b></span>
-                        <span><i>AR</i><b>{r.ar ?? NONE}</b></span>
-                        <span><i>OD</i><b>{r.od ?? NONE}</b></span>
-                        {norms.length ? (
-                          <span>
-                            <i>Normalized</i>
-                            <b className="diffcol">
-                              {norms.slice(0, 2).map((pair, i) => (
-                                <span key={i}>
-                                  {i ? "   " : ""}
-                                  <s>{pair[0]}</s> &rarr; {pair[1]}
-                                </span>
-                              ))}
-                            </b>
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
-
-                    {isErr ? null : (
-                      <div className="review-controls">
+                <MapCard
+                  key={r.uid}
+                  osuBeatmapId={r.beatmapId ?? 0}
+                  osuBeatmapsetId={r.beatmapsetId}
+                  title={r.title}
+                  version={r.version}
+                  mapper={r.notes.length ? r.notes[0] : r.mapper}
+                  tierOrder={r.tierOrder}
+                  stars={r.stars}
+                  bpm={r.bpm}
+                  drain={secondsToDrain(r.drainSeconds)}
+                  cs={r.cs}
+                  ar={r.ar}
+                  od={r.od}
+                  tone={tone}
+                  linkTitle={!isErr}
+                  leading={
+                    <input
+                      type="checkbox"
+                      checked={r.selected}
+                      onChange={(e) => patch(r.uid, { selected: e.target.checked })}
+                      aria-label={"Select " + (r.title || "row")}
+                    />
+                  }
+                  packEditable={!isErr}
+                  pack={
+                    isErr ? undefined : (
+                      <PackPicker
+                        value={tierByOrder(r.tierOrder)?.slug ?? ""}
+                        onChange={(slug) => {
+                          const t = tierBySlug(slug);
+                          patch(r.uid, { tier: t ? t.name : "" });
+                        }}
+                      />
+                    )
+                  }
+                  tags={
+                    isErr ? undefined : (
+                      <>
                         <select
                           className="mini"
                           value={r.mod}
@@ -501,16 +484,6 @@ export function Importer() {
                         >
                           {MODS.concat(MODS.includes(r.mod) ? [] : [r.mod]).map((m) => (
                             <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                        <select
-                          className="mini"
-                          value={tierByOrder(r.tierOrder)?.name ?? ""}
-                          onChange={(e) => patch(r.uid, { tier: e.target.value })}
-                        >
-                          <option value="">Pick a pack</option>
-                          {TIERS.map((t) => (
-                            <option key={t.slug} value={t.name}>{t.name}</option>
                           ))}
                         </select>
                         <select
@@ -541,14 +514,25 @@ export function Importer() {
                           <option value="">Speed</option>
                           {SPEEDS.map((sp) => <option key={sp} value={sp}>{sp}</option>)}
                         </select>
-                      </div>
-                    )}
-                  </div>
-
-                  <span className={"chip prev-status " + STATUS_CHIP[r.status][0]}>
-                    {STATUS_CHIP[r.status][1]}
-                  </span>
-                </div>
+                        {norms.length ? (
+                          <span className="diffcol">
+                            {norms.slice(0, 2).map((pair, i) => (
+                              <span key={i}>
+                                {i ? "   " : ""}
+                                <s>{pair[0]}</s> &rarr; <b>{pair[1]}</b>
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
+                      </>
+                    )
+                  }
+                  status={
+                    <span className={"chip " + STATUS_CHIP[r.status][0]}>
+                      {STATUS_CHIP[r.status][1]}
+                    </span>
+                  }
+                />
               );
             })}
           </div>

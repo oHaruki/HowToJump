@@ -325,8 +325,6 @@ tbody tr:hover { background: var(--bg-c); }
   outline: var(--border-width) solid var(--border);
 }
 .thumb { width: 56px; height: 42px; }
-/* Card art, for screens where the background itself is being judged. */
-.banner { width: 132px; height: 46px; }
 .art-none {
   display: grid; place-items: center; font-family: var(--font-mono);
   font-size: 11px; color: var(--text-dark); background: var(--bg-d);
@@ -520,36 +518,10 @@ footer {
 .menu-item.danger { color: var(--danger); }
 .menu-item.danger:hover { background: color-mix(in srgb, var(--danger) 12%, var(--bg-c)); }
 
-/* ---------------------------------------------------------- review cards */
-
-/*
- * The queue is a decision surface, not a dataset to scan in columns. Thirteen
- * table columns pushed Approve off the right edge behind a scrollbar, so each
- * pending map gets a card that fits at any width instead.
- */
+/* The vertical list every card surface sits in. */
 .review-list { display: flex; flex-direction: column; gap: 10px; }
-.review-card {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  gap: 16px; align-items: center;
-  padding: 14px 16px;
-  background: var(--bg-b);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--surface-radius); corner-shape: var(--corner-shape);
-  box-shadow: var(--box-shadow);
-}
-.review-card[data-nopack="true"] {
-  border-color: color-mix(in srgb, var(--warning) 34%, var(--border));
-}
-.review-art {
-  width: 188px; height: 66px; flex: none; object-fit: cover;
-  border-radius: 8px; corner-shape: var(--corner-shape);
-  outline: var(--border-width) solid var(--border);
-}
-.review-body { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
-.review-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
 
-/* Label above value, so a long row of figures stays readable. */
+/* Label above value. Still used by the overview cards. */
 .statline { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
 .statline > span { display: flex; flex-direction: column; gap: 1px; }
 .statline i {
@@ -561,48 +533,6 @@ footer {
   font-family: var(--font-mono); font-weight: 400;
   font-variant-numeric: tabular-nums; color: var(--text-focus);
 }
-.review-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-
-@media (max-width: 1100px) {
-  .review-card { grid-template-columns: auto minmax(0, 1fr); }
-  .review-art { grid-column: 1 / -1; width: 100%; height: 90px; }
-  .review-actions { grid-column: 1 / -1; flex-direction: row; }
-}
-
-/* The bank has no per row actions, so its cards lose the trailing column. */
-.map-card { grid-template-columns: auto minmax(0, 1fr); }
-@media (max-width: 1100px) {
-  .map-card .review-art { grid-column: auto; width: 188px; height: 66px; }
-}
-
-/* --------------------------------------------------------- import preview */
-
-/* Same card shape as the review queue: the preview grew past what fits on a
-   screen once mod, pack, category and both pacing buckets became editable. */
-.prev-card {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  gap: 16px; align-items: center;
-  padding: 14px 16px;
-  background: var(--bg-b);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--surface-radius); corner-shape: var(--corner-shape);
-  box-shadow: var(--box-shadow);
-}
-.prev-card[data-status="error"] {
-  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
-  background: color-mix(in srgb, var(--danger) 5%, var(--bg-b));
-}
-.prev-card[data-status="attention"] {
-  border-color: color-mix(in srgb, var(--warning) 36%, var(--border));
-}
-.prev-card[data-status="exists"], .prev-card[data-status="duplicate"] { opacity: 0.62; }
-.prev-status { flex: none; align-self: flex-start; }
-@media (max-width: 1100px) {
-  .prev-card { grid-template-columns: auto minmax(0, 1fr); }
-  .prev-card .review-art { grid-column: 1 / -1; width: 100%; height: 90px; }
-  .prev-status { grid-column: 1 / -1; }
-}
 
 /* ------------------------------------------------------------- map cards */
 
@@ -612,7 +542,10 @@ footer {
  * fully solid at the right so the figures stay crisp.
  */
 .mapcard {
-  position: relative; overflow: hidden;
+  position: relative;
+  /* Clipped by default so the art stays inside the corners. A card holding
+     the pack picker opts out, otherwise the popup is cut off. */
+  overflow: hidden;
   background: var(--bg-b);
   border: var(--border-width) solid var(--border);
   border-radius: var(--surface-radius); corner-shape: var(--corner-shape);
@@ -620,6 +553,13 @@ footer {
   transition: border-color var(--dur-fast);
 }
 .mapcard:hover { border-color: color-mix(in srgb, var(--text-focus) 22%, var(--border)); }
+.mapcard[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+}
+.mapcard[data-tone="attention"] {
+  border-color: color-mix(in srgb, var(--warning) 38%, var(--border));
+}
+.mapcard[data-tone="muted"] { opacity: 0.6; }
 
 .mapcard-art {
   position: absolute; inset: 0;
@@ -651,6 +591,23 @@ footer {
   display: flex; align-items: center; gap: 24px;
   min-width: 0; flex: 1 1 auto;
 }
+.mapcard-lead { flex: none; display: flex; align-items: center; }
+.mapcard-status { flex: none; align-self: flex-start; }
+.mapcard-actions {
+  display: flex; flex-direction: column; gap: 6px;
+  flex: none; align-items: stretch;
+}
+/* Fixed slot so the pack lines up down the list, whatever sits in it. */
+.mapcard-pack {
+  flex: none; width: 112px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+/* Staff screens put a control here, which needs room for its label. */
+.mapcard-pack.editable { width: 176px; align-items: stretch; }
+/* The art is clipped by its own radius, so the card itself can let the
+   pack popup out. */
+.mapcard:has(.mapcard-pack.editable) { overflow: visible; }
+.mapcard-art { border-radius: inherit; corner-shape: var(--corner-shape); }
 
 /* The pack, given the weight it carries in this project. */
 .packtile {
@@ -687,7 +644,7 @@ footer {
 /* Beside the map, not beneath it. */
 .mapcard-tags {
   display: flex; flex-wrap: wrap; gap: 6px;
-  align-items: center; flex: none; max-width: 280px;
+  align-items: center; flex: none; max-width: 340px;
 }
 
 .mapcard-stats { display: flex; gap: 22px; align-items: baseline; flex: none; }
@@ -703,12 +660,13 @@ footer {
   font-size: 18px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1280px) {
   /* Figures drop to their own row rather than squeezing the title. */
   .mapcard-inner { flex-wrap: wrap; row-gap: 14px; }
   .mapcard-left { flex: 1 1 100%; }
   .mapcard-stats { justify-content: flex-start; }
   .mapcard-stats > span { text-align: left; }
+  .mapcard-actions { flex-direction: row; }
 }
 @media (max-width: 720px) {
   .mapcard-left { flex-wrap: wrap; gap: 14px; }
