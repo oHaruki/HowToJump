@@ -15,10 +15,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    # Published only so you can run migrations from the host. Drop this in
-    # production and exec into the container instead.
-    ports:
-      - "127.0.0.1:5432:5432"
+    # Deliberately not published. Everything that needs the database reaches it
+    # over the compose network as postgres:5432 — the app, and the migrate
+    # service in compose.override.yml. Publishing it collides with a host
+    # Postgres, and exposes the port to anything on the box for no gain. For a
+    # dump or a psql session: docker compose exec postgres ...
 
   app:
     build:
