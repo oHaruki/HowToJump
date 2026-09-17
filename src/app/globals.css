@@ -437,6 +437,8 @@ tbody tr:hover { background: var(--bg-c); }
   padding: 11px 14px; background: var(--bg-c);
   border: var(--border-width) solid var(--border);
   border-radius: var(--control-radius); corner-shape: var(--corner-shape);
+  /* Holds a pack picker, so it must not clip and must sit above the rows. */
+  position: relative; z-index: 40;
 }
 
 .pbar { height: 7px; background: var(--bg-d); border-radius: 99px; overflow: hidden; flex: 1 1 90px; min-width: 70px; }
@@ -607,6 +609,13 @@ footer {
 /* The art is clipped by its own radius, so the card itself can let the
    pack popup out. */
 .mapcard:has(.mapcard-pack.editable) { overflow: visible; }
+/*
+ * .mapcard-inner is positioned with a z-index, which makes it a stacking
+ * context the popup cannot escape. Raising the whole card lifts that context
+ * above the cards that follow it, which were painting over the popup.
+ */
+.mapcard:has(.packgrid-pop) { z-index: 70; }
+.mapcard-inner:has(.packgrid-pop) { z-index: 70; }
 .mapcard-art { border-radius: inherit; corner-shape: var(--corner-shape); }
 
 /* The pack, given the weight it carries in this project. */
@@ -751,8 +760,8 @@ footer {
 .hero-copy { position: relative; }
 .hero-copy > *:not(.hero-art) { position: relative; z-index: 1; }
 .hero-art {
-  position: absolute; right: -24px; bottom: -34px;
-  height: 340px; width: auto; max-width: none;
+  position: absolute; right: -40px; bottom: -44px;
+  height: 440px; width: auto; max-width: none;
   opacity: 0.55; pointer-events: none; user-select: none; z-index: 0;
   -webkit-mask-image:
     linear-gradient(90deg, transparent 0%, #000 42%),

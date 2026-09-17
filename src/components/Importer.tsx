@@ -297,14 +297,13 @@ export function Importer() {
             placeholder={PLACEHOLDER_LINKS.join(String.fromCharCode(10))}
           />
           <div className="row" style={{ alignItems: "flex-end" }}>
-            <label className="field" style={{ flex: "1 1 150px" }}>
+            <label className="field" style={{ flex: "1 1 190px" }}>
               <span className="lbl">Pack</span>
-              <select value={linkTier} onChange={(e) => setLinkTier(e.target.value)}>
-                <option value="">Pick a pack</option>
-                {TIERS.map((t) => (
-                  <option key={t.slug} value={t.name}>{t.name}</option>
-                ))}
-              </select>
+              <PackPicker
+                value={tierByName(linkTier)?.slug ?? ""}
+                placeholder="Pick a pack"
+                onChange={(slug) => setLinkTier(tierBySlug(slug)?.name ?? "")}
+              />
             </label>
             <label className="field" style={{ flex: "1 1 170px" }}>
               <span className="lbl">Category</span>
@@ -368,14 +367,17 @@ export function Importer() {
             </label>
             <span style={{ flex: "1 1 auto" }} />
             <span className="small">Set for selected:</span>
-            <select
-              className="mini"
-              value=""
-              onChange={(e) => { if (e.target.value) bulk({ tier: e.target.value }); }}
-            >
-              <option value="">Set pack</option>
-              {TIERS.map((t) => <option key={t.slug} value={t.name}>{t.name}</option>)}
-            </select>
+            <div style={{ width: 170 }}>
+              <PackPicker
+                value=""
+                placeholder="Set pack"
+                allowClear={false}
+                onChange={(slug) => {
+                  const t = tierBySlug(slug);
+                  if (t) bulk({ tier: t.name });
+                }}
+              />
+            </div>
             <select
               className="mini"
               value=""

@@ -14,10 +14,16 @@ export function PackPicker({
   value,
   counts,
   onChange,
+  placeholder = "All packs",
+  allowClear = true,
 }: {
   value: string;
   counts?: Record<string, number>;
   onChange: (slug: string) => void;
+  /** Shown when nothing is picked. "Set pack" when used as a bulk action. */
+  placeholder?: string;
+  /** Off where clearing makes no sense, such as setting a pack on a row. */
+  allowClear?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -56,20 +62,22 @@ export function PackPicker({
         {selected ? (
           <span className="dot" style={{ background: tierFill(selected) }} />
         ) : null}
-        <span className="packpick-label">{selected ? selected.name : "All packs"}</span>
+        <span className="packpick-label">{selected ? selected.name : placeholder}</span>
         <span className="caret" aria-hidden="true" />
       </button>
 
       {open ? (
         <div className="packgrid-pop" role="dialog" aria-label="Pick a pack">
-          <button
-            className="packgrid-all"
-            type="button"
-            data-active={String(!value)}
-            onClick={() => pick("")}
-          >
-            All packs
-          </button>
+          {allowClear ? (
+            <button
+              className="packgrid-all"
+              type="button"
+              data-active={String(!value)}
+              onClick={() => pick("")}
+            >
+              {placeholder}
+            </button>
+          ) : null}
           <div className="packgrid">
             {TIERS.map((t) => {
               const n = counts?.[t.slug];
