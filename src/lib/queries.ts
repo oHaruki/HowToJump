@@ -152,17 +152,6 @@ export async function getRecentEntries(limit = 4): Promise<BankRow[]> {
   return shape(rows);
 }
 
-export async function getHardestEntry(): Promise<BankRow | null> {
-  const rows = await db
-    .select(bankSelection)
-    .from(entries)
-    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
-    .where(eq(entries.isActive, true))
-    .orderBy(desc(entries.stars))
-    .limit(1);
-  return shape(rows)[0] ?? null;
-}
-
 /** Every entry key already on the ladder, so the importer can spot repeats. */
 export async function getExistingEntryKeys(): Promise<Set<string>> {
   const rows = await db

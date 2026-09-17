@@ -774,3 +774,27 @@ footer {
 }
 /* Too little room beside the text to be anything but clutter. */
 @media (max-width: 1100px) { .hero-art { display: none; } }
+
+/* --------------------------------------------------------------- rotator */
+
+.rotator { position: relative; padding: 0; }
+.rotator-slide { display: flex; flex-direction: column; animation: slide-in var(--dur) ease both; }
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+.rotator-dots {
+  position: absolute; right: 14px; top: 14px; z-index: 2;
+  display: flex; gap: 5px; padding: 5px 7px;
+  background: color-mix(in srgb, var(--main-bg) 62%, transparent);
+  backdrop-filter: blur(4px);
+  border-radius: 99px;
+}
+.rotator-dot {
+  appearance: none; border: 0; cursor: pointer; padding: 0;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: color-mix(in srgb, var(--text-focus) 35%, transparent);
+  transition: background var(--dur-fast), transform var(--dur-fast);
+}
+.rotator-dot:hover { background: var(--text); }
+.rotator-dot[data-active="true"] { background: var(--text-focus); transform: scale(1.35); }

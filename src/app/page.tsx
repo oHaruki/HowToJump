@@ -1,19 +1,21 @@
 import Link from "next/link";
-import { getBankStats, getHardestEntry, getRecentEntries, getTierCounts } from "@/lib/queries";
+import { getBankStats, getRecentEntries, getTierCounts } from "@/lib/queries";
 import {
   LadderGrid, ModChip, NONE, Stat, TierChip, beatmapUrl,
 } from "@/components/ui";
 import { Cover } from "@/components/Cover";
+import { FeaturedRotator } from "@/components/FeaturedRotator";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const [counts, stats, hardest, recent] = await Promise.all([
+  const [counts, stats, newest] = await Promise.all([
     getTierCounts(),
     getBankStats(),
-    getHardestEntry(),
-    getRecentEntries(4),
+    // Enough to be worth cycling, few enough that the dots stay usable.
+    getRecentEntries(8),
   ]);
+  const recent = newest.slice(0, 4);
 
   return (
     <div className="view">
@@ -46,53 +48,7 @@ export default async function OverviewPage() {
           </div>
         </div>
 
-        {hardest ? (
-          <div className="box feat">
-            <Cover
-              setId={hardest.osuBeatmapsetId}
-              kind="card"
-              tierOrder={hardest.tierOrder}
-              className="feat-art"
-            />
-            <div className="feat-body">
-              <span className="lbl">Hardest on the ladder</span>
-              <h3>
-                <a
-                  href={beatmapUrl(hardest)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: "none" }}
-                >
-                  {hardest.title}
-                </a>
-              </h3>
-              <span className="t-diff">[{hardest.version}]</span>
-              <div className="row-tight" style={{ marginTop: 2 }}>
-                <TierChip tier={hardest.tierOrder} />
-                <ModChip mod={hardest.mod} />
-                <span className="chip">{hardest.category}</span>
-              </div>
-              <div className="statline">
-                <span><i>Stars</i><b>{hardest.stars?.toFixed(2)}&#9733;</b></span>
-                <span><i>BPM</i><b>{hardest.bpm != null ? Math.round(hardest.bpm) : NONE}</b></span>
-                <span><i>Length</i><b>{hardest.drain || NONE}</b></span>
-                <span><i>CS</i><b>{hardest.cs ?? NONE}</b></span>
-                <span><i>AR</i><b>{hardest.ar ?? NONE}</b></span>
-                <span><i>OD</i><b>{hardest.od ?? NONE}</b></span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="box feat">
-            <div className="feat-body">
-              <span className="lbl">Nothing banked yet</span>
-              <h3>The ladder is empty</h3>
-              <p className="small">
-                Staff add the first entries from the Add maps screen.
-              </p>
-            </div>
-          </div>
-        )}
+        <FeaturedRotator entries={newest} />
       </div>
 
       <div className="stat-strip">
