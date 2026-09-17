@@ -79,6 +79,7 @@ and falls back to the sheet's own values when they are not, so it works offline.
 | `npm run db:generate` | Generate a migration from the schema |
 | `npm run db:push` | Push the schema straight to the database |
 | `npm run db:seed` | Seed grades, config and the map bank |
+| `npm run seed:examples` | Example bank rows for checking search; `-- --clear` removes them |
 | `npm run sync` | One sync pass from the CLI |
 
 ## Layout

@@ -13,6 +13,7 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
+    "seed:examples": "tsx src/db/seed-examples.ts",
     "sync": "tsx src/db/sync-cli.ts",
     "test": "node --import tsx --test src/**/*.test.ts",
     "build:check": "cross-env NEXT_DIST_DIR=.next-check next build"
