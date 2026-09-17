@@ -396,7 +396,8 @@ tbody tr:hover { background: var(--bg-c); }
 
 /* ---------------------------------------------------------------- grades */
 
-.grade-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); }
+.grade-grid { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .grade-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .grade {
   display: flex; align-items: center; gap: 11px; padding: 9px 11px;
   background: var(--bg-b); border: var(--border-width) solid var(--border);
