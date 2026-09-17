@@ -1,6 +1,7 @@
 /**
  * The sixteen packs, ascending. A four column grid lays these out in the
- * bands the sheet uses: Stone-Bronze, Silver-Titanium, Topaz-Emerald, Opal-GOAT.
+ * bands the sheet uses: Stone-Bronze, Silver-Titanium, Rhodonite-Sapphire,
+ * Emerald-GOAT.
  */
 export type Tier = {
   order: number;
@@ -21,18 +22,18 @@ export const TIERS: Tier[] = [
   { order: 6, name: "Gold", slug: "gold", color: "#f0d959" },
   { order: 7, name: "Platinum", slug: "platinum", color: "#E5E4E2" },
   { order: 8, name: "Titanium", slug: "titanium", color: "#708a99" },
-  { order: 9, name: "Topaz", slug: "topaz", color: "#ffb84d" },
-  { order: 10, name: "Ruby", slug: "ruby", color: "#d21f3c" },
-  { order: 11, name: "Sapphire", slug: "sapphire", color: "#5fa6ff" },
-  { order: 12, name: "Emerald", slug: "emerald", color: "#4ef399" },
   {
-    order: 13,
+    order: 9,
     name: "Rhodonite",
     slug: "rhodonite",
     color: "#f19bc2",
     // The sheet still calls this pack Opal, so pasted rows keep resolving.
     aliases: ["Opal"],
   },
+  { order: 10, name: "Topaz", slug: "topaz", color: "#ffb84d" },
+  { order: 11, name: "Ruby", slug: "ruby", color: "#d21f3c" },
+  { order: 12, name: "Sapphire", slug: "sapphire", color: "#5fa6ff" },
+  { order: 13, name: "Emerald", slug: "emerald", color: "#4ef399" },
   { order: 14, name: "Amethyst", slug: "amethyst", color: "#8e44ad" },
   { order: 15, name: "Diamond", slug: "diamond", color: "#a2f0ff" },
   {
@@ -40,7 +41,7 @@ export const TIERS: Tier[] = [
     name: "GOAT",
     slug: "goat",
     color: "#c7e9e4",
-    // The iridescent fill this ladder used to give pack 13.
+    // The iridescent fill this ladder used to give the Opal pack.
     gradient:
       "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",
   },
