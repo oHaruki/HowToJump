@@ -123,168 +123,23 @@ ladder without a pack, enforced both in the UI and in `approveSuggestions`.
 
 ## Deploying
 
-Compose runs four things: the app, Postgres, a worker that calls
-`POST /api/sync/run` every 15 minutes, and optionally Caddy for TLS. The sync
-endpoint decides who is actually due, so that timer only has to be more
-frequent than the shortest interval, never exact.
-
-There are two shapes of host. On a box where ports 80 and 443 are free, Caddy
-can terminate TLS itself. On a box already serving other sites, an existing
-nginx or Caddy proxies to the app instead, and the bundled Caddy stays off.
-`docker/compose.override.yml` assumes the second, because it is the case that
-goes wrong quietly: it keeps Caddy behind a profile so a plain `up` cannot take
-80 and 443 out from under something else.
-
-### 1. DNS
-
-Point an A record at the host and let it resolve before requesting a
-certificate. Behind Cloudflare's proxy, set SSL/TLS to **Full (strict)**;
-on Flexible the site redirect-loops.
-
-### 2. Configure
-
 ```bash
 cd docker
-cp ../.env.example .env
-chmod 600 .env          # it holds the osu! client secret
-```
-
-Compose reads `.env` from the directory the compose file lives in, so it
-belongs in `docker/`, not the repository root. Fill in:
-
-| | |
-|---|---|
-| `POSTGRES_PASSWORD` | `openssl rand -hex 24` |
-| `AUTH_SECRET` | `openssl rand -base64 32` |
-| `SYNC_TOKEN` | `openssl rand -hex 32` |
-| `AUTH_URL` | the public HTTPS URL, exactly |
-| `OSU_CLIENT_ID`, `OSU_CLIENT_SECRET` | from the osu! OAuth app |
-| `BOOTSTRAP_ADMINS` | your osu! user ID, so the first sign in lands as admin |
-| `DOMAIN` | only when the bundled Caddy terminates TLS |
-
-`AUTH_URL` is the usual cause of a redirect mismatch at sign in. The osu! app's
-callback URL has to match it: `https://<domain>/api/auth/callback/osu`.
-`AUTH_TRUST_HOST` is already set in the compose file, which is what a proxied
-deployment needs.
-
-### 3. Start
-
-Behind an existing proxy:
-
-```bash
+cp ../.env.example .env    # secrets, plus AUTH_URL as the public HTTPS URL
 docker compose up -d --build
-```
-
-The app is published on `127.0.0.1:6500` and nothing binds 80 or 443. The
-loopback prefix is not decoration: Docker writes its own iptables rules, so a
-bare `6500:3000` would be reachable from the internet whatever UFW reports.
-
-Or, on a host with 80 and 443 free, with `DOMAIN` set:
-
-```bash
-docker compose --profile edge up -d --build
-```
-
-Check what came up, and that the ports are what you expect:
-
-```bash
-docker compose ps
-sudo ss -tlnp | grep 6500
-```
-
-### 4. Schema and seed
-
-```bash
 docker compose run --rm migrate
-docker compose restart app
 ```
 
-The runtime image is a Next standalone build, so it has no `drizzle-kit`, no
-`tsx` and no `src/`. The `migrate` service runs `db:push` and `db:seed` from
-the builder stage, which has all three. The seed pulls beatmap metadata when
-osu! credentials are present and falls back to the sheet's own numbers when
-they are not.
+Compose runs the app, Postgres, and a worker that calls `POST /api/sync/run`
+every 15 minutes. The endpoint decides who is actually due, so the timer only
+has to be more frequent than the shortest interval.
 
-The restart matters: `app` has been holding connections to a Postgres that
-`migrate` may have just waited on.
+The app is published on `127.0.0.1:6500` for an existing reverse proxy to sit
+in front of. On a host where 80 and 443 are free, `--profile edge` brings up
+the bundled Caddy instead, with `DOMAIN` set.
 
-### 5. Reverse proxy
-
-Only when the host already runs one. A new server block, rather than an edit to
-an existing one:
-
-```nginx
-server {
-    listen 80;
-    listen [::]:80;
-    server_name howtojump.example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:6500;
-        proxy_http_version 1.1;
-        proxy_set_header Host              $host;
-        proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade           $http_upgrade;
-        proxy_set_header Connection        "upgrade";
-    }
-}
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/howtojump.example.com /etc/nginx/sites-enabled/
-sudo nginx -t          # must pass before the reload
-sudo systemctl reload nginx
-sudo certbot --nginx -d howtojump.example.com
-```
-
-`nginx -t` is what protects the other sites on the box. If it fails, remove the
-symlink rather than reloading. Certbot's HTTP-01 challenge works through
-Cloudflare's proxy.
-
-For host Caddy, the whole of it is one block, and the certificate is automatic:
-
-```
-howtojump.example.com {
-    reverse_proxy 127.0.0.1:6500
-}
-```
-
-### 6. Verify
-
-The ladder loads, sign in with osu! lands as admin, `/staff` is reachable, and
-`docker compose logs worker --tail 20` shows the sync loop alive.
-
-### Keeping it running
-
-Deploy a change, re-running `migrate` only when the schema moved:
-
-```bash
-git pull && docker compose up -d --build
-```
-
-Postgres is not published on the host, so a dump goes through the container.
-A crontab entry is one line, and two details there bite: `exec -T` is
-required, because without a TTY the dump fails silently, and `%` has to be
-escaped as `\%`.
-
-```bash
-0 4 * * * cd /srv/howtojump/docker && docker compose exec -T postgres pg_dump -U howtojump howtojump | gzip > ~/backups/htj-$(date +\%F).sql.gz
-```
-
-Docker's default `json-file` log driver has no size limit, so container logs
-grow until the disk is full. Worth capping once, in `/etc/docker/daemon.json`:
-
-```json
-{
-  "log-driver": "json-file",
-  "log-opts": { "max-size": "10m", "max-file": "3" }
-}
-```
-
-That one needs `systemctl restart docker`, which restarts every container on
-the host.
+Migrations run through `migrate` rather than the app container: the runtime
+image is a Next standalone build, with no `drizzle-kit`, `tsx` or `src/`.
 
 ## Notes
 
