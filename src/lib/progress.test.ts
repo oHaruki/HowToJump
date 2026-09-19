@@ -67,12 +67,12 @@ test("a score is new, improved, or old news, against when the player last looked
 
 test("counting places: each category's best ten by EXP, older id first on a tie", () => {
   const plays = [
-    { id: 1, tierOrder: 13, categories: [RAW], grade: "A" },
-    { id: 2, tierOrder: 14, categories: [RAW], grade: "SS" },
-    { id: 3, tierOrder: 13, categories: [RAW], grade: "A" },
-    { id: 4, tierOrder: 13, categories: ["Raw Aim"], grade: "SS" }, // old spelling, same category
-    { id: 5, tierOrder: 16, categories: ["Flow Aim"], grade: "SSS" }, // dropped, counts nowhere
-    ...Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, tierOrder: 1, categories: [RAW], grade: "Pass" })),
+    { id: 1, tierOrder: 13, categories: [RAW], grade: "A", missCount: 0, noteCount: null },
+    { id: 2, tierOrder: 14, categories: [RAW], grade: "SS", missCount: 0, noteCount: null },
+    { id: 3, tierOrder: 13, categories: [RAW], grade: "A", missCount: 0, noteCount: null },
+    { id: 4, tierOrder: 13, categories: ["Raw Aim"], grade: "SS", missCount: 0, noteCount: null }, // old spelling, same category
+    { id: 5, tierOrder: 16, categories: ["Flow Aim"], grade: "SSS", missCount: 0, noteCount: null }, // dropped, counts nowhere
+    ...Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, tierOrder: 1, categories: [RAW], grade: "Pass", missCount: 0, noteCount: null })),
   ];
   const place = (id: number) => countingPlaces(plays).get(id)?.map((p) => p.place);
   assert.deepEqual(place(2), [1]);
@@ -87,8 +87,8 @@ test("counting places: each category's best ten by EXP, older id first on a tie"
 test("a play on a map in two categories holds a place in each, best first", () => {
   const CONSISTENCY = "Aim - consistency";
   const places = countingPlaces([
-    { id: 1, tierOrder: 14, categories: [RAW], grade: "SS" },
-    { id: 2, tierOrder: 13, categories: [RAW, CONSISTENCY], grade: "SS" },
+    { id: 1, tierOrder: 14, categories: [RAW], grade: "SS", missCount: 0, noteCount: null },
+    { id: 2, tierOrder: 13, categories: [RAW, CONSISTENCY], grade: "SS", missCount: 0, noteCount: null },
   ]);
   assert.deepEqual(places.get(2), [
     { category: CONSISTENCY, place: 1 },

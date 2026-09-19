@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { missFactor } from "@/lib/grading";
 import { playExp } from "@/lib/levels";
 import { normalizeMod } from "@/lib/mods";
 import {
@@ -71,7 +72,7 @@ export default async function BeatmapPage({
 
   const tier = tierByOrder(map.tierOrder);
   const colour = tier ? tier.color : "#777";
-  const expOf = (grade: string) => playExp(map.tierOrder, grade);
+  const expOf = (s: BoardScore) => playExp(map.tierOrder, s.grade, s.missCount, map.noteCount);
 
   return (
     <div className="view">
@@ -90,9 +91,9 @@ export default async function BeatmapPage({
 
         {board.length ? (
           <>
-            <ScoreCard s={board[0]} exp={expOf(board[0].grade)} setId={map.osuBeatmapsetId} kind="top" />
+            <ScoreCard s={board[0]} exp={expOf(board[0])} setId={map.osuBeatmapsetId} kind="top" />
             {mine && mine.rank !== 1 ? (
-              <ScoreCard s={mine} exp={expOf(mine.grade)} setId={map.osuBeatmapsetId} kind="mine" />
+              <ScoreCard s={mine} exp={expOf(mine)} setId={map.osuBeatmapsetId} kind="mine" />
             ) : null}
             <Scoreboard scores={board} expOf={expOf} me={session?.userId ?? null} />
           </>
@@ -238,6 +239,7 @@ function Header({
               <span>A full combo here is worth</span>
               <b>{fmt(playExp(map.tierOrder, "SS"))} EXP</b>
             </div>
+            {map.noteCount ? <MissNote notes={map.noteCount} /> : null}
           </aside>
         </div>
       </div>
@@ -259,6 +261,20 @@ function Player({ s, avatar }: { s: BoardScore; avatar?: boolean }) {
       <Flag code={s.countryCode} />
       <span>{s.username}</span>
     </Link>
+  );
+}
+
+/**
+ * What a miss costs here. Misses count for more on short maps and less on
+ * long ones, against a 1,500 note map; the grade itself stays the real count.
+ */
+function MissNote({ notes }: { notes: number }) {
+  const f = missFactor(notes);
+  return (
+    <p className="bm-misses">
+      {fmt(notes)} notes, so each miss counts as{" "}
+      <b>×{f >= 1 ? f.toFixed(1) : f.toFixed(2)}</b> in EXP
+    </p>
   );
 }
 
@@ -339,7 +355,7 @@ function Scoreboard({
   me,
 }: {
   scores: BoardScore[];
-  expOf: (grade: string) => number;
+  expOf: (s: BoardScore) => number;
   me: number | null;
 }) {
   return (
@@ -379,7 +395,7 @@ function Scoreboard({
           <span role="cell" className="c sb-num sb-opt" data-zero={s.missCount === 0 || undefined}>
             {s.missCount}
           </span>
-          <span role="cell" className="c sb-num sb-exp sb-end">{fmt(expOf(s.grade))}</span>
+          <span role="cell" className="c sb-num sb-exp sb-end">{fmt(expOf(s))}</span>
           <span role="cell" className="r small sb-opt">{timeAgo(s.playedAt)}</span>
           <span role="cell" className="r sb-opt">
             <ModChip mod={s.mods} />

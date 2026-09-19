@@ -50,12 +50,10 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
   const main = current[MAIN_LEVEL];
   const mainTier = tierByOrder(main.tierOrder);
 
-  const places = countingPlaces(
-    plays.map((p) => ({ id: p.scoreId, tierOrder: p.tierOrder, categories: p.categories, grade: p.grade })),
-  );
+  const places = countingPlaces(plays.map((p) => ({ ...p, id: p.scoreId })));
   const views: PlayView[] = plays.map((p) => ({
     ...p,
-    exp: playExp(p.tierOrder, p.grade),
+    exp: playExp(p.tierOrder, p.grade, p.missCount, p.noteCount),
     places: places.get(p.scoreId) ?? [],
     fresh: freshness(p, seenAt),
   }));

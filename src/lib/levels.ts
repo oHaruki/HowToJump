@@ -1,5 +1,5 @@
 import { CATEGORIES, TIERS, normalizeCategory, tierByOrder } from "@/lib/tiers";
-import { GRADE_RULES, expPercentFor } from "@/lib/grading";
+import { GRADE_RULES, MISS_CURVE, REFERENCE_NOTES, expShare } from "@/lib/grading";
 
 /**
  * Skill levels, as Kayrem set them out.
@@ -20,9 +20,9 @@ export const MAIN_LEVEL = "main";
 /**
  * Bump when the formula itself changes, such as the main level moving from
  * an average to a sum. Changed numbers are noticed without it. 2: a map can
- * sit in several categories.
+ * sit in several categories. 3: misses cost EXP by the map's note count.
  */
-export const LEVEL_RULES_VERSION = 2;
+export const LEVEL_RULES_VERSION = 3;
 
 /**
  * Everything a stored level depends on, as one string. Each deploy compares
@@ -37,6 +37,7 @@ export function levelRules(): string {
     categories: CATEGORIES,
     packs: TIERS.map((t) => [t.order, t.exp]),
     grades: GRADE_RULES.map((g) => [g.grade, g.expPercent]),
+    missScaling: [REFERENCE_NOTES, MISS_CURVE],
   });
 }
 
@@ -59,15 +60,37 @@ export type Level = {
 
 /**
  * A play as the level rule sees it. A map can sit in several categories, so
- * one play can count toward several levels. The id, when there is one, only
+ * one play can count toward several levels. Misses and the map's note count
+ * set what the misses cost; a null count is a map osu! has not told us about
+ * yet, which pays what the grade says. The id, when there is one, only
  * settles ties, so the same plays always count.
  */
-export type LevelPlay = { id?: number; tierOrder: number; categories: readonly string[]; grade: string };
+export type LevelPlay = {
+  id?: number;
+  tierOrder: number;
+  categories: readonly string[];
+  grade: string;
+  missCount: number;
+  noteCount: number | null;
+};
 
-export function playExp(tierOrder: number, grade: string): number {
+/**
+ * EXP for one play: the pack's value times the share the play earns. Without
+ * misses and a note count it is the grade's share as the table has it, which
+ * is what a pack's threshold and a full combo's worth are read from.
+ */
+export function playExp(
+  tierOrder: number,
+  grade: string,
+  missCount = 0,
+  noteCount: number | null = null,
+): number {
   const tier = tierByOrder(tierOrder);
-  return tier ? (tier.exp * expPercentFor(grade)) / 100 : 0;
+  return tier ? (tier.exp * expShare(grade, missCount, noteCount)) / 100 : 0;
 }
+
+const expOf = (p: Omit<LevelPlay, "categories">) =>
+  playExp(p.tierOrder, p.grade, p.missCount, p.noteCount);
 
 /** EXP needed to reach a pack. */
 export function threshold(tierOrder: number): number {
@@ -90,9 +113,9 @@ export function levelFromExp(exp: number): Level {
 }
 
 /** EXP of the best BEST_PLAYS plays among these. */
-export function bestExp(plays: Array<Pick<LevelPlay, "tierOrder" | "grade">>): number {
+export function bestExp(plays: Array<Omit<LevelPlay, "categories">>): number {
   return plays
-    .map((p) => playExp(p.tierOrder, p.grade))
+    .map(expOf)
     .sort((a, b) => b - a)
     .slice(0, BEST_PLAYS)
     .reduce((sum, v) => sum + v, 0);
@@ -111,7 +134,7 @@ function countingByCategory(plays: readonly LevelPlay[]): Map<string, number[]> 
   const scored = plays.map((p, i) => ({
     i,
     tie: p.id ?? i,
-    exp: playExp(p.tierOrder, p.grade),
+    exp: expOf(p),
     categories: new Set(p.categories.map((c) => normalizeCategory(c))),
   }));
   const out = new Map<string, number[]>();
@@ -136,7 +159,7 @@ export function categoryLevels(plays: readonly LevelPlay[]): Record<string, Leve
   const out: Record<string, Level> = {};
   for (const [c, counting] of countingByCategory(plays)) {
     out[c] = levelFromExp(
-      counting.reduce((sum, i) => sum + playExp(plays[i].tierOrder, plays[i].grade), 0),
+      counting.reduce((sum, i) => sum + expOf(plays[i]), 0),
     );
   }
   return out;
@@ -149,7 +172,7 @@ export function categoryLevels(plays: readonly LevelPlay[]): Record<string, Leve
  */
 export function totalExp(plays: readonly LevelPlay[]): number {
   const counted = new Set([...countingByCategory(plays).values()].flat());
-  return [...counted].reduce((sum, i) => sum + playExp(plays[i].tierOrder, plays[i].grade), 0);
+  return [...counted].reduce((sum, i) => sum + expOf(plays[i]), 0);
 }
 
 /** Where a play stands in one category it counts toward. */

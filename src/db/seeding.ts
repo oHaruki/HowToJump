@@ -1,12 +1,13 @@
 /**
  * The seed's steps, shared by npm run db:seed, which runs all of them, and
- * the deploy step, which refreshes the grades every time but only seeds the
- * sheet's maps into an empty bank.
+ * the deploy step, which refreshes the grades and fills missing note counts
+ * every time but only seeds the sheet's maps into an empty bank.
  *
  * If osu! credentials are present the beatmap metadata is pulled fresh from
  * the API. Without them the sheet's own numbers are used, so the seed still
  * works offline.
  */
+import { eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { beatmaps, entries, gradeRules, siteConfig } from "@/lib/schema";
 import { GRADE_RULES } from "@/lib/grading";
@@ -41,6 +42,37 @@ function splitTitle(v: string) {
 
 const coverBase = (setId: number, kind: string) =>
   "https://assets.ppy.sh/beatmaps/" + setId + "/covers/" + kind + ".jpg";
+
+/**
+ * Note counts for maps banked before they were stored, from osu! at 50 maps
+ * a request. If osu! can't be reached they wait for the next deploy; until a
+ * map has its count, its misses cost what they always did. Returns the
+ * beatmaps it filled, whose players then need their levels recomputed.
+ */
+export async function backfillNoteCounts(): Promise<number[]> {
+  const missing = await db
+    .select({ id: beatmaps.id, osuBeatmapId: beatmaps.osuBeatmapId })
+    .from(beatmaps)
+    .where(isNull(beatmaps.noteCount));
+  if (!missing.length) return [];
+
+  let facts: Map<number, BeatmapFacts>;
+  try {
+    facts = await fetchBeatmaps(missing.map((m) => m.osuBeatmapId));
+  } catch (e) {
+    console.warn("Note counts not fetched, trying again next deploy: " + (e instanceof Error ? e.message : e));
+    return [];
+  }
+
+  const filled: number[] = [];
+  for (const m of missing) {
+    const noteCount = facts.get(m.osuBeatmapId)?.noteCount;
+    if (noteCount == null) continue;
+    await db.update(beatmaps).set({ noteCount }).where(eq(beatmaps.id, m.id));
+    filled.push(m.id);
+  }
+  return filled;
+}
 
 /**
  * Replaces the grade table with the scale in the code. One transaction, so
@@ -112,6 +144,7 @@ export async function seedSheet() {
         od: f?.od ?? num(row[COL.od]),
         hp: f?.hp ?? null,
         maxCombo: f?.maxCombo ?? null,
+        noteCount: f?.noteCount ?? null,
         status: f?.status ?? null,
         // Old sets genuinely have no cover art. The UI falls back to a
         // pack tinted placeholder, so a missing file here is fine.

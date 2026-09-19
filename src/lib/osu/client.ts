@@ -120,6 +120,9 @@ export type OsuBeatmap = {
   accuracy: number; // OD
   drain: number; // HP
   max_combo: number | null;
+  count_circles?: number;
+  count_sliders?: number;
+  count_spinners?: number;
   status: string;
   user_id: number;
   beatmapset?: {
@@ -150,6 +153,8 @@ export type BeatmapFacts = {
   od: number;
   hp: number;
   maxCombo: number | null;
+  /** Circles, sliders and spinners: what a miss can land on. */
+  noteCount: number | null;
   status: string;
   coverUrl: string;
   cardUrl: string;
@@ -180,6 +185,10 @@ export function toFacts(b: OsuBeatmap): BeatmapFacts {
     od: b.accuracy,
     hp: b.drain,
     maxCombo: b.max_combo ?? null,
+    noteCount:
+      b.count_circles == null
+        ? null
+        : b.count_circles + (b.count_sliders ?? 0) + (b.count_spinners ?? 0),
     status: b.status ?? set?.status ?? "unknown",
     coverUrl: coverBase(setId, "cover"),
     cardUrl: coverBase(setId, "card"),

@@ -176,9 +176,12 @@ export async function refreshProgress(userId: number): Promise<void> {
       tierOrder: entries.tierOrder,
       categories: entries.categories,
       grade: scores.grade,
+      missCount: scores.missCount,
+      noteCount: beatmaps.noteCount,
     })
     .from(scores)
     .innerJoin(entries, eq(scores.entryId, entries.id))
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
     .where(counted);
 
   const byCategory = categoryLevels(plays);

@@ -1695,6 +1695,8 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
   font-size: var(--font-size-small); color: var(--text);
 }
 .bm-worth b { font-family: var(--font-mono); font-size: 18px; font-weight: 400; color: color-mix(in srgb, var(--success) 75%, var(--text-focus)); }
+.bm-misses { margin-top: -8px; font-size: var(--font-size-small); color: var(--text-dark); }
+.bm-misses b { font-family: var(--font-mono); font-weight: 400; color: var(--text); }
 @media (max-width: 640px) {
   .bm-title { font-size: 31px; }
   .bm-panel { flex-basis: 100%; }

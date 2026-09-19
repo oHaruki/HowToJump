@@ -380,6 +380,7 @@ export async function getProfilePlays(userId: number) {
       mod: entries.mod,
       categories: entries.categories,
       stars: entries.stars,
+      noteCount: beatmaps.noteCount,
       osuBeatmapId: beatmaps.osuBeatmapId,
       osuBeatmapsetId: beatmaps.osuBeatmapsetId,
       title: beatmaps.title,
@@ -565,6 +566,7 @@ export async function getBeatmapPage(osuBeatmapId: number) {
       version: beatmaps.version,
       mapper: beatmaps.mapper,
       maxCombo: beatmaps.maxCombo,
+      noteCount: beatmaps.noteCount,
       status: beatmaps.status,
     })
     .from(entries)

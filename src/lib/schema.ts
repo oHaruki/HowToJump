@@ -69,6 +69,8 @@ export const beatmaps = pgTable(
     od: doublePrecision("od"),
     hp: doublePrecision("hp"),
     maxCombo: integer("max_combo"),
+    /** Circles, sliders and spinners, which set what a miss costs in EXP. */
+    noteCount: integer("note_count"),
     /** ranked | loved | graveyard | qualified | wip | pending */
     status: varchar("status", { length: 24 }),
     coverUrl: text("cover_url"),

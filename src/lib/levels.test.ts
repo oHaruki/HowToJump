@@ -17,10 +17,13 @@ import { CATEGORIES, TIERS, tierByName } from "./tiers";
 const order = (name: string) => tierByName(name)!.order;
 const RAW = "Aim - raw mechanic";
 const CONSISTENCY = "Aim - consistency";
+// No note count, so each play earns what its grade says, as on a 1,500 note map.
 const play = (pack: string, grade: string, ...categories: string[]): LevelPlay => ({
   tierOrder: order(pack),
   categories: categories.length ? categories : [RAW],
   grade,
+  missCount: 0,
+  noteCount: null,
 });
 const fcs = (pack: string, n: number) => Array.from({ length: n }, () => play(pack, "SS"));
 
@@ -177,4 +180,22 @@ test("a play pushed out of one category still counts toward the total through an
   assert.equal(categoryLevels(plays)[RAW].exp, 34000);
   assert.equal(categoryLevels(plays)[CONSISTENCY].exp, 30);
   assert.equal(totalExp(plays), 34030);
+});
+
+test("misses cost EXP by map size, while the pack's bar stays put", () => {
+  // Amethyst, one miss (A+): a 30 second map counts it about three times.
+  assert.equal(playExp(order("Amethyst"), "A+", 1, 150), 3250); // as A-, 65%
+  assert.equal(playExp(order("Amethyst"), "A+", 1, 1500), 4250); // as A+, 85%
+  assert.equal(playExp(order("Amethyst"), "A", 2, 3000), 4250); // counts as 1 miss
+  // Full combos and 100% runs are never scaled.
+  assert.equal(playExp(order("Amethyst"), "SS", 0, 150), 5000);
+  assert.equal(playExp(order("Amethyst"), "SSS", 0, 150), 6000);
+  // Reaching a pack is still ten 2-miss plays as the table reads them.
+  assert.equal(threshold(order("Amethyst")), 37500);
+
+  const short: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 150 };
+  const long: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 1500 };
+  // 2 misses on 150 notes count as 6 (B, 50%): 3,400 × 50%.
+  assert.equal(categoryLevels([short])[RAW].exp, 1700);
+  assert.equal(categoryLevels([long])[RAW].exp, 2550);
 });

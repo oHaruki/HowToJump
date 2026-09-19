@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { GRADE_RULES } from "@/lib/grading";
+import { GRADE_RULES, REFERENCE_NOTES, missFactor } from "@/lib/grading";
 import { BEST_PLAYS, THRESHOLD_GRADE, threshold } from "@/lib/levels";
 import { MODS, modLabel } from "@/lib/mods";
 import { TIERS, tierByName } from "@/lib/tiers";
@@ -28,7 +28,13 @@ export default function InfoPage() {
             hold the combo and you take SS, and a 100% takes SSS.
             Thresholds are stored as data, so staff retune them without a deploy.
             The percentage beside each grade is the share of a map&apos;s EXP it
-            earns.
+            earns on a normal {fmt(REFERENCE_NOTES)} note map.
+          </p>
+          <p className="lede">
+            Staying clean is easier on a short map, so there misses cost more EXP:
+            on a short map of 150 notes each miss counts
+            ×{missFactor(150).toFixed(1)}, and on a 3,000 note map
+            ×{missFactor(3000).toFixed(1)}. The grade still shows your real misses.
           </p>
         </div>
         <div className="grade-grid">

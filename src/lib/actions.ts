@@ -296,6 +296,7 @@ async function ensureBeatmap(osuBeatmapId: number): Promise<number> {
       od: facts?.od ?? null,
       hp: facts?.hp ?? null,
       maxCombo: facts?.maxCombo ?? null,
+      noteCount: facts?.noteCount ?? null,
       status: facts?.status ?? null,
       coverUrl: facts?.coverUrl ?? null,
       cardUrl: facts?.cardUrl ?? null,

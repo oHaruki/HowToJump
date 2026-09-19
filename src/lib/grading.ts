@@ -92,3 +92,52 @@ export function gradeRank(grade: string, rules: GradeRule[] = GRADE_RULES): numb
 export function expPercentFor(grade: string, rules: GradeRule[] = GRADE_RULES): number {
   return rules.find((x) => x.grade === grade)?.expPercent ?? 0;
 }
+
+/* ---------------------------------------------------- misses by map size */
+
+/**
+ * Misses cost more EXP on a short map than on a long one, since staying
+ * clean over 150 notes is far easier than over 1,500. The grade letter still
+ * reads the real misses, osu! style, so every grade stays reachable on every
+ * map; only the EXP a play earns moves.
+ *
+ * A map of REFERENCE_NOTES, a normal consistency map, counts as it is.
+ * Elsewhere each miss counts (REFERENCE_NOTES / notes) ^ MISS_CURVE times.
+ * That's the gentle curve Kayrem picked: a 30 second map of about 150 notes
+ * counts each miss about three times, rather than the ten that plain division
+ * would give.
+ */
+export const REFERENCE_NOTES = 1500;
+export const MISS_CURVE = 0.5;
+
+/** How many misses one miss counts as on a map this size; 1 when unknown. */
+export function missFactor(noteCount: number | null | undefined): number {
+  if (!noteCount || noteCount <= 0) return 1;
+  return Math.pow(REFERENCE_NOTES / noteCount, MISS_CURVE);
+}
+
+/** Misses as they count on a map this size: rounded, and never below one. */
+export function scaledMisses(missCount: number, noteCount: number | null | undefined): number {
+  if (missCount <= 0) return 0;
+  return Math.max(1, Math.round(missCount * missFactor(noteCount)));
+}
+
+/**
+ * The share of a map's pack EXP a play earns. 100% runs, full combos and
+ * zero-miss passes keep their own share. Anything with misses earns what its
+ * scaled misses would, read off the same table. A map still waiting for its
+ * note count earns what the grade says, as every map did before.
+ */
+export function expShare(
+  grade: string,
+  missCount: number,
+  noteCount: number | null | undefined,
+  rules: GradeRule[] = GRADE_RULES,
+): number {
+  if (missCount <= 0 || !noteCount) return expPercentFor(grade, rules);
+  const scaled = gradeFor(
+    { missCount: scaledMisses(missCount, noteCount), isFc: false, isPerfect: false },
+    rules,
+  );
+  return expPercentFor(scaled, rules);
+}
