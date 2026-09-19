@@ -74,6 +74,10 @@ services:
   # Calls the sync endpoint every minute. The endpoint reads play counts and
   # syncs whoever has played since, and a pass that finds the previous one
   # still running returns straight away, so the timer never has to be exact.
+  #
+  # A literal block (|), so the script reaches sh exactly as written. A folded
+  # one (>) keeps the line break before any deeper indented line, which cut
+  # the Authorization header off curl and left every call a 401.
   worker:
     image: alpine:3.20
     restart: unless-stopped
@@ -81,13 +85,17 @@ services:
       - app
     environment:
       SYNC_TOKEN: ${SYNC_TOKEN}
-    command: >
-      sh -c "apk add --no-cache curl >/dev/null &&
-      while true; do
-        curl -fsS -X POST http://app:3000/api/sync/run
-          -H \"Authorization: Bearer $$SYNC_TOKEN\" || echo 'sync call failed';
-        sleep 60;
-      done"
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache curl >/dev/null || exit 1
+        while true; do
+          curl -fsS -X POST http://app:3000/api/sync/run \
+            -H "Authorization: Bearer $$SYNC_TOKEN" || echo 'sync call failed'
+          echo
+          sleep 60
+        done
 
   caddy:
     image: caddy:2-alpine
