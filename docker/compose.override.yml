@@ -2,8 +2,7 @@
 # than the bundled Caddy. The app is published on loopback only and nothing
 # here binds 80 or 443, so other sites on the box are untouched.
 #
-#   docker compose up -d --build     # postgres, app, worker
-#   docker compose run --rm migrate  # schema push and seed
+#   docker compose up -d --build     # postgres, migrate, app, worker
 #
 # To use the bundled Caddy instead, on a host with 80 and 443 free:
 #
@@ -19,23 +18,3 @@ services:
       # Loopback only. Docker's iptables rules bypass UFW, so a bare "6500:3000"
       # here would be open to the internet whatever the firewall says.
       - "127.0.0.1:6500:3000"
-
-  # The runtime image is a Next standalone build: no drizzle-kit, no tsx, no
-  # src/. Migrations run from the builder stage, which has all three.
-  migrate:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: builder
-    profiles: ["tools"]
-    restart: "no"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-howtojump}:${POSTGRES_PASSWORD:-howtojump}@postgres:5432/${POSTGRES_DB:-howtojump}
-      # The seed pulls beatmap metadata when these are set, and falls back to
-      # the sheet's own numbers when they are not.
-      OSU_CLIENT_ID: ${OSU_CLIENT_ID}
-      OSU_CLIENT_SECRET: ${OSU_CLIENT_SECRET}
-    command: sh -c "npm run db:push && npm run db:seed"

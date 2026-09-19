@@ -6,8 +6,9 @@
  *
  * Sixty rows is enough to page at forty eight, and they are spread so that
  * every filter has something to find: all sixteen packs, four mods, the whole
- * length and speed scales, a handful carrying category wording the grading
- * scale has dropped, and a handful already taken off the ladder.
+ * length and speed scales, some in two categories at once, a handful carrying
+ * category wording the grading scale has dropped, and a handful already taken
+ * off the ladder.
  *
  * Every row is marked by an osu! beatmap ID at or above EXAMPLE_ID_BASE,
  * which is far outside the real range, so clearing matches exactly these and
@@ -64,8 +65,14 @@ function row(i: number) {
     mapper: pick(MAPPERS, i),
     mod: pick(MODS, i),
     tierOrder: pick(TIERS, i * 7).order,
-    // Every seventh row keeps wording the scale has dropped.
-    category: i % 7 === 0 ? pick(STALE_CATEGORIES, i) : pick(CATEGORIES, i * 3),
+    // Every seventh row keeps wording the scale has dropped, and every fifth
+    // other one sits in two categories.
+    categories:
+      i % 7 === 0
+        ? [pick(STALE_CATEGORIES, i)]
+        : i % 5 === 0
+          ? [pick(CATEGORIES, i * 3), pick(CATEGORIES, i * 3 + 1)]
+          : [pick(CATEGORIES, i * 3)],
     lengthBucket: bucketFor(LENGTH_SCALE, drainSeconds),
     speedBucket: bucketFor(SPEED_SCALE, bpm),
     stars: Math.round((3 + ((i * 13) % 70) / 10) * 100) / 100,
@@ -131,7 +138,7 @@ async function main() {
       beatmapId: bm.id,
       mod: r.mod,
       tierOrder: r.tierOrder,
-      category: r.category,
+      categories: r.categories,
       lengthBucket: r.lengthBucket,
       speedBucket: r.speedBucket,
       stars: r.stars,
@@ -145,7 +152,7 @@ async function main() {
     });
   }
 
-  const stale = rows.filter((r) => !CATEGORIES.includes(r.category)).length;
+  const stale = rows.filter((r) => r.categories.some((c) => !CATEGORIES.includes(c))).length;
   const removed = rows.filter((r) => !r.isActive).length;
   console.log(
     "Inserted " + rows.length + " example entries" +

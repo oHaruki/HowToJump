@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { approveSuggestions, rejectSuggestions, setSuggestionTier } from "@/lib/actions";
 import { tierByOrder, tierBySlug } from "@/lib/tiers";
-import { ModChip, NONE, PacingChips } from "@/components/ui";
+import { CategoryChips, ModChip, NONE, PacingChips } from "@/components/ui";
 import { MapCard } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
 import { secondsToDrain } from "@/lib/import/parse";
@@ -18,7 +18,7 @@ export type QueueRow = {
   mapper: string | null;
   mod: string;
   tierOrder: number | null;
-  category: string | null;
+  categories: string[];
   stars: number | null;
   bpm: number | null;
   drainSeconds: number | null;
@@ -153,7 +153,11 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
             tags={
               <>
                 <ModChip mod={r.mod} />
-                <span className="chip">{r.category ?? "no category"}</span>
+                {r.categories.length ? (
+                  <CategoryChips categories={r.categories} />
+                ) : (
+                  <span className="chip">no category</span>
+                )}
                 <PacingChips length={r.lengthBucket} speed={r.speedBucket} />
                 <span className="small">
                   {"batch #" + (r.batchId ?? NONE) + "  " + NONE + "  " +

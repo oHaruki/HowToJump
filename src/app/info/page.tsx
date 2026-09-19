@@ -1,6 +1,16 @@
+import { Fragment } from "react";
 import { GRADE_RULES } from "@/lib/grading";
+import { BEST_PLAYS, THRESHOLD_GRADE, threshold } from "@/lib/levels";
 import { MODS, modLabel } from "@/lib/mods";
+import { TIERS, tierByName } from "@/lib/tiers";
 import { SectionHead } from "@/components/ui";
+
+const fmt = (n: number) => n.toLocaleString("en");
+const standard = GRADE_RULES.find((g) => g.grade === THRESHOLD_GRADE);
+const packLine = (name: string) => {
+  const t = tierByName(name);
+  return t ? fmt(threshold(t.order)) + " for " + t.name : "";
+};
 
 export default function InfoPage() {
   return (
@@ -17,6 +27,8 @@ export default function InfoPage() {
             Your grade comes from your misscount, with two exceptions at the top:
             hold the combo and you take SS, and a 100% takes SSS.
             Thresholds are stored as data, so staff retune them without a deploy.
+            The percentage beside each grade is the share of a map&apos;s EXP it
+            earns.
           </p>
         </div>
         <div className="grade-grid">
@@ -24,8 +36,44 @@ export default function InfoPage() {
             <div className="grade" key={g.grade}>
               <span className="grade-badge">{g.grade}</span>
               <span className="grade-cond">{g.label}</span>
+              <span className="grade-exp num">{g.expPercent}%</span>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="two-col">
+        <div className="box stack">
+          <span className="lbl">Levels</span>
+          <h3>Your best {BEST_PLAYS} plays in each skill</h3>
+          <p>
+            Every play earns EXP: its pack&apos;s value times the percentage its
+            grade earns. Each category adds up your best {BEST_PLAYS} plays in it,
+            so grinding easy maps does not help, and a new map never lowers
+            anyone. A map can sit in more than one category, and then a play on
+            it counts toward each.
+          </p>
+          <hr className="sep" />
+          <p className="small">
+            You reach a pack when your best {BEST_PLAYS} add up to {BEST_PLAYS}{" "}
+            plays at {standard?.grade} ({standard?.label}) on it: {packLine("Emerald")},{" "}
+            {packLine("Amethyst")}. Full combos on the pack below never get there on
+            their own, so reaching a pack means playing it. Your main level is the
+            average of the five categories.
+          </p>
+        </div>
+
+        <div className="box stack">
+          <span className="lbl">Pack values</span>
+          <h3>EXP for a full combo</h3>
+          <dl className="kv">
+            {TIERS.map((t) => (
+              <Fragment key={t.slug}>
+                <dt>{t.name}</dt>
+                <dd className="num">{fmt(t.exp)}</dd>
+              </Fragment>
+            ))}
+          </dl>
         </div>
       </div>
 
@@ -77,10 +125,11 @@ export default function InfoPage() {
           <p className="small">
             Almost every map on the ladder is graveyard, so there is no beatmap
             leaderboard to read. Recent plays come back as plays rather than
-            leaderboard entries, so they cover graveyard maps fine. It is the same
-            data <code>&gt;rs</code> reads. The window is the last 100 plays or 24
-            hours, whichever runs out first, which is what sets the half hour
-            cadence.
+            leaderboard entries, so they cover graveyard maps fine, on stable and
+            lazer. It is the same data <code>&gt;rs</code> reads. The site checks
+            every minute who has played, so a score usually shows up within a
+            minute. In a hurry? Sync now on your page, or <code>/rs</code> in the
+            Discord, pulls it straight away.
           </p>
         </div>
 

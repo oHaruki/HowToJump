@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { removeEntry, restoreEntry, updateEntry } from "@/lib/actions";
 import {
-  CATEGORIES, LENGTHS, SPEEDS, LENGTH_SCALE, SPEED_SCALE, scaleHint,
+  LENGTHS, SPEEDS, LENGTH_SCALE, SPEED_SCALE, scaleHint,
   tierByName, tierByOrder, tierBySlug,
 } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
-import { ModChip, PacingChips, PickSelect } from "@/components/ui";
+import { CategoryChips, ModChip, PacingChips, PickSelect } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
+import { CategoryPicker } from "@/components/CategoryPicker";
 
 const LENGTH_HINT = scaleHint(LENGTH_SCALE, "Drain time");
 const SPEED_HINT = scaleHint(SPEED_SCALE, "BPM");
@@ -24,7 +25,7 @@ export type BankAdminRow = {
   mapper: string | null;
   mod: string;
   tierOrder: number;
-  category: string;
+  categories: string[];
   lengthBucket: string | null;
   speedBucket: string | null;
   stars: number | null;
@@ -39,7 +40,7 @@ export type BankAdminRow = {
 
 type Draft = {
   tier: string;
-  category: string;
+  categories: string[];
   mod: string;
   length: string;
   speed: string;
@@ -133,12 +134,10 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <PickSelect
-                      value={draft.category}
-                      options={CATEGORIES}
-                      placeholder="Pick a category"
-                      disabled={pending}
-                      onChange={(v) => setDraft({ ...draft, category: v })}
+                    <CategoryPicker
+                      mini
+                      value={draft.categories}
+                      onChange={(v) => setDraft({ ...draft, categories: v })}
                     />
                     <PickSelect
                       value={draft.length}
@@ -163,7 +162,7 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                 ) : (
                   <>
                     <ModChip mod={r.mod} />
-                    <span className="chip">{r.category}</span>
+                    <CategoryChips categories={r.categories} />
                     <PacingChips length={r.lengthBucket} speed={r.speedBucket} />
                     {r.judgedByName ? (
                       <span className="small">by {r.judgedByName}</span>
@@ -223,7 +222,7 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                         setEditing(r.entryId);
                         setDraft({
                           tier: tierByOrder(r.tierOrder)?.name ?? "",
-                          category: r.category ?? "",
+                          categories: r.categories,
                           mod: r.mod,
                           length: r.lengthBucket ?? "",
                           speed: r.speedBucket ?? "",

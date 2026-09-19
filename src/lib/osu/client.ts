@@ -328,17 +328,34 @@ export async function fetchRecentPlays(
   return (rows ?? []).map(toPlay).filter((p) => p.osuBeatmapId > 0);
 }
 
-/** A player's top plays, swept on sign in to catch anything already in their top 100. */
-export async function fetchBestPlays(
-  osuUserId: number,
-  token?: string,
-  limit = 100,
-): Promise<PlayFacts[]> {
-  const rows = await apiGet<OsuScore[]>(
-    "/users/" + osuUserId + "/scores/best?mode=osu&limit=" + Math.min(100, limit),
-    token,
-  );
-  return (rows ?? []).map(toPlay).filter((p) => p.osuBeatmapId > 0);
+type OsuUserWithStats = {
+  id: number;
+  statistics_rulesets?: { osu?: { play_count?: number } };
+};
+
+/**
+ * osu! standard play counts, fifty players to a request.
+ *
+ * Play count rises with every play, graveyard maps included, so comparing it
+ * between checks says who has played since, at a fiftieth of the cost of
+ * reading everyone's recent plays. Players osu! no longer returns, such as
+ * restricted or deleted accounts, are simply absent from the result.
+ */
+export async function fetchPlayCounts(osuUserIds: number[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  const unique = Array.from(new Set(osuUserIds.filter((n) => Number.isFinite(n) && n > 0)));
+  for (let i = 0; i < unique.length; i += 50) {
+    const qs = unique
+      .slice(i, i + 50)
+      .map((id) => "ids[]=" + id)
+      .join("&");
+    const json = await apiGet<{ users?: OsuUserWithStats[] }>("/users?" + qs);
+    for (const u of json.users ?? []) {
+      const n = u.statistics_rulesets?.osu?.play_count;
+      if (typeof n === "number") out.set(u.id, n);
+    }
+  }
+  return out;
 }
 
 export type OsuMe = {

@@ -2,6 +2,7 @@ import {
   pgTable, serial, integer, bigint, text, varchar, boolean, timestamp,
   doublePrecision, jsonb, uniqueIndex, index, primaryKey,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /* ------------------------------------------------------------------ users */
 
@@ -17,9 +18,22 @@ export const users = pgTable(
     /** user | helper | admin */
     role: varchar("role", { length: 16 }).notNull().default("user"),
     syncEnabled: boolean("sync_enabled").notNull().default(true),
-    /** Drives the active vs dormant polling tier. */
+    /** Newest play seen, fails included. Tells a sync whether a play arrived. */
     lastPlayedAt: timestamp("last_played_at", { withTimezone: true }),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    /**
+     * osu!'s own play count, which rises with every play, graveyard maps
+     * included. A rise between two checks is what makes a player due a sync.
+     */
+    osuPlayCount: integer("osu_play_count"),
+    playCountCheckedAt: timestamp("play_count_checked_at", { withTimezone: true }),
+    /**
+     * The levels as the player last saw them on their profile, and when. The
+     * profile animates from here to where they are now, and marks scores
+     * imported since as new.
+     */
+    progressSeen: jsonb("progress_seen").$type<Record<string, unknown>>(),
+    progressSeenAt: timestamp("progress_seen_at", { withTimezone: true }),
     bannedAt: timestamp("banned_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -80,7 +94,8 @@ export const entries = pgTable(
     /** Canonical mod string, "NM" when nomod. */
     mod: varchar("mod", { length: 16 }).notNull().default("NM"),
     tierOrder: integer("tier_order").notNull(),
-    category: varchar("category", { length: 48 }).notNull(),
+    /** One map can train more than one skill, so it can sit in several. */
+    categories: varchar("categories", { length: 48 }).array().notNull().default(sql`'{}'`),
     lengthBucket: varchar("length_bucket", { length: 24 }),
     speedBucket: varchar("speed_bucket", { length: 24 }),
     /** Mod-adjusted values, which differ from the beatmap's nomod numbers. */
@@ -101,7 +116,7 @@ export const entries = pgTable(
   (t) => [
     uniqueIndex("entries_beatmap_mod_idx").on(t.beatmapId, t.mod),
     index("entries_tier_idx").on(t.tierOrder),
-    index("entries_category_idx").on(t.category),
+    index("entries_categories_idx").using("gin", t.categories),
     index("entries_active_idx").on(t.isActive),
     /*
      * The public bank reads one page at a time, filtered to active rows and
@@ -144,7 +159,7 @@ export const suggestions = pgTable(
     mapper: text("mapper"),
     mod: varchar("mod", { length: 16 }).notNull().default("NM"),
     proposedTierOrder: integer("proposed_tier_order"),
-    proposedCategory: varchar("proposed_category", { length: 48 }),
+    proposedCategories: varchar("proposed_categories", { length: 48 }).array().notNull().default(sql`'{}'`),
     proposedLength: varchar("proposed_length", { length: 24 }),
     proposedSpeed: varchar("proposed_speed", { length: 24 }),
     stars: doublePrecision("stars"),
@@ -204,6 +219,8 @@ export const scores = pgTable(
     hiddenReason: text("hidden_reason"),
     playedAt: timestamp("played_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** When this result landed: first import, or the last time it improved. */
+    importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("scores_osu_score_id_idx").on(t.osuScoreId),
@@ -227,6 +244,26 @@ export const userTierProgress = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.tierOrder] })],
 );
 
+/**
+ * Skill levels, one row per category plus "main". Rebuilt alongside the pack
+ * rollup, so a profile, and later a Discord role, reads one row per level.
+ */
+export const userLevels = pgTable(
+  "user_levels",
+  {
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** A category label, or "main" for the combined level. */
+    scope: varchar("scope", { length: 48 }).notNull(),
+    exp: integer("exp").notNull().default(0),
+    /** Null below Stone. */
+    tierOrder: integer("tier_order"),
+    /** 0 to 99 toward the next pack; null at the top. */
+    progress: integer("progress"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.scope] })],
+);
+
 /* ------------------------------------------------------------------ config */
 
 export const gradeRules = pgTable("grade_rules", {
@@ -238,6 +275,8 @@ export const gradeRules = pgTable("grade_rules", {
   maxMiss: integer("max_miss"),
   requiresFc: boolean("requires_fc").notNull().default(false),
   requiresPerfect: boolean("requires_perfect").notNull().default(false),
+  /** Share of a map's pack EXP the grade earns, as a percentage. */
+  expPercent: integer("exp_percent").notNull().default(0),
 });
 
 /** Editable site copy, so the rules page is not hardcoded. */

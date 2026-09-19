@@ -2,7 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { syncMyScores } from "@/lib/actions";
+import { syncMyScores, type SyncSummary } from "@/lib/actions";
+
+/** How many imported maps the message names before it just counts the rest. */
+const NAMED = 3;
+
+function describe(r: SyncSummary): string {
+  if (r.error) return r.error;
+  if (r.syncedSecondsAgo != null) return "Synced " + r.syncedSecondsAgo + "s ago";
+  if (!r.imported.length) return r.playsSeen + " plays read, nothing new";
+  const named = r.imported.slice(0, NAMED).join(", ");
+  const rest = r.imported.length - NAMED;
+  return "Imported " + named + (rest > 0 ? " and " + rest + " more" : "");
+}
 
 export function SyncButton() {
   const router = useRouter();
@@ -20,14 +32,7 @@ export function SyncButton() {
           start(async () => {
             setMsg(null);
             try {
-              const r = await syncMyScores();
-              setMsg(
-                r.error
-                  ? r.error
-                  : r.scoresImported
-                    ? r.scoresImported + " new"
-                    : r.playsSeen + " plays read, nothing new",
-              );
+              setMsg(describe(await syncMyScores()));
               router.refresh();
             } catch (e) {
               setMsg(e instanceof Error ? e.message : String(e));

@@ -18,9 +18,12 @@ export function BankPager({
   total,
   pageSize,
   query,
+  noun = ["entry", "entries"],
 }: {
   /** Which bank is being paged. The staff one lives at its own route. */
   basePath?: string;
+  /** What is being counted, singular and plural; the leaderboard pages players. */
+  noun?: [string, string];
   page: number;
   pageCount: number;
   total: number;
@@ -41,9 +44,9 @@ export function BankPager({
     <div className="pager">
       <p className="small">
         {total === 0
-          ? "No entries"
-          : "Showing " + first + "-" + last + " of " + total +
-            (total === 1 ? " entry" : " entries")}
+          ? "No " + noun[1]
+          : "Showing " + first + "-" + last + " of " + total + " " +
+            (total === 1 ? noun[0] : noun[1])}
       </p>
 
       {pageCount > 1 ? (

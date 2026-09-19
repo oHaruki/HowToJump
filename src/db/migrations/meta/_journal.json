@@ -15,6 +15,41 @@
       "when": 1789681270586,
       "tag": "0001_jittery_magik",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789760700722,
+      "tag": "0002_play_counts",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789761027592,
+      "tag": "0003_skill_levels",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789764755829,
+      "tag": "0004_profile_seen",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789776171414,
+      "tag": "0005_multi_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789776189573,
+      "tag": "0006_drop_single_category",
+      "breakpoints": true
     }
   ]
 }

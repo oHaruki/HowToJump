@@ -11,6 +11,12 @@ export type GradeRule = {
   maxMiss: number | null;
   requiresFc: boolean;
   requiresPerfect: boolean;
+  /**
+   * The share of a map's pack EXP this grade earns, as a percentage. Kayrem's
+   * scale: a 100% run earns a fifth more than the map is worth, a full combo
+   * or zero misses all of it, then less for every miss band.
+   */
+  expPercent: number;
 };
 
 const miss = (
@@ -19,30 +25,31 @@ const miss = (
   label: string,
   minMiss: number | null,
   maxMiss: number | null,
+  expPercent: number,
 ): GradeRule => ({
   grade, sortOrder, label, minMiss, maxMiss,
-  requiresFc: false, requiresPerfect: false,
+  requiresFc: false, requiresPerfect: false, expPercent,
 });
 
 export const GRADE_RULES: GradeRule[] = [
-  { grade: "SSS", sortOrder: 1, label: "100%", minMiss: null, maxMiss: null, requiresFc: false, requiresPerfect: true },
-  { grade: "SS", sortOrder: 2, label: "Full combo", minMiss: null, maxMiss: null, requiresFc: true, requiresPerfect: false },
-  miss("S", 3, "0 miss", 0, 0),
-  miss("A+", 4, "1 miss", 1, 1),
-  miss("A", 5, "2 miss", 2, 2),
-  miss("A-", 6, "3 miss", 3, 3),
-  miss("B+", 7, "4-5 miss", 4, 5),
-  miss("B", 8, "6-7 miss", 6, 7),
-  miss("B-", 9, "8-10 miss", 8, 10),
-  miss("C+", 10, "11-15 miss", 11, 15),
-  miss("C", 11, "16-20 miss", 16, 20),
-  miss("C-", 12, "21-30 miss", 21, 30),
-  miss("D+", 13, "31-40 miss", 31, 40),
-  miss("D", 14, "41-50 miss", 41, 50),
-  miss("D-", 15, "51-60 miss", 51, 60),
-  miss("F+", 16, "61-80 miss", 61, 80),
-  miss("F", 17, "81-100 miss", 81, 100),
-  miss("Pass", 18, "100+ miss pass", 101, null),
+  { grade: "SSS", sortOrder: 1, label: "100%", minMiss: null, maxMiss: null, requiresFc: false, requiresPerfect: true, expPercent: 120 },
+  { grade: "SS", sortOrder: 2, label: "Full combo", minMiss: null, maxMiss: null, requiresFc: true, requiresPerfect: false, expPercent: 100 },
+  miss("S", 3, "0 miss", 0, 0, 100),
+  miss("A+", 4, "1 miss", 1, 1, 85),
+  miss("A", 5, "2 miss", 2, 2, 75),
+  miss("A-", 6, "3 miss", 3, 3, 65),
+  miss("B+", 7, "4-5 miss", 4, 5, 55),
+  miss("B", 8, "6-7 miss", 6, 7, 50),
+  miss("B-", 9, "8-10 miss", 8, 10, 44),
+  miss("C+", 10, "11-15 miss", 11, 15, 36),
+  miss("C", 11, "16-20 miss", 16, 20, 29),
+  miss("C-", 12, "21-30 miss", 21, 30, 21),
+  miss("D+", 13, "31-40 miss", 31, 40, 15),
+  miss("D", 14, "41-50 miss", 41, 50, 10),
+  miss("D-", 15, "51-60 miss", 51, 60, 7),
+  miss("F+", 16, "61-80 miss", 61, 80, 5),
+  miss("F", 17, "81-100 miss", 81, 100, 2),
+  miss("Pass", 18, "100+ miss pass", 101, null, 1),
 ];
 
 export type PlayShape = {
@@ -79,4 +86,9 @@ export function gradeFor(play: PlayShape, rules: GradeRule[] = GRADE_RULES): str
 export function gradeRank(grade: string, rules: GradeRule[] = GRADE_RULES): number {
   const r = rules.find((x) => x.grade === grade);
   return r ? r.sortOrder : 999;
+}
+
+/** The percentage of a map's pack EXP a grade earns; 0 for an unknown grade. */
+export function expPercentFor(grade: string, rules: GradeRule[] = GRADE_RULES): number {
+  return rules.find((x) => x.grade === grade)?.expPercent ?? 0;
 }

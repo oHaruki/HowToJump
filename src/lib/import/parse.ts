@@ -1,6 +1,6 @@
 import { normalizeMod } from "@/lib/mods";
 import {
-  isCategory, normalizeCategory, normalizeLength, normalizeSpeed, tierByName,
+  isCategory, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
   type Tier,
 } from "@/lib/tiers";
 
@@ -22,7 +22,8 @@ export type ParsedRow = {
   title: string;
   version: string;
   mapper: string;
-  category: string;
+  /** One cell can name several ("Raw Aim / Consistency"); a map can sit in each. */
+  categories: string[];
   length: string;
   speed: string;
   mod: string;
@@ -196,7 +197,7 @@ export function parsePaste(text: string): ParseResult {
 
 export function rowFromLink(
   line: string,
-  defaults?: { tier?: string; category?: string; mod?: string },
+  defaults?: { tier?: string; categories?: string[]; mod?: string },
 ): ParsedRow {
   const link = String(line).trim();
   return finish({
@@ -208,7 +209,7 @@ export function rowFromLink(
     title: "",
     version: "",
     mapper: "",
-    category: defaults?.category ?? "",
+    categories: defaults?.categories ?? [],
     length: "",
     speed: "",
     mod: normalizeMod(defaults?.mod),
@@ -243,7 +244,7 @@ function rowFromCells(cells: string[], order: Array<string | null>): ParsedRow {
     title: t.title,
     version: t.version,
     mapper: g.mapper ?? "",
-    category: normalizeCategory(g.category),
+    categories: normalizeCategories(g.category),
     length: normalizeLength(g.length),
     speed: normalizeSpeed(g.speed),
     mod: normalizeMod(g.mod),
@@ -272,7 +273,7 @@ function finish(r: ParsedRow): ParsedRow {
 export function recheck(r: ParsedRow): ParsedRow {
   r.notes = [];
   r.mod = normalizeMod(r.mod);
-  r.category = normalizeCategory(r.category);
+  r.categories = normalizeCategories(r.categories);
   r.length = normalizeLength(r.length);
   r.speed = normalizeSpeed(r.speed);
   r.tierObj = tierByName(r.tier);
@@ -289,15 +290,17 @@ export function recheck(r: ParsedRow): ParsedRow {
   if (!r.tierObj) {
     r.notes.push(r.tier ? "Unknown pack: " + r.tier : "Pick a pack");
   }
-  if (!r.category) {
-    r.notes.push("Pick a category");
-  } else if (!isCategory(r.category)) {
-    // A category that is no longer judged on has to be picked again rather
-    // than ridden back onto the ladder by a paste.
-    r.notes.push("Unknown category: " + r.category);
-  }
+  r.notes.push(...categoryNotes(r.categories));
   r.status = r.notes.length ? "attention" : "new";
   return r;
+}
+
+/** What a row's categories still need before it can be sent. */
+export function categoryNotes(categories: readonly string[]): string[] {
+  if (!categories.length) return ["Pick a category"];
+  // A category that is no longer judged on has to be picked again rather
+  // than ridden back onto the ladder by a paste.
+  return categories.filter((c) => !isCategory(c)).map((c) => "Unknown category: " + c);
 }
 
 /** Identity is beatmap plus mod, so the same map under DT is a new entry. */

@@ -5,16 +5,17 @@ import { useRouter } from "next/navigation";
 import {
   importRows, previewPaste, starRatingFor, type PreviewRow,
 } from "@/lib/actions";
-import { normalizations, secondsToDrain } from "@/lib/import/parse";
+import { categoryNotes, normalizations, secondsToDrain } from "@/lib/import/parse";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   TIERS, tierByName, tierByOrder, tierBySlug, CATEGORIES, LENGTHS, SPEEDS,
-  LENGTH_SCALE, SPEED_SCALE, isCategory, scaleHint,
+  LENGTH_SCALE, SPEED_SCALE, normalizeCategories, scaleHint,
 } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
 import { MapCard } from "@/components/MapCard";
 import { PickSelect } from "@/components/ui";
 import { PackPicker } from "@/components/PackPicker";
+import { CategoryPicker } from "@/components/CategoryPicker";
 
 type Row = PreviewRow & { selected: boolean };
 
@@ -50,7 +51,7 @@ export function Importer() {
 
   const linkRef = useRef<HTMLTextAreaElement>(null);
   const [linkTier, setLinkTier] = useState("");
-  const [linkCat, setLinkCat] = useState("");
+  const [linkCats, setLinkCats] = useState<string[]>([]);
   const [linkMod, setLinkMod] = useState("NM");
 
   const detected = useMemo(() => {
@@ -82,7 +83,7 @@ export function Importer() {
         // One request for the whole list, so twenty links are one API batch.
         const res = await previewPaste(
           v,
-          { tier: linkTier, category: linkCat, mod: linkMod },
+          { tier: linkTier, categories: linkCats, mod: linkMod },
           true,
         );
         setRows((prev) =>
@@ -93,7 +94,7 @@ export function Importer() {
         setError(e instanceof Error ? e.message : String(e));
       }
     });
-  }, [linkTier, linkCat, linkMod]);
+  }, [linkTier, linkCats, linkMod]);
 
   const readFile = useCallback(
     (f: File) => {
@@ -156,6 +157,19 @@ export function Importer() {
     );
   }, []);
 
+  /** Categories are a set per row, so a bulk edit can replace it or add to it. */
+  const bulkCategories = useCallback((next: (current: string[]) => string[]) => {
+    setRows((prev) =>
+      revalidate(
+        prev.map((r) =>
+          r.selected && r.status !== "error"
+            ? { ...r, categories: normalizeCategories(next(r.categories)) }
+            : r,
+        ),
+      ),
+    );
+  }, []);
+
   const tally = useMemo(() => {
     const t: Record<string, number> = {};
     for (const r of rows) t[r.status] = (t[r.status] ?? 0) + 1;
@@ -180,7 +194,7 @@ export function Importer() {
             mapper: r.mapper,
             mod: r.mod,
             tierOrder: r.tierOrder!,
-            category: r.category,
+            categories: r.categories,
             length: r.length,
             speed: r.speed,
             stars: r.stars,
@@ -292,7 +306,7 @@ export function Importer() {
         <div className="box stack">
           <div className="row spread">
             <span className="lbl">Paste links, one per line</span>
-            <span className="small">Pack, category and mod apply to all of them</span>
+            <span className="small">Pack, categories and mod apply to all of them</span>
           </div>
           <textarea
             ref={linkRef}
@@ -311,15 +325,10 @@ export function Importer() {
                 onChange={(slug) => setLinkTier(tierBySlug(slug)?.name ?? "")}
               />
             </label>
-            <label className="field" style={{ flex: "1 1 170px" }}>
-              <span className="lbl">Category</span>
-              <select value={linkCat} onChange={(e) => setLinkCat(e.target.value)}>
-                <option value="" disabled>Pick a category</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </label>
+            <div className="field" style={{ flex: "1 1 170px" }}>
+              <span className="lbl">Categories</span>
+              <CategoryPicker value={linkCats} onChange={setLinkCats} />
+            </div>
             <label className="field" style={{ flex: "1 1 120px" }}>
               <span className="lbl">Mod</span>
               <select value={linkMod} onChange={(e) => setLinkMod(e.target.value)}>
@@ -387,10 +396,18 @@ export function Importer() {
             <select
               className="mini"
               value=""
-              onChange={(e) => { if (e.target.value) bulk({ category: e.target.value }); }}
+              onChange={(e) => {
+                const [how, c] = e.target.value.split("|");
+                if (c) bulkCategories((cats) => (how === "set" ? [c] : [...cats, c]));
+              }}
             >
               <option value="" disabled>Set category</option>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <optgroup label="Only this">
+                {CATEGORIES.map((c) => <option key={c} value={"set|" + c}>{c}</option>)}
+              </optgroup>
+              <optgroup label="Add to what is there">
+                {CATEGORIES.map((c) => <option key={c} value={"add|" + c}>+ {c}</option>)}
+              </optgroup>
             </select>
             <select
               className="mini"
@@ -496,11 +513,10 @@ export function Importer() {
                             <option key={m} value={m}>{m}</option>
                           ))}
                         </select>
-                        <PickSelect
-                          value={r.category}
-                          options={CATEGORIES}
-                          placeholder="Pick a category"
-                          onChange={(v) => patch(r.uid, { category: v })}
+                        <CategoryPicker
+                          mini
+                          value={r.categories}
+                          onChange={(v) => patch(r.uid, { categories: v })}
                         />
                         <PickSelect
                           value={r.length}
@@ -580,8 +596,7 @@ function revalidate(rows: Row[]): Row[] {
     const tier = tierByName(r.tier);
     const notes: string[] = [];
     if (!tier) notes.push(r.tier ? "Unknown pack: " + r.tier : "Pick a pack");
-    if (!r.category) notes.push("Pick a category");
-    else if (!isCategory(r.category)) notes.push("Unknown category: " + r.category);
+    notes.push(...categoryNotes(r.categories));
 
     const key = r.beatmapId + "|" + r.mod;
     let status = notes.length ? "attention" : "new";

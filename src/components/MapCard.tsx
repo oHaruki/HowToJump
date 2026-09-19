@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import Link from "next/link";
 import { NONE } from "@/components/ui";
 import { tierByOrder, tierFill } from "@/lib/tiers";
 
@@ -32,6 +33,7 @@ export function MapCard({
   packEditable,
   extraStats,
   linkTitle = true,
+  href,
 }: {
   osuBeatmapId: number;
   osuBeatmapsetId: number | null;
@@ -57,6 +59,8 @@ export function MapCard({
   /** Appended to the figures, for surfaces with their own, like a score. */
   extraStats?: ReactNode;
   linkTitle?: boolean;
+  /** The map's page on this site; the title links to osu! when there is none. */
+  href?: string;
 }) {
   const url = osuBeatmapsetId
     ? "https://osu.ppy.sh/beatmapsets/" + osuBeatmapsetId + "#osu/" + osuBeatmapId
@@ -80,7 +84,11 @@ export function MapCard({
           ) : null}
 
           <div className="mapcard-info">
-            {linkTitle ? (
+            {linkTitle && href ? (
+              <Link className="mapcard-title" href={href}>
+                {title || "beatmap " + osuBeatmapId}
+              </Link>
+            ) : linkTitle ? (
               <a
                 className="mapcard-title"
                 href={url}

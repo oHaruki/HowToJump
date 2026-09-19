@@ -11,16 +11,16 @@ import { auth, requireAdmin, requireStaff } from "@/lib/auth";
 import {
   fetchBeatmaps, fetchStarRating, fetchUser, type BeatmapFacts,
 } from "@/lib/osu/client";
-import { syncUser } from "@/lib/osu/sync";
+import { cooldownLeft, refreshEntryPlayers, syncUser } from "@/lib/osu/sync";
 import { modAcronyms, normalizeMod } from "@/lib/mods";
 import {
-  CATEGORIES, normalizeCategory, normalizeLength, normalizeSpeed, tierByName,
+  CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
 } from "@/lib/tiers";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
 } from "@/lib/import/parse";
-import { getExistingEntryKeys } from "@/lib/queries";
+import { describeScores, entryName, getExistingEntryKeys } from "@/lib/queries";
 
 async function record(
   actorId: number | undefined,
@@ -76,7 +76,7 @@ export type PreviewRow = Omit<ParsedRow, "tierObj"> & {
  */
 export async function previewPaste(
   text: string,
-  defaults?: { tier?: string; category?: string; mod?: string },
+  defaults?: { tier?: string; categories?: string[]; mod?: string },
   asLinks?: boolean,
 ): Promise<{ mode: string | null; rows: PreviewRow[] }> {
   await requireStaff();
@@ -84,7 +84,7 @@ export async function previewPaste(
   const parsed = asLinks
     ? {
         mode: "links" as string | null,
-        // One link per line, all sharing the pack, category and mod chosen above.
+        // One link per line, all sharing the pack, categories and mod chosen above.
         rows: splitLines(text).map((l) => rowFromLink(l, defaults)),
       }
     : parsePaste(text);
@@ -201,7 +201,7 @@ const ImportRow = z.object({
   mapper: z.string().default(""),
   mod: z.string().default("NM"),
   tierOrder: z.number().int().min(1).max(16),
-  category: z.string().min(1),
+  categories: z.array(z.string().min(1)).min(1),
   length: z.string().default(""),
   speed: z.string().default(""),
   stars: z.number().nullable().optional(),
@@ -239,7 +239,7 @@ export async function importRows(
       mapper: r.mapper,
       mod: normalizeMod(r.mod),
       proposedTierOrder: r.tierOrder,
-      proposedCategory: normalizeCategory(r.category),
+      proposedCategories: normalizeCategories(r.categories),
       proposedLength: normalizeLength(r.length) || null,
       proposedSpeed: normalizeSpeed(r.speed) || null,
       stars: r.stars ?? null,
@@ -327,7 +327,9 @@ export async function approveSuggestions(ids: number[]) {
         tierOrder: s.proposedTierOrder,
         // The importer will not send a row without one, so this only stands in
         // for a suggestion that somehow arrived with the field empty.
-        category: normalizeCategory(s.proposedCategory) || CATEGORIES[0],
+        categories: s.proposedCategories.length
+          ? normalizeCategories(s.proposedCategories)
+          : [CATEGORIES[0]],
         lengthBucket: s.proposedLength,
         speedBucket: s.proposedSpeed,
         stars: s.stars,
@@ -404,7 +406,7 @@ export async function updateEntry(
   entryId: number,
   patch: {
     tier?: string;
-    category?: string;
+    categories?: string[];
     mod?: string;
     length?: string;
     speed?: string;
@@ -436,7 +438,11 @@ export async function updateEntry(
     if (!t) throw new Error("Unknown pack: " + patch.tier);
     set.tierOrder = t.order;
   }
-  if (patch.category) set.category = normalizeCategory(patch.category);
+  if (patch.categories) {
+    const categories = normalizeCategories(patch.categories);
+    if (!categories.length) throw new Error("Pick at least one category");
+    set.categories = categories;
+  }
   if (patch.length !== undefined) set.lengthBucket = normalizeLength(patch.length) || null;
   if (patch.speed !== undefined) set.speedBucket = normalizeSpeed(patch.speed) || null;
 
@@ -480,6 +486,8 @@ export async function updateEntry(
 
   await db.update(entries).set(set).where(eq(entries.id, entryId));
   await record(staff.id, staff.name ?? undefined, "entry.update", "entry", entryId, patch);
+  // A new pack or category changes what every play on the map is worth.
+  if (patch.tier || patch.categories) await refreshEntryPlayers(entryId);
 
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
@@ -494,6 +502,7 @@ export async function removeEntry(entryId: number) {
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(entries.id, entryId));
   await record(staff.id, staff.name ?? undefined, "entry.remove", "entry", entryId);
+  await refreshEntryPlayers(entryId);
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
@@ -513,6 +522,7 @@ export async function restoreEntry(entryId: number) {
     .set({ isActive: true, updatedAt: new Date() })
     .where(eq(entries.id, entryId));
   await record(staff.id, staff.name ?? undefined, "entry.restore", "entry", entryId);
+  await refreshEntryPlayers(entryId);
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
@@ -584,15 +594,41 @@ export async function addStaffMember(
 
 /* ------------------------------------------------------------------- sync */
 
-export async function syncMyScores() {
+export type SyncSummary = {
+  error?: string;
+  /** Set when the cooldown refused the sync: seconds since the last one. */
+  syncedSecondsAgo?: number;
+  playsSeen: number;
+  /** "Title [Diff] +DT · A", one for each score the sync kept. */
+  imported: string[];
+};
+
+export async function syncMyScores(): Promise<SyncSummary> {
   const session = await auth();
   if (!session?.user) throw new Error("Sign in first");
-  const result = await syncUser(
-    session.userId,
-    session.osuUserId,
-    session.osuAccessToken,
-    { includeBest: true },
-  );
+
+  const [me] = await db
+    .select({ lastSyncedAt: users.lastSyncedAt })
+    .from(users)
+    .where(eq(users.id, session.userId));
+  const last = me?.lastSyncedAt ?? null;
+  if (last && cooldownLeft(last) > 0) {
+    return {
+      syncedSecondsAgo: Math.round((Date.now() - last.getTime()) / 1000),
+      playsSeen: 0,
+      imported: [],
+    };
+  }
+
+  // The app token, not the player's: theirs is only issued at sign in and
+  // expires a day later, while recent plays are public either way.
+  const result = await syncUser(session.userId, session.osuUserId);
   revalidatePath("/me");
-  return result;
+  if (result.error) return { error: result.error, playsSeen: result.playsSeen, imported: [] };
+
+  const lines = await describeScores(result.imported);
+  return {
+    playsSeen: result.playsSeen,
+    imported: lines.map((s) => entryName(s) + " · " + s.grade),
+  };
 }

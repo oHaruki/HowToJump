@@ -13,8 +13,8 @@ import {
 } from "./parse";
 import { normalizeMod, modsFromApi } from "../mods";
 import {
-  CATEGORIES, LENGTHS, SPEEDS, isCategory, normalizeCategory, normalizeLength,
-  normalizeSpeed, orderByScale,
+  CATEGORIES, LENGTHS, SPEEDS, isCategory, normalizeCategories, normalizeCategory,
+  normalizeLength, normalizeSpeed, orderByScale,
 } from "../tiers";
 import { gradeFor } from "../grading";
 import {
@@ -369,8 +369,27 @@ test("a paste carrying a dropped category is held back", () => {
 
   // The same row on the new list sails through.
   const { rows: ok } = parsePaste(HEADER + "\n" + ROW_LUNATICON);
-  assert.equal(ok[0].category, "Aim - raw mechanic");
+  assert.deepEqual(ok[0].categories, ["Aim - raw mechanic"]);
   assert.equal(ok[0].status, "new");
+});
+
+test("one cell can put a map in several categories", () => {
+  const both = ROW_LUNATICON.split(T);
+  both[1] = "Raw Aim / Consistency";
+  const { rows } = parsePaste(HEADER + "\n" + both.join(T));
+  // Scale order, not the order they were typed in.
+  assert.deepEqual(rows[0].categories, ["Aim - consistency", "Aim - raw mechanic"]);
+  assert.equal(rows[0].status, "new");
+
+  assert.deepEqual(normalizeCategories("Precision, anti-aim; Precision"), ["Anti-aim", "Precision"]);
+  assert.deepEqual(normalizeCategories(["Aim control", "Raw Aim"]), ["Aim - raw mechanic", "Aim control"]);
+  assert.deepEqual(normalizeCategories(""), []);
+
+  // One dropped label in the set holds the row back, named.
+  both[1] = "Raw Aim + Flow Aim";
+  const { rows: held } = parsePaste(HEADER + "\n" + both.join(T));
+  assert.equal(held[0].status, "attention");
+  assert.deepEqual(held[0].notes, ["Unknown category: Flow Aim"]);
 });
 
 test("filters read along their list, not the alphabet", () => {

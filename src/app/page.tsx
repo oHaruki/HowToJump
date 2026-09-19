@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getBankStats, getRecentEntries, getTierCounts } from "@/lib/queries";
 import {
-  LadderGrid, ModChip, NONE, Stat, TierChip, beatmapUrl,
+  CategoryChips, LadderGrid, ModChip, NONE, Stat, TierChip, beatmapUrl,
 } from "@/components/ui";
 import { Cover } from "@/components/Cover";
 import { FeaturedRotator } from "@/components/FeaturedRotator";
@@ -108,7 +108,7 @@ export default async function OverviewPage() {
                   <div className="row-tight">
                     <TierChip tier={m.tierOrder} />
                     <ModChip mod={m.mod} />
-                    <span className="chip">{m.category}</span>
+                    <CategoryChips categories={m.categories} />
                   </div>
                   <div className="statline">
                     <span><i>Stars</i><b>{m.stars?.toFixed(2)}&#9733;</b></span>

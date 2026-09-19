@@ -72,6 +72,20 @@ function KeyedChip({ label, value }: { label: string; value: string }) {
 }
 
 /**
+ * A map's categories, one chip each. Written as stored, so a label the
+ * grading team has since renamed or dropped still shows for what it is.
+ */
+export function CategoryChips({ categories }: { categories: readonly string[] }) {
+  return (
+    <>
+      {categories.map((c) => (
+        <span key={c} className="chip">{c}</span>
+      ))}
+    </>
+  );
+}
+
+/**
  * A dropdown whose first line is a label, not a choice.
  *
  * Pack, category, length and speed all have to end up with a real value, so
@@ -121,6 +135,48 @@ export function PickSelect({
   );
 }
 
+/**
+ * A country flag, drawn with the same artwork osu! uses. Emoji flags would be
+ * simpler, but Windows shows them as two bare letters.
+ */
+export function Flag({ code }: { code: string | null | undefined }) {
+  if (!code || !/^[A-Za-z]{2}$/.test(code)) return null;
+  const points = code
+    .toUpperCase()
+    .split("")
+    .map((c) => (0x1f1e6 + c.charCodeAt(0) - 65).toString(16))
+    .join("-");
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      className="flag"
+      src={"https://osu.ppy.sh/assets/images/flags/" + points + ".svg"}
+      alt={code.toUpperCase()}
+      title={code.toUpperCase()}
+      loading="lazy"
+    />
+  );
+}
+
+/* osu!'s grade colours by family: gold at the top, then green, blue, purple, red. */
+function gradeTone(grade: string): string {
+  if (grade === "SSS" || grade === "SS" || grade === "S") return grade.toLowerCase();
+  const letter = grade.charAt(0);
+  return "ABCD".includes(letter) ? letter.toLowerCase() : "f";
+}
+
+/**
+ * A grade drawn the way osu! draws one on a scoreboard: a big slanted letter
+ * in its family's colours, no box around it.
+ */
+export function GradeLetter({ grade, big }: { grade: string; big?: boolean }) {
+  return (
+    <span className={"gl" + (big ? " big" : "")} data-tone={gradeTone(grade)}>
+      {grade}
+    </span>
+  );
+}
+
 export function GradeBadge({ grade }: { grade: string }) {
   return <span className="grade-badge">{grade}</span>;
 }
@@ -156,6 +212,15 @@ export function beatmapUrl(m: MapLike) {
   return m.osuBeatmapsetId
     ? "https://osu.ppy.sh/beatmapsets/" + m.osuBeatmapsetId + "#osu/" + m.osuBeatmapId
     : "https://osu.ppy.sh/b/" + m.osuBeatmapId;
+}
+
+/**
+ * A map's page on this site: /beatmap/ and the same number as on osu!, so it
+ * can be typed from memory. Anything banked under a mod carries it, since
+ * one beatmap can be banked more than once.
+ */
+export function mapHref(osuBeatmapId: number, mod?: string | null) {
+  return "/beatmap/" + osuBeatmapId + (mod && mod !== "NM" ? "?mod=" + mod : "");
 }
 
 /** Cover art. The 404 fallback lives in Cover, which needs the client. */

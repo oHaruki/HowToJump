@@ -1,5 +1,5 @@
 import { MapCard, PackTile } from "@/components/MapCard";
-import { ModChip, PacingChips } from "@/components/ui";
+import { CategoryChips, ModChip, PacingChips, mapHref } from "@/components/ui";
 import type { BankRow } from "@/lib/queries";
 
 /** The public bank. Read only, so the pack is a tile and there are no actions. */
@@ -25,11 +25,12 @@ export function MapList({ rows }: { rows: BankRow[] }) {
           cs={m.cs}
           ar={m.ar}
           od={m.od}
+          href={mapHref(m.osuBeatmapId, m.mod)}
           pack={<PackTile tierOrder={m.tierOrder} />}
           tags={
             <>
               <ModChip mod={m.mod} />
-              <span className="chip">{m.category}</span>
+              <CategoryChips categories={m.categories} />
               <PacingChips length={m.lengthBucket} speed={m.speedBucket} />
             </>
           }

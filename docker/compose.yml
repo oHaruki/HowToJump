@@ -21,6 +21,31 @@ services:
     # Postgres, and exposes the port to anything on the box for no gain. For a
     # dump or a psql session: docker compose exec postgres ...
 
+  # Brings the database up to this build before the app starts, on every
+  # `up`: new migrations, the grade table, the sheet's maps into an empty
+  # bank, and levels when the numbers behind them changed. Every step is safe
+  # to repeat. If it fails, compose stops there and the running app is left
+  # as it was; `docker compose logs migrate` says why.
+  #
+  # Built from the builder stage, because the runtime image is a Next
+  # standalone build with no drizzle-kit, tsx or src/.
+  migrate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: builder
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-howtojump}:${POSTGRES_PASSWORD:-howtojump}@postgres:5432/${POSTGRES_DB:-howtojump}
+      # Only used when the bank is empty, to pull the sheet's beatmaps from
+      # osu!; without them the sheet's own numbers are used.
+      OSU_CLIENT_ID: ${OSU_CLIENT_ID}
+      OSU_CLIENT_SECRET: ${OSU_CLIENT_SECRET}
+    command: npm run db:deploy
+
   app:
     build:
       context: ..
@@ -29,6 +54,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-howtojump}:${POSTGRES_PASSWORD:-howtojump}@postgres:5432/${POSTGRES_DB:-howtojump}
       OSU_CLIENT_ID: ${OSU_CLIENT_ID}
@@ -38,12 +65,15 @@ services:
       AUTH_TRUST_HOST: "true"
       BOOTSTRAP_ADMINS: ${BOOTSTRAP_ADMINS}
       SYNC_TOKEN: ${SYNC_TOKEN}
+      DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID:-}
+      DISCORD_PUBLIC_KEY: ${DISCORD_PUBLIC_KEY:-}
+      DISCORD_SCORES_WEBHOOK_URL: ${DISCORD_SCORES_WEBHOOK_URL:-}
     expose:
       - "3000"
 
-  # Calls the sync endpoint every 15 minutes. The endpoint itself decides who
-  # is actually due, so this timer only has to be more frequent than the
-  # shortest interval, never exact.
+  # Calls the sync endpoint every minute. The endpoint reads play counts and
+  # syncs whoever has played since, and a pass that finds the previous one
+  # still running returns straight away, so the timer never has to be exact.
   worker:
     image: alpine:3.20
     restart: unless-stopped
@@ -56,7 +86,7 @@ services:
       while true; do
         curl -fsS -X POST http://app:3000/api/sync/run
           -H \"Authorization: Bearer $$SYNC_TOKEN\" || echo 'sync call failed';
-        sleep 900;
+        sleep 60;
       done"
 
   caddy:

@@ -1,8 +1,9 @@
 import {
-  and, asc, desc, eq, ilike, notInArray, or, sql as raw,
+  and, arrayContained, arrayContains, asc, desc, eq, ilike, inArray, isNull, not, or,
+  sql as raw,
 } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { beatmaps, entries, scores, suggestions, users } from "@/lib/schema";
+import { beatmaps, entries, scores, suggestions, userLevels, users } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
 import { CATEGORIES, LENGTHS, SPEEDS, orderByScale } from "@/lib/tiers";
 
@@ -18,7 +19,8 @@ export type BankRow = {
   cardUrl: string | null;
   mod: string;
   tierOrder: number;
-  category: string;
+  /** Every skill the map is judged on, in the scale's order. */
+  categories: string[];
   lengthBucket: string | null;
   speedBucket: string | null;
   stars: number | null;
@@ -50,10 +52,10 @@ export type BankFilters = {
   /** Staff only. Defaults to "listed" everywhere else. */
   status?: BankStatus;
   /**
-   * Staff only: just the entries whose category is not one the team still
-   * judges. Labels are left alone in the database when the scale is renamed
-   * and fixed as staff touch the rows, so this is the queue of rows that
-   * never got touched.
+   * Staff only: just the entries carrying a category the team no longer
+   * judges, or none at all. Labels are left alone in the database when the
+   * scale is renamed and fixed as staff touch the rows, so this is the queue
+   * of rows that never got touched.
    */
   staleLabels?: boolean;
 };
@@ -82,7 +84,7 @@ const bankSelection = {
   cardUrl: beatmaps.cardUrl,
   mod: entries.mod,
   tierOrder: entries.tierOrder,
-  category: entries.category,
+  categories: entries.categories,
   lengthBucket: entries.lengthBucket,
   speedBucket: entries.speedBucket,
   stars: entries.stars,
@@ -112,9 +114,16 @@ function bankWhere(filters: BankFilters) {
   const where = [];
   const status = statusWhere(filters.status);
   if (status) where.push(status);
-  if (filters.staleLabels) where.push(notInArray(entries.category, CATEGORIES));
+  if (filters.staleLabels) {
+    where.push(
+      or(
+        not(arrayContained(entries.categories, CATEGORIES)),
+        raw`cardinality(${entries.categories}) = 0`,
+      )!,
+    );
+  }
   if (filters.pack) where.push(eq(entries.tierOrder, filters.pack));
-  if (filters.category) where.push(eq(entries.category, filters.category));
+  if (filters.category) where.push(arrayContains(entries.categories, [filters.category]));
   if (filters.mod) where.push(eq(entries.mod, filters.mod));
   if (filters.length) where.push(eq(entries.lengthBucket, filters.length));
   if (filters.speed) where.push(eq(entries.speedBucket, filters.speed));
@@ -209,6 +218,25 @@ export async function getTierCounts(
   return new Map(rows.map((r) => [r.tierOrder, r.n]));
 }
 
+/**
+ * Listed entries per pack and set of categories, for the staff coverage grid,
+ * which counts a map once in each of its categories. Labels the grading team
+ * has dropped come back as they are, so the page can count them apart.
+ */
+export async function getCoverage(): Promise<
+  Array<{ tierOrder: number; categories: string[]; n: number }>
+> {
+  return db
+    .select({
+      tierOrder: entries.tierOrder,
+      categories: entries.categories,
+      n: raw<number>`count(*)::int`,
+    })
+    .from(entries)
+    .where(eq(entries.isActive, true))
+    .groupBy(entries.tierOrder, entries.categories);
+}
+
 export async function getBankStats() {
   const [row] = await db
     .select({
@@ -230,7 +258,7 @@ export async function getBankStats() {
 export async function getFacets(status: BankStatus = "listed") {
   const rows = await db
     .selectDistinct({
-      category: entries.category,
+      categories: entries.categories,
       mod: entries.mod,
       lengthBucket: entries.lengthBucket,
       speedBucket: entries.speedBucket,
@@ -245,7 +273,7 @@ export async function getFacets(status: BankStatus = "listed") {
   // reads Very low to Extreme+ rather than Extreme to Very low. Anything left
   // over from an older list sorts to the end instead of hiding mid-list.
   return {
-    categories: orderByScale(uniq(rows.map((r) => r.category)), CATEGORIES),
+    categories: orderByScale(uniq(rows.flatMap((r) => r.categories)), CATEGORIES),
     mods: uniq(rows.map((r) => r.mod)),
     lengths: orderByScale(uniq(rows.map((r) => r.lengthBucket)), LENGTHS),
     speeds: orderByScale(uniq(rows.map((r) => r.speedBucket)), SPEEDS),
@@ -285,7 +313,7 @@ export async function getPendingSuggestions() {
       mapper: suggestions.mapper,
       mod: suggestions.mod,
       tierOrder: suggestions.proposedTierOrder,
-      category: suggestions.proposedCategory,
+      categories: suggestions.proposedCategories,
       stars: suggestions.stars,
       bpm: suggestions.bpm,
       drainSeconds: suggestions.drainSeconds,
@@ -330,28 +358,28 @@ export async function getStaffStats() {
 
 /* --------------------------------------------------------------- profile */
 
-export async function getUserScores(userId: number) {
+/**
+ * Every play a profile shows, newest first: visible scores on maps still on
+ * the ladder. All of them rather than a page, since top plays are ranked by
+ * EXP across the lot, and a player has hundreds at most.
+ */
+export async function getProfilePlays(userId: number) {
   return db
     .select({
       scoreId: scores.id,
       grade: scores.grade,
-      gradeRank: scores.gradeRank,
       missCount: scores.missCount,
       accuracy: scores.accuracy,
-      mods: scores.mods,
+      isFc: scores.isFc,
+      isPerfect: scores.isPerfect,
       playedAt: scores.playedAt,
+      createdAt: scores.createdAt,
+      importedAt: scores.importedAt,
       entryId: entries.id,
       tierOrder: entries.tierOrder,
       mod: entries.mod,
-      category: entries.category,
-      lengthBucket: entries.lengthBucket,
-      speedBucket: entries.speedBucket,
+      categories: entries.categories,
       stars: entries.stars,
-      bpm: entries.bpm,
-      drainSeconds: entries.drainSeconds,
-      cs: entries.cs,
-      ar: entries.ar,
-      od: entries.od,
       osuBeatmapId: beatmaps.osuBeatmapId,
       osuBeatmapsetId: beatmaps.osuBeatmapsetId,
       title: beatmaps.title,
@@ -361,25 +389,293 @@ export async function getUserScores(userId: number) {
     .from(scores)
     .innerJoin(entries, eq(scores.entryId, entries.id))
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
-    .where(and(eq(scores.userId, userId), eq(scores.isHidden, false)))
-    .orderBy(desc(scores.playedAt))
-    .limit(50);
+    .where(
+      and(eq(scores.userId, userId), eq(scores.isHidden, false), eq(entries.isActive, true)),
+    )
+    .orderBy(desc(scores.playedAt), desc(scores.id));
+}
+
+export type ProfilePlay = Awaited<ReturnType<typeof getProfilePlays>>[number];
+
+export type ScoreLine = {
+  entryId: number;
+  title: string;
+  version: string | null;
+  mod: string;
+  tierOrder: number;
+  categories: string[];
+  grade: string;
+  missCount: number;
+};
+
+/**
+ * The maps behind what a sync just imported, in the order it imported them,
+ * for the Sync now button, the /rs reply and the score feed.
+ */
+export async function describeScores(
+  imported: Array<{ entryId: number; grade: string; missCount: number }>,
+): Promise<ScoreLine[]> {
+  if (!imported.length) return [];
+  const rows = await db
+    .select({
+      entryId: entries.id,
+      title: beatmaps.title,
+      version: beatmaps.version,
+      mod: entries.mod,
+      tierOrder: entries.tierOrder,
+      categories: entries.categories,
+    })
+    .from(entries)
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .where(inArray(entries.id, imported.map((i) => i.entryId)));
+  const byId = new Map(rows.map((r) => [r.entryId, r]));
+  return imported.flatMap((i) => {
+    const r = byId.get(i.entryId);
+    return r ? [{ ...r, grade: i.grade, missCount: i.missCount }] : [];
+  });
+}
+
+/** "Title [Diff] +DT", the way the bank names an entry. */
+export function entryName(s: { title: string; version: string | null; mod: string }): string {
+  const diff = s.version ? " [" + s.version + "]" : "";
+  const mod = s.mod && s.mod !== "NM" ? " +" + s.mod : "";
+  return s.title + diff + mod;
+}
+
+/** "A (2 misses)", or the top two grades by what they mean. */
+export function gradeText(s: { grade: string; missCount: number }): string {
+  if (s.grade === "SSS") return "SSS (100%)";
+  if (s.grade === "SS") return "SS (FC)";
+  return s.grade + " (" + s.missCount + (s.missCount === 1 ? " miss)" : " misses)");
 }
 
 /** Per entry leaderboard: best grade first, accuracy as the tie break. */
-export async function getEntryLeaderboard(entryId: number, limit = 50) {
-  return db
+const boardScore = {
+  scoreId: scores.id,
+  userId: users.id,
+  osuUserId: users.osuUserId,
+  username: users.username,
+  avatarUrl: users.avatarUrl,
+  countryCode: users.countryCode,
+  grade: scores.grade,
+  missCount: scores.missCount,
+  accuracy: scores.accuracy,
+  maxCombo: scores.maxCombo,
+  isFc: scores.isFc,
+  mods: scores.mods,
+  playedAt: scores.playedAt,
+};
+
+export type BoardScore = {
+  rank: number;
+  scoreId: number;
+  userId: number;
+  osuUserId: number;
+  username: string;
+  avatarUrl: string | null;
+  countryCode: string | null;
+  grade: string;
+  missCount: number;
+  accuracy: number | null;
+  maxCombo: number | null;
+  isFc: boolean;
+  mods: string;
+  playedAt: Date | null;
+};
+
+/** Who can appear on a map's board: visible scores by players not banned. */
+const onBoard = (entryId: number) =>
+  and(eq(scores.entryId, entryId), eq(scores.isHidden, false), isNull(users.bannedAt));
+
+/**
+ * A map's leaderboard, osu! style: best grade first, accuracy to split a
+ * grade, and on a dead heat whoever set it first. The same order ranks a
+ * single player in getEntryRankOf, so the two can never disagree.
+ */
+export async function getEntryLeaderboard(entryId: number, limit = 50): Promise<BoardScore[]> {
+  const rows = await db
+    .select(boardScore)
+    .from(scores)
+    .innerJoin(users, eq(scores.userId, users.id))
+    .where(onBoard(entryId))
+    .orderBy(
+      asc(scores.gradeRank),
+      raw`${scores.accuracy} desc nulls last`,
+      raw`${scores.playedAt} asc nulls last`,
+      asc(scores.id),
+    )
+    .limit(limit);
+  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+/** A player's best on a map and where it stands, or null if they have none. */
+export async function getEntryRankOf(entryId: number, userId: number): Promise<BoardScore | null> {
+  const ranked = db
     .select({
-      username: users.username,
-      avatarUrl: users.avatarUrl,
-      grade: scores.grade,
-      missCount: scores.missCount,
-      accuracy: scores.accuracy,
-      playedAt: scores.playedAt,
+      ...boardScore,
+      // Both tables have an id; inside a subquery each needs its own name.
+      scoreId: raw<number>`${scores.id}`.as("score_id"),
+      userId: raw<number>`${users.id}`.as("user_id"),
+      rank: raw<number>`(row_number() over (order by ${scores.gradeRank},
+        ${scores.accuracy} desc nulls last, ${scores.playedAt} asc nulls last, ${scores.id}))::int`.as("rank"),
     })
     .from(scores)
     .innerJoin(users, eq(scores.userId, users.id))
-    .where(and(eq(scores.entryId, entryId), eq(scores.isHidden, false)))
-    .orderBy(asc(scores.gradeRank), desc(scores.accuracy))
-    .limit(limit);
+    .where(onBoard(entryId))
+    .as("ranked");
+  const [row] = await db.select().from(ranked).where(eq(ranked.userId, userId));
+  return (row as BoardScore | undefined) ?? null;
+}
+
+/** How many players have a score on a map. */
+export async function getEntryPlayerCount(entryId: number): Promise<number> {
+  const [row] = await db
+    .select({ n: raw<number>`count(*)::int` })
+    .from(scores)
+    .innerJoin(users, eq(scores.userId, users.id))
+    .where(onBoard(entryId));
+  return row?.n ?? 0;
+}
+
+/**
+ * Everything a beatmap's page shows, by osu!'s own beatmap ID so a link can
+ * be typed straight from osu!. The same beatmap can be banked under more
+ * than one mod, so every listed entry comes back, and the page picks one.
+ */
+export async function getBeatmapPage(osuBeatmapId: number) {
+  return db
+    .select({
+      entryId: entries.id,
+      mod: entries.mod,
+      tierOrder: entries.tierOrder,
+      categories: entries.categories,
+      lengthBucket: entries.lengthBucket,
+      speedBucket: entries.speedBucket,
+      stars: entries.stars,
+      bpm: entries.bpm,
+      drainSeconds: entries.drainSeconds,
+      cs: entries.cs,
+      ar: entries.ar,
+      od: entries.od,
+      judgedByName: entries.judgedByName,
+      osuBeatmapId: beatmaps.osuBeatmapId,
+      osuBeatmapsetId: beatmaps.osuBeatmapsetId,
+      artist: beatmaps.artist,
+      title: beatmaps.title,
+      version: beatmaps.version,
+      mapper: beatmaps.mapper,
+      maxCombo: beatmaps.maxCombo,
+      status: beatmaps.status,
+    })
+    .from(entries)
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .where(and(eq(beatmaps.osuBeatmapId, osuBeatmapId), eq(entries.isActive, true)))
+    .orderBy(asc(entries.tierOrder), asc(entries.id));
+}
+
+export type BeatmapEntry = Awaited<ReturnType<typeof getBeatmapPage>>[number];
+
+/* -------------------------------------------------------------- rankings */
+
+export const RANKING_PAGE_SIZE = 50;
+
+const rankedPlayer = {
+  userId: users.id,
+  osuUserId: users.osuUserId,
+  username: users.username,
+  avatarUrl: users.avatarUrl,
+  countryCode: users.countryCode,
+  exp: userLevels.exp,
+  tierOrder: userLevels.tierOrder,
+  progress: userLevels.progress,
+};
+
+export type RankingRow = {
+  rank: number;
+  userId: number;
+  osuUserId: number;
+  username: string;
+  avatarUrl: string | null;
+  countryCode: string | null;
+  exp: number;
+  tierOrder: number | null;
+  progress: number | null;
+};
+
+/** Everyone with EXP in a scope, banned players left out. */
+const inRanking = (scope: string) =>
+  and(eq(userLevels.scope, scope), raw`${userLevels.exp} > 0`, isNull(users.bannedAt));
+
+/**
+ * One page of the EXP leaderboard for a scope: "main" for overall, or a
+ * category label. Most EXP first; on a tie the older account, so places are
+ * stable from one load to the next.
+ */
+export async function getRankings(scope: string, page = 1) {
+  const [counted] = await db
+    .select({ n: raw<number>`count(*)::int` })
+    .from(userLevels)
+    .innerJoin(users, eq(users.id, userLevels.userId))
+    .where(inRanking(scope));
+  const total = counted?.n ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / RANKING_PAGE_SIZE));
+  const current = Math.min(Math.max(1, Math.trunc(page) || 1), pageCount);
+  const offset = (current - 1) * RANKING_PAGE_SIZE;
+
+  const rows = total
+    ? await db
+        .select(rankedPlayer)
+        .from(userLevels)
+        .innerJoin(users, eq(users.id, userLevels.userId))
+        .where(inRanking(scope))
+        .orderBy(desc(userLevels.exp), asc(users.id))
+        .limit(RANKING_PAGE_SIZE)
+        .offset(offset)
+    : [];
+
+  return {
+    rows: rows.map((r, i): RankingRow => ({ ...r, rank: offset + i + 1 })),
+    total,
+    page: current,
+    pageCount,
+    pageSize: RANKING_PAGE_SIZE,
+  };
+}
+
+/** A player's place in a scope's leaderboard, or null while they have no EXP there. */
+export async function getRankOf(userId: number, scope: string): Promise<RankingRow | null> {
+  const ranked = db
+    .select({
+      ...rankedPlayer,
+      rank: raw<number>`(row_number() over (order by ${userLevels.exp} desc, ${users.id}))::int`.as("rank"),
+    })
+    .from(userLevels)
+    .innerJoin(users, eq(users.id, userLevels.userId))
+    .where(inRanking(scope))
+    .as("ranked");
+  const [row] = await db.select().from(ranked).where(eq(ranked.userId, userId));
+  return (row as RankingRow | undefined) ?? null;
+}
+
+export type PlayerTally = { clears: number; fcs: number; sss: number; ss: number; s: number };
+
+/** Clears, full combos and top grades for some players, on maps still listed. */
+export async function getPlayerTallies(userIds: number[]): Promise<Map<number, PlayerTally>> {
+  if (!userIds.length) return new Map();
+  const rows = await db
+    .select({
+      userId: scores.userId,
+      clears: raw<number>`count(*)::int`,
+      fcs: raw<number>`(count(*) filter (where ${scores.isFc}))::int`,
+      sss: raw<number>`(count(*) filter (where ${scores.grade} = 'SSS'))::int`,
+      ss: raw<number>`(count(*) filter (where ${scores.grade} = 'SS'))::int`,
+      s: raw<number>`(count(*) filter (where ${scores.grade} = 'S'))::int`,
+    })
+    .from(scores)
+    .innerJoin(entries, eq(scores.entryId, entries.id))
+    .where(
+      and(inArray(scores.userId, userIds), eq(scores.isHidden, false), eq(entries.isActive, true)),
+    )
+    .groupBy(scores.userId);
+  return new Map(rows.map(({ userId, ...t }) => [userId, t]));
 }

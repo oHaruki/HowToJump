@@ -24,6 +24,7 @@ export default async function RootLayout({
     { href: "/", label: "Overview" },
     { href: "/maps", label: "Map bank" },
     { href: "/ladder", label: "Ladder" },
+    { href: "/leaderboard", label: "Leaderboard" },
     { href: "/info", label: "Info" },
   ];
 

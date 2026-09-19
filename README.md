@@ -18,8 +18,13 @@ There is no submission form, no screenshot, and no review queue for scores.
 The reason it polls rather than reading leaderboards: almost every map on the
 ladder is graveyard, and graveyard maps have no beatmap leaderboard. The recent
 plays endpoint returns *plays* rather than leaderboard entries, so it covers
-them. Its window is the last 100 plays or 24 hours, whichever runs out first,
-which is why active players are swept every 30 minutes rather than daily.
+them. Its window is the last 100 plays or 24 hours, whichever runs out first.
+
+osu! has no way to push a score, so every minute the worker reads everyone's
+play count, fifty players to a request, and fetches recent plays only for the
+players whose count went up. Play count moves for graveyard plays on stable and
+lazer alike, so a score usually lands within a minute. Everyone is also swept
+once a day as a backstop, and Sync now or `/rs` pulls scores in straight away.
 
 ## Stack
 
@@ -60,13 +65,14 @@ docker run -d --name htj-pg \
 
 ```bash
 npm install
-npm run db:push     # or db:migrate to apply the generated SQL
-npm run db:seed     # grading scale, site config, and the sheet's map bank
+npm run db:deploy   # migrations, grading scale, and the sheet's map bank
 npm run dev
 ```
 
-The seed pulls beatmap metadata from the osu! API when credentials are present
-and falls back to the sheet's own values when they are not, so it works offline.
+`db:deploy` is the same step production runs on every deploy, and safe to run
+again whenever you pull. The seed pulls beatmap metadata from the osu! API when
+credentials are present and falls back to the sheet's own values when they are
+not, so it works offline.
 
 ## Commands
 
@@ -77,10 +83,13 @@ and falls back to the sheet's own values when they are not, so it works offline.
 | `npm test` | Parser, mod and grading tests |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:generate` | Generate a migration from the schema |
+| `npm run db:deploy` | Bring the database up to date: migrations, grades, first seed, levels |
 | `npm run db:push` | Push the schema straight to the database |
 | `npm run db:seed` | Seed grades, config and the map bank |
 | `npm run seed:examples` | Example bank rows for checking search; `-- --clear` removes them |
 | `npm run sync` | One sync pass from the CLI |
+| `npm run levels:rebuild` | Recompute every player's levels now; deploys do it when the numbers change |
+| `npm run discord:commands` | Register `/rs` with the Discord server |
 
 ## Layout
 
@@ -98,7 +107,7 @@ src/lib
   import/parse.ts  the sheet parser
   osu/client.ts  osu! API client and rate limiter
   osu/sync.ts    the score sync worker
-src/db           seed, migrations, sync CLI
+src/db           migrations, the deploy step, seed and CLIs
 docker           compose, Dockerfile, Caddyfile
 ```
 
@@ -128,19 +137,30 @@ ladder without a pack, enforced both in the UI and in `approveSuggestions`.
 cd docker
 cp ../.env.example .env    # secrets, plus AUTH_URL as the public HTTPS URL
 docker compose up -d --build
-docker compose run --rm migrate
 ```
 
+Updating is the same command after a `git pull`; there is nothing to run by
+hand. Every `up` runs the `migrate` service first, from the builder stage since
+the runtime image has no `drizzle-kit`, `tsx` or `src/`. It applies new
+migrations, refreshes the grade table, seeds the sheet's maps into an empty
+bank, and recomputes levels when the numbers behind them changed. The app only
+starts once it has finished, and if it fails the running app is left alone;
+`docker compose logs migrate` says what it did.
+
 Compose runs the app, Postgres, and a worker that calls `POST /api/sync/run`
-every 15 minutes. The endpoint decides who is actually due, so the timer only
-has to be more frequent than the shortest interval.
+every minute. The endpoint decides who is actually due, and a pass that finds
+the previous one still running returns straight away.
 
 The app is published on `127.0.0.1:6500` for an existing reverse proxy to sit
 in front of. On a host where 80 and 443 are free, `--profile edge` brings up
 the bundled Caddy instead, with `DOMAIN` set.
 
-Migrations run through `migrate` rather than the app container: the runtime
-image is a Next standalone build, with no `drizzle-kit`, `tsx` or `src/`.
+## Discord
+
+Optional. Create an application in the Discord developer portal, set the
+`DISCORD_*` values from `.env.example`, point its Interactions Endpoint URL at
+`https://<domain>/api/discord/interactions`, and run `npm run discord:commands`
+once. `DISCORD_SCORES_WEBHOOK_URL` alone turns on the score feed.
 
 ## Notes
 
