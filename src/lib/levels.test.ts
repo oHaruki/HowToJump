@@ -27,7 +27,7 @@ const play = (pack: string, grade: string, ...categories: string[]): LevelPlay =
 });
 const fcs = (pack: string, n: number) => Array.from({ length: n }, () => play(pack, "SS"));
 
-/* The example in the write-up: Emerald, 68/100 to Amethyst. */
+/* The example in the write-up, under the doubled packs: Emerald, 50/100. */
 const EXAMPLE: LevelPlay[] = [
   ...fcs("Emerald", 6),
   play("Amethyst", "SS"), // FC
@@ -37,44 +37,53 @@ const EXAMPLE: LevelPlay[] = [
 ];
 
 test("a play is worth its pack's EXP times its grade's share", () => {
-  assert.equal(playExp(order("Amethyst"), "A"), 3750);
-  assert.equal(playExp(order("Emerald"), "SS"), 3400);
-  assert.equal(playExp(order("Amethyst"), "SSS"), 6000);
-  assert.equal(playExp(order("Bronze"), "Pass"), 1);
+  assert.equal(playExp(order("Amethyst"), "A"), 614_400);
+  assert.equal(playExp(order("Emerald"), "SS"), 409_600);
+  assert.equal(playExp(order("Amethyst"), "SSS"), 983_040);
+  assert.equal(playExp(order("Bronze"), "Pass"), 8);
 });
 
 test("a pack is reached at ten 2-miss plays on it", () => {
-  assert.equal(threshold(order("Emerald")), 25500);
-  assert.equal(threshold(order("Amethyst")), 37500);
-  assert.equal(threshold(order("Diamond")), 55500);
+  assert.equal(threshold(order("Emerald")), 3_072_000);
+  assert.equal(threshold(order("Amethyst")), 6_144_000);
+  assert.equal(threshold(order("Diamond")), 12_288_000);
 });
 
-test("the worked example reads Emerald, 68/100 to Amethyst", () => {
-  assert.equal(bestExp(EXAMPLE), 33700);
+test("the worked example reads Emerald, 50/100 to Amethyst", () => {
+  assert.equal(bestExp(EXAMPLE), 4_636_672);
   assert.deepEqual(levelFromExp(bestExp(EXAMPLE)), {
-    exp: 33700,
+    exp: 4_636_672,
     tierOrder: order("Emerald"),
-    progress: 68,
+    progress: 50,
   });
 });
 
-test("one more Amethyst FC makes it 95, two reach Amethyst", () => {
+test("one more Amethyst FC makes it 68, four reach Amethyst", () => {
   const one = levelFromExp(bestExp([...EXAMPLE, play("Amethyst", "SS")]));
   assert.equal(one.tierOrder, order("Emerald"));
-  assert.equal(one.progress, 95);
+  assert.equal(one.progress, 68);
 
-  const two = levelFromExp(bestExp([...EXAMPLE, play("Amethyst", "SS"), play("Amethyst", "SS")]));
-  assert.equal(two.tierOrder, order("Amethyst"));
-  assert.equal(two.exp, 39150);
+  const four = levelFromExp(bestExp([...EXAMPLE, ...fcs("Amethyst", 4)]));
+  assert.equal(four.tierOrder, order("Amethyst"));
+  assert.equal(four.exp, 6_389_760);
 });
 
 test("full combos on the pack below never reach a pack, however many", () => {
-  assert.equal(bestExp(fcs("Emerald", 10)), 34000);
+  assert.equal(bestExp(fcs("Emerald", 10)), 4_096_000);
   assert.equal(levelFromExp(bestExp(fcs("Emerald", 25))).tierOrder, order("Emerald"));
   for (const t of TIERS.slice(1)) {
     const below = TIERS.find((x) => x.order === t.order - 1)!;
     const best = levelFromExp(bestExp(fcs(below.name, 50)));
     assert.equal(best.tierOrder, below.order, "ten " + below.name + " FCs stay " + below.name);
+  }
+});
+
+test("even ten 100% runs on the pack below stay on that pack", () => {
+  // Ten of them come to 12 times a pack's value against the 15 it takes.
+  for (const t of TIERS.slice(1)) {
+    const below = TIERS.find((x) => x.order === t.order - 1)!;
+    const best = levelFromExp(bestExp(Array.from({ length: 10 }, () => play(below.name, "SSS"))));
+    assert.equal(best.tierOrder, below.order, "ten " + below.name + " 100% runs stay " + below.name);
   }
 });
 
@@ -124,11 +133,11 @@ test("each category counts only its own plays, and a dropped label counts toward
     play("GOAT", "SSS", "Flow Aim"),
   ]);
   assert.deepEqual(Object.keys(levels), CATEGORIES);
-  assert.equal(levels[RAW].exp, 33700);
-  assert.equal(levels["Precision"].exp, 3400);
+  assert.equal(levels[RAW].exp, 4_636_672);
+  assert.equal(levels["Precision"].exp, 409_600);
   assert.equal(levels["Anti-aim"].exp, 0);
   const total = Object.values(levels).reduce((sum, l) => sum + l.exp, 0);
-  assert.equal(total, 33700 + 3400);
+  assert.equal(total, 4_636_672 + 409_600);
 });
 
 test("an old spelling still in the database counts toward the category it became", () => {
@@ -136,8 +145,8 @@ test("an old spelling still in the database counts toward the category it became
     play("Copper", "SS", "Raw Aim"),
     play("Copper", "SS", "Consistency Aim"),
   ]);
-  assert.equal(levels[RAW].exp, 45);
-  assert.equal(levels["Aim - consistency"].exp, 45);
+  assert.equal(levels[RAW].exp, 200);
+  assert.equal(levels["Aim - consistency"].exp, 200);
 });
 
 test("the main level averages the five", () => {
@@ -156,18 +165,21 @@ test("the main level averages the five", () => {
 
 test("a map in two categories counts in full toward both", () => {
   const levels = categoryLevels([play("Emerald", "SS", RAW, CONSISTENCY), play("Emerald", "A")]);
-  assert.equal(levels[RAW].exp, 3400 + 2550);
-  assert.equal(levels[CONSISTENCY].exp, 3400);
+  assert.equal(levels[RAW].exp, 409_600 + 307_200);
+  assert.equal(levels[CONSISTENCY].exp, 409_600);
   assert.equal(levels["Precision"].exp, 0);
 });
 
 test("the total adds each counting play once, however many categories it fills", () => {
   const both = play("Emerald", "SS", RAW, CONSISTENCY);
-  assert.equal(totalExp([both]), 3400);
-  assert.equal(totalExp([both, play("Emerald", "A"), play("Stone", "SS", "Precision")]), 3400 + 2550 + 30);
+  assert.equal(totalExp([both]), 409_600);
+  assert.equal(
+    totalExp([both, play("Emerald", "A"), play("Stone", "SS", "Precision")]),
+    409_600 + 307_200 + 100,
+  );
   // Only plays inside some category's best ten add to it.
   const eleven = [...fcs("Emerald", 10), play("Stone", "SS")];
-  assert.equal(totalExp(eleven), 34000);
+  assert.equal(totalExp(eleven), 4_096_000);
   // A dropped label earns nothing anywhere.
   assert.equal(totalExp([play("GOAT", "SSS", "Flow Aim")]), 0);
 });
@@ -177,25 +189,25 @@ test("a play pushed out of one category still counts toward the total through an
   // Consistency's best, so it is still added once.
   const shared = play("Stone", "SS", RAW, CONSISTENCY);
   const plays = [...fcs("Emerald", 10), shared];
-  assert.equal(categoryLevels(plays)[RAW].exp, 34000);
-  assert.equal(categoryLevels(plays)[CONSISTENCY].exp, 30);
-  assert.equal(totalExp(plays), 34030);
+  assert.equal(categoryLevels(plays)[RAW].exp, 4_096_000);
+  assert.equal(categoryLevels(plays)[CONSISTENCY].exp, 100);
+  assert.equal(totalExp(plays), 4_096_100);
 });
 
 test("misses cost EXP by map size, while the pack's bar stays put", () => {
   // Amethyst, one miss (A+): a 30 second map counts it about three times.
-  assert.equal(playExp(order("Amethyst"), "A+", 1, 150), 3250); // as A-, 65%
-  assert.equal(playExp(order("Amethyst"), "A+", 1, 1500), 4250); // as A+, 85%
-  assert.equal(playExp(order("Amethyst"), "A", 2, 3000), 4250); // counts as 1 miss
+  assert.equal(playExp(order("Amethyst"), "A+", 1, 150), 532_480); // as A-, 65%
+  assert.equal(playExp(order("Amethyst"), "A+", 1, 1500), 696_320); // as A+, 85%
+  assert.equal(playExp(order("Amethyst"), "A", 2, 3000), 696_320); // counts as 1 miss
   // Full combos and 100% runs are never scaled.
-  assert.equal(playExp(order("Amethyst"), "SS", 0, 150), 5000);
-  assert.equal(playExp(order("Amethyst"), "SSS", 0, 150), 6000);
+  assert.equal(playExp(order("Amethyst"), "SS", 0, 150), 819_200);
+  assert.equal(playExp(order("Amethyst"), "SSS", 0, 150), 983_040);
   // Reaching a pack is still ten 2-miss plays as the table reads them.
-  assert.equal(threshold(order("Amethyst")), 37500);
+  assert.equal(threshold(order("Amethyst")), 6_144_000);
 
   const short: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 150 };
   const long: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 1500 };
-  // 2 misses on 150 notes count as 6 (B, 50%): 3,400 × 50%.
-  assert.equal(categoryLevels([short])[RAW].exp, 1700);
-  assert.equal(categoryLevels([long])[RAW].exp, 2550);
+  // 2 misses on 150 notes count as 6 (B, 50%): 409,600 × 50%.
+  assert.equal(categoryLevels([short])[RAW].exp, 204_800);
+  assert.equal(categoryLevels([long])[RAW].exp, 307_200);
 });

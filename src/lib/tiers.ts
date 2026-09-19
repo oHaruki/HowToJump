@@ -12,21 +12,22 @@ export type Tier = {
   /** Former names, so older spreadsheet rows still resolve. */
   aliases?: string[];
   /**
-   * EXP for a full combo on one of this pack's maps. Each pack is worth about
-   * 1.5 times the one below, so the hardest maps you play well carry a level.
+   * EXP for a full combo on one of this pack's maps. Each pack is worth twice
+   * the one below, so what you play at your limit carries a level and the
+   * packs you have outgrown fall away fast.
    */
   exp: number;
 };
 
 export const TIERS: Tier[] = [
-  { order: 1, name: "Stone", slug: "stone", color: "#777777", exp: 30 },
-  { order: 2, name: "Copper", slug: "copper", color: "#d25907", exp: 45 },
-  { order: 3, name: "Iron", slug: "iron", color: "#555a5c", exp: 70 },
-  { order: 4, name: "Bronze", slug: "bronze", color: "#783f04", exp: 100 },
-  { order: 5, name: "Silver", slug: "silver", color: "#c0c0c0", exp: 150 },
-  { order: 6, name: "Gold", slug: "gold", color: "#f0d959", exp: 220 },
-  { order: 7, name: "Platinum", slug: "platinum", color: "#E5E4E2", exp: 320 },
-  { order: 8, name: "Titanium", slug: "titanium", color: "#708a99", exp: 480 },
+  { order: 1, name: "Stone", slug: "stone", color: "#777777", exp: 100 },
+  { order: 2, name: "Copper", slug: "copper", color: "#d25907", exp: 200 },
+  { order: 3, name: "Iron", slug: "iron", color: "#555a5c", exp: 400 },
+  { order: 4, name: "Bronze", slug: "bronze", color: "#783f04", exp: 800 },
+  { order: 5, name: "Silver", slug: "silver", color: "#c0c0c0", exp: 1600 },
+  { order: 6, name: "Gold", slug: "gold", color: "#f0d959", exp: 3200 },
+  { order: 7, name: "Platinum", slug: "platinum", color: "#E5E4E2", exp: 6400 },
+  { order: 8, name: "Titanium", slug: "titanium", color: "#708a99", exp: 12800 },
   {
     order: 9,
     name: "Rhodonite",
@@ -34,20 +35,20 @@ export const TIERS: Tier[] = [
     color: "#f19bc2",
     // The sheet still calls this pack Opal, so pasted rows keep resolving.
     aliases: ["Opal"],
-    exp: 700,
+    exp: 25600,
   },
-  { order: 10, name: "Topaz", slug: "topaz", color: "#ffb84d", exp: 1050 },
-  { order: 11, name: "Ruby", slug: "ruby", color: "#d21f3c", exp: 1550 },
-  { order: 12, name: "Sapphire", slug: "sapphire", color: "#5fa6ff", exp: 2300 },
-  { order: 13, name: "Emerald", slug: "emerald", color: "#4ef399", exp: 3400 },
-  { order: 14, name: "Amethyst", slug: "amethyst", color: "#8e44ad", exp: 5000 },
-  { order: 15, name: "Diamond", slug: "diamond", color: "#a2f0ff", exp: 7400 },
+  { order: 10, name: "Topaz", slug: "topaz", color: "#ffb84d", exp: 51200 },
+  { order: 11, name: "Ruby", slug: "ruby", color: "#d21f3c", exp: 102400 },
+  { order: 12, name: "Sapphire", slug: "sapphire", color: "#5fa6ff", exp: 204800 },
+  { order: 13, name: "Emerald", slug: "emerald", color: "#4ef399", exp: 409600 },
+  { order: 14, name: "Amethyst", slug: "amethyst", color: "#8e44ad", exp: 819200 },
+  { order: 15, name: "Diamond", slug: "diamond", color: "#a2f0ff", exp: 1638400 },
   {
     order: 16,
     name: "GOAT",
     slug: "goat",
     color: "#c7e9e4",
-    exp: 11000,
+    exp: 3276800,
     // The iridescent fill this ladder used to give the Opal pack.
     gradient:
       "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",

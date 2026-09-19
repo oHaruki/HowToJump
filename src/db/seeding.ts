@@ -1,15 +1,16 @@
 /**
  * The seed's steps, shared by npm run db:seed, which runs all of them, and
- * the deploy step, which refreshes the grades and fills missing note counts
- * every time but only seeds the sheet's maps into an empty bank.
+ * the deploy step, which refreshes the grades, fills missing note counts and
+ * folds entries whose mod no longer stands on its own every time, but only
+ * seeds the sheet's maps into an empty bank.
  *
  * If osu! credentials are present the beatmap metadata is pulled fresh from
  * the API. Without them the sheet's own numbers are used, so the seed still
  * works offline.
  */
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { beatmaps, entries, gradeRules, siteConfig } from "@/lib/schema";
+import { auditLog, beatmaps, entries, gradeRules, scores, siteConfig } from "@/lib/schema";
 import { GRADE_RULES } from "@/lib/grading";
 import { normalizeMod } from "@/lib/mods";
 import {
@@ -72,6 +73,71 @@ export async function backfillNoteCounts(): Promise<number[]> {
     filled.push(m.id);
   }
   return filled;
+}
+
+/**
+ * Folds entries banked under a mod that no longer stands on its own into the
+ * entry that mod now resolves to: Hidden stopped splitting entries and
+ * Nightcore became Double Time, so an HDDT entry is a DT entry.
+ *
+ * Where the beatmap has no entry under the canonical mod the row is simply
+ * renamed. Where it has one, the scores move across, each player keeping
+ * their better result, and the emptied entry goes. A judged entry is never
+ * overwritten, so the surviving row keeps its own pack and categories, and
+ * both ids are written to the audit log for staff to look over.
+ *
+ * Returns the players whose levels the move changed, and is safe to repeat:
+ * a second run finds nothing left to fold.
+ */
+export async function mergeLooseModEntries(): Promise<number[]> {
+  const all = await db
+    .select({ id: entries.id, beatmapId: entries.beatmapId, mod: entries.mod })
+    .from(entries);
+  const loose = all.filter((e) => normalizeMod(e.mod) !== e.mod);
+  if (!loose.length) return [];
+
+  const touched = new Set<number>();
+  for (const entry of loose) {
+    const mod = normalizeMod(entry.mod);
+    // Re-read: an earlier row in this run may have taken the canonical mod.
+    const [target] = await db
+      .select({ id: entries.id })
+      .from(entries)
+      .where(and(eq(entries.beatmapId, entry.beatmapId), eq(entries.mod, mod)));
+
+    if (!target) {
+      await db.update(entries).set({ mod }).where(eq(entries.id, entry.id));
+      continue;
+    }
+
+    const moving = await db.select().from(scores).where(eq(scores.entryId, entry.id));
+    for (const score of moving) {
+      touched.add(score.userId);
+      const [held] = await db
+        .select()
+        .from(scores)
+        .where(and(eq(scores.userId, score.userId), eq(scores.entryId, target.id)));
+      // The same comparison the sync makes: grade first, accuracy to break a tie.
+      const better =
+        !held ||
+        score.gradeRank < held.gradeRank ||
+        (score.gradeRank === held.gradeRank && (score.accuracy ?? 0) > (held.accuracy ?? 0));
+      if (!better) continue;
+      if (held) await db.delete(scores).where(eq(scores.id, held.id));
+      await db.update(scores).set({ entryId: target.id }).where(eq(scores.id, score.id));
+    }
+
+    await db.delete(entries).where(eq(entries.id, entry.id));
+    await db.insert(auditLog).values({
+      actorName: "deploy",
+      action: "entry.merge",
+      entityType: "entry",
+      entityId: target.id,
+      detail: { mergedEntryId: entry.id, from: entry.mod, into: mod },
+    });
+    console.log("Merged entry " + entry.id + " (" + entry.mod + ") into " + target.id + " (" + mod + ")");
+  }
+  return [...touched];
 }
 
 /**

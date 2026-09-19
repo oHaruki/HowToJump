@@ -8,9 +8,10 @@
  *   2. The grade table, refreshed from the code.
  *   3. The sheet's maps, but only into an empty bank, so a deploy can never
  *      undo what staff changed.
- *   4. Note counts from osu! for maps that don't have one yet.
+ *   4. Note counts from osu! for maps that don't have one yet, and entries
+ *      folded together where a mod stopped standing on its own.
  *   5. Levels, recomputed when the numbers behind them changed, or just for
- *      the players on maps that got their note count.
+ *      the players the steps above moved.
  */
 import "./env";
 import { createHash } from "node:crypto";
@@ -21,7 +22,9 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { db, sql } from "@/lib/db";
 import { entries, scores } from "@/lib/schema";
 import { rebuildLevelsIfRulesChanged, refreshProgress } from "@/lib/osu/sync";
-import { backfillNoteCounts, seedGradeRules, seedSheet, seedSiteConfig } from "./seeding";
+import {
+  backfillNoteCounts, mergeLooseModEntries, seedGradeRules, seedSheet, seedSiteConfig,
+} from "./seeding";
 
 const MIGRATIONS = fileURLToPath(new URL("./migrations", import.meta.url));
 
@@ -88,6 +91,8 @@ async function main() {
   const filled = await backfillNoteCounts();
   if (filled.length) console.log("Note counts filled for " + filled.length + " maps");
 
+  const remoded = await mergeLooseModEntries();
+
   // The previous build's app keeps running until this finishes, so a player
   // it syncs in the meantime is recomputed under the old rules. Their next
   // imported score puts that right.
@@ -98,15 +103,18 @@ async function main() {
       : "Level rules unchanged",
   );
 
-  // A count that arrives later changes what misses on that map cost.
-  if (!levels.rebuilt && filled.length) {
-    const players = await db
-      .selectDistinct({ userId: scores.userId })
-      .from(scores)
-      .innerJoin(entries, eq(scores.entryId, entries.id))
-      .where(inArray(entries.beatmapId, filled));
-    for (const p of players) await refreshProgress(p.userId);
-    console.log("Recomputed " + players.length + " players on those maps");
+  // A count or a merge that arrives later changes what those plays are worth.
+  if (!levels.rebuilt && (filled.length || remoded.length)) {
+    const onFilled = filled.length
+      ? await db
+          .selectDistinct({ userId: scores.userId })
+          .from(scores)
+          .innerJoin(entries, eq(scores.entryId, entries.id))
+          .where(inArray(entries.beatmapId, filled))
+      : [];
+    const players = new Set([...onFilled.map((p) => p.userId), ...remoded]);
+    for (const userId of players) await refreshProgress(userId);
+    console.log("Recomputed " + players.size + " players on those maps");
   }
 
   await sql.end();

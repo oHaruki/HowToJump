@@ -3,32 +3,28 @@
  * identity rather than a label on it. The same map under DT is a separate
  * entry with its own pack and its own leaderboard.
  */
-export const MODS = [
-  "NM", "HD", "HR", "DT", "NC", "HT", "EZ", "FL",
-  "HDHR", "HDDT", "HRDT", "HDHRDT",
-];
+export const MODS = ["NM", "HR", "DT", "HT", "EZ", "FL", "HRDT"];
 
 export const MOD_NAMES: Record<string, string> = {
   NM: "No mod",
-  HD: "Hidden",
   HR: "Hard Rock",
   DT: "Double Time",
-  NC: "Nightcore",
   HT: "Half Time",
   EZ: "Easy",
   FL: "Flashlight",
-  HDHR: "Hidden + Hard Rock",
-  HDDT: "Hidden + Double Time",
   HRDT: "Hard Rock + Double Time",
-  HDHRDT: "Hidden + Hard Rock + Double Time",
 };
 
-/** Canonical ordering, so HDDT and DTHD resolve to the same entry. */
-const ORDER = ["EZ", "HT", "HD", "HR", "DT", "NC", "FL"];
+/** Canonical ordering, so HRDT and DTHR resolve to the same entry. */
+const ORDER = ["EZ", "HT", "HR", "DT", "FL"];
 
-/** Mods osu! reports that do not change difficulty, so they never split an entry. */
+/**
+ * Mods that do not change where the notes are, so they never split an entry.
+ * Hidden is one of them: it takes the approach circles away, but a DTHR map
+ * played with DTHRHD is the same aim, so it counts on the DTHR entry.
+ */
 const COSMETIC = new Set([
-  "CL", "NF", "SO", "SD", "PF", "MR", "TD", "AT", "CP", "DA", "AC", "RX", "AP",
+  "HD", "CL", "NF", "SO", "SD", "PF", "MR", "TD", "AT", "CP", "DA", "AC", "RX", "AP",
 ]);
 
 /**
@@ -43,12 +39,10 @@ export function normalizeMod(input: string | null | undefined): string {
   const pairs: string[] = [];
   for (let i = 0; i + 2 <= raw.length; i += 2) pairs.push(raw.slice(i, i + 2));
 
-  const kept = Array.from(new Set(pairs.filter((m) => !COSMETIC.has(m))));
-  // Nightcore already implies Double Time in osu!, so keep only NC.
-  if (kept.includes("NC")) {
-    const i = kept.indexOf("DT");
-    if (i > -1) kept.splice(i, 1);
-  }
+  // Nightcore is Double Time with another sound, so it is banked as DT.
+  const kept = Array.from(
+    new Set(pairs.filter((m) => !COSMETIC.has(m)).map((m) => (m === "NC" ? "DT" : m))),
+  );
   if (!kept.length) return "NM";
 
   kept.sort((a, b) => {

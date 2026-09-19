@@ -181,15 +181,22 @@ test("normalisations are reported so staff can see what changed", () => {
 test("mod strings resolve to one canonical form", () => {
   assert.equal(normalizeMod(""), "NM");
   assert.equal(normalizeMod("nm"), "NM");
-  assert.equal(normalizeMod("hd,dt"), "HDDT");
-  assert.equal(normalizeMod("DTHD"), "HDDT");
-  assert.equal(normalizeMod("HD DT"), "HDDT");
-  // Nightcore already implies Double Time.
-  assert.equal(normalizeMod("NCHD"), "HDNC");
-  // Mods that do not change difficulty never split an entry.
-  assert.equal(normalizeMod("NFHD"), "HD");
+  assert.equal(normalizeMod("hr,dt"), "HRDT");
+  assert.equal(normalizeMod("DTHR"), "HRDT");
+  assert.equal(normalizeMod("HR DT"), "HRDT");
+  // Hidden moves no notes, so it never splits an entry.
+  assert.equal(normalizeMod("hd,dt"), "DT");
+  assert.equal(normalizeMod("HD"), "NM");
+  assert.equal(normalizeMod("HDHRDT"), "HRDT");
+  // Nightcore is Double Time with another sound.
+  assert.equal(normalizeMod("NC"), "DT");
+  assert.equal(normalizeMod("NCHD"), "DT");
+  assert.equal(normalizeMod("DTNC"), "DT");
+  // Mods that do not change difficulty never split an entry either.
+  assert.equal(normalizeMod("NFHD"), "NM");
   assert.equal(normalizeMod("CL"), "NM");
-  assert.equal(modsFromApi([{ acronym: "DT" }, { acronym: "HD" }]), "HDDT");
+  assert.equal(modsFromApi([{ acronym: "DT" }, { acronym: "HD" }]), "DT");
+  assert.equal(modsFromApi([{ acronym: "NC" }, { acronym: "HR" }]), "HRDT");
   assert.equal(modsFromApi([]), "NM");
 });
 

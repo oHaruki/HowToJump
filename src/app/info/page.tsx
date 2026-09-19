@@ -101,6 +101,9 @@ export default function InfoPage() {
             A map is banked together with the mod it is judged under. The same
             beatmap under a different mod is a separate entry with its own pack and
             its own leaderboard, and a score only counts when the mods match.
+            Hidden is the exception: it moves no notes, so it never splits an entry
+            and a Hidden run counts on the entry without it. Nightcore counts as
+            Double Time, and so do No Fail and the rest that change nothing.
           </p>
           <hr className="sep" />
           <div className="row-tight">
