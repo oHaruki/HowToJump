@@ -42,10 +42,7 @@ export default async function MapsPage({
 
   return (
     <div className="view">
-      <SectionHead label="Map bank" title="Every judged entry">
-        Star rating, BPM and drain come from the osu! API. Pack, category, mod and
-        pacing are assigned by staff.
-      </SectionHead>
+      <SectionHead label="Map bank" title="Every judged entry" />
 
       <BankFilters
         packCounts={packCounts}

@@ -11,7 +11,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLog, beatmaps, entries, gradeRules, scores, siteConfig } from "@/lib/schema";
-import { GRADE_RULES } from "@/lib/grading";
+import { compareResults, GRADE_RULES } from "@/lib/grading";
 import { normalizeMod } from "@/lib/mods";
 import {
   normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
@@ -117,12 +117,8 @@ export async function mergeLooseModEntries(): Promise<number[]> {
         .select()
         .from(scores)
         .where(and(eq(scores.userId, score.userId), eq(scores.entryId, target.id)));
-      // The same comparison the sync makes: grade first, accuracy to break a tie.
-      const better =
-        !held ||
-        score.gradeRank < held.gradeRank ||
-        (score.gradeRank === held.gradeRank && (score.accuracy ?? 0) > (held.accuracy ?? 0));
-      if (!better) continue;
+      // The same comparison the sync makes: grade, then misses, then accuracy.
+      if (held && compareResults(score, held) >= 0) continue;
       if (held) await db.delete(scores).where(eq(scores.id, held.id));
       await db.update(scores).set({ entryId: target.id }).where(eq(scores.id, score.id));
     }

@@ -41,7 +41,7 @@ export default async function StaffBankPage({
   return (
     <>
       <SectionHead label="Staff" title="Map bank">
-        Move an entry between packs, or pull it off the ladder. Removing keeps the
+        Move an entry between packs, or pull it out of the bank. Removing keeps the
         row and its scores, it just stops showing. Search to find one entry, or
         filter to Stale label for the rows still carrying wording the grading
         scale has dropped.

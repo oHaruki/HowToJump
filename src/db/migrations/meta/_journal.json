@@ -57,6 +57,13 @@
       "when": 1789851075141,
       "tag": "0007_note_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789937475141,
+      "tag": "0008_fractional_exp_percent",
+      "breakpoints": true
     }
   ]
 }

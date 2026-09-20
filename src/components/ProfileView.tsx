@@ -5,10 +5,8 @@ import { db } from "@/lib/db";
 import { userLevels, userTierProgress, users } from "@/lib/schema";
 import { RANKING_PAGE_SIZE, getProfilePlays, getRankOf } from "@/lib/queries";
 import { GRADE_RULES } from "@/lib/grading";
-import {
-  BEST_PLAYS, MAIN_LEVEL, countingPlaces, levelValue, playExp,
-} from "@/lib/levels";
-import { PROFILE_SCOPES, freshness, readSnapshot, snapshotOf } from "@/lib/progress";
+import { BEST_PLAYS, MAIN_LEVEL, levelValue } from "@/lib/levels";
+import { PROFILE_SCOPES, profileLists, readSnapshot, snapshotOf } from "@/lib/progress";
 import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeBadge } from "@/components/ui";
 import { LevelBar, SkillRadar } from "@/components/LevelView";
@@ -50,16 +48,10 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
   const main = current[MAIN_LEVEL];
   const mainTier = tierByOrder(main.tierOrder);
 
-  const places = countingPlaces(plays.map((p) => ({ ...p, id: p.scoreId })));
-  const views: PlayView[] = plays.map((p) => ({
-    ...p,
-    exp: playExp(p.tierOrder, p.grade, p.missCount, p.noteCount),
-    places: places.get(p.scoreId) ?? [],
-    fresh: freshness(p, seenAt),
-  }));
-  const top = views
-    .slice()
-    .sort((a, b) => b.exp - a.exp || (b.playedAt?.getTime() ?? 0) - (a.playedAt?.getTime() ?? 0));
+  // Newest first for the history, by what they are worth for the top plays,
+  // the second under the same order their places are numbered in.
+  const { recent: views, top }: { recent: PlayView[]; top: PlayView[] } =
+    profileLists(plays, seenAt);
 
   const clears = packRows.reduce((n, p) => n + p.entriesCleared, 0);
   const packsTouched = packRows.filter((p) => p.entriesCleared > 0).length;
@@ -134,7 +126,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
                           : "")
                       }
                     >
-                      #{fmt(standing.rank)} on the ladder
+                      #{fmt(standing.rank)} on the leaderboard
                     </Link>
                   ) : null}
                   {me?.countryCode ? (
@@ -259,7 +251,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
           </div>
           <PlayList
             plays={top}
-            empty={owner ? "No plays on the ladder yet. Play any map from the bank." : "No plays on the ladder yet."}
+            empty={owner ? "No plays yet. Play any map from the bank." : "No plays yet."}
           />
         </section>
         <section className="stack">
@@ -278,7 +270,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
       <section className="stack-lg">
         <div className="section-head">
           <span className="lbl">Packs</span>
-          <h2>Through the ladder</h2>
+          <h2>Through the packs</h2>
         </div>
         <div className="pf-packs">
           {TIERS.map((t) => {

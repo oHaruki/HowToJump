@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAIN_LEVEL } from "@/lib/levels";
+import { MAIN_LEVEL, byWorth, countingPlaces, playExp, type Place } from "@/lib/levels";
 import { CATEGORIES } from "@/lib/tiers";
 
 /**
@@ -79,4 +79,52 @@ export function freshness(
 ): "new" | "improved" | null {
   if (!seenAt || score.importedAt <= seenAt) return null;
   return score.createdAt > seenAt ? "new" : "improved";
+}
+
+/* ------------------------------------------------ the two lists a profile draws */
+
+/** What the working below needs of a play; a caller passes whole rows. */
+export type PlayForProfile = {
+  scoreId: number;
+  tierOrder: number;
+  categories: readonly string[];
+  grade: string;
+  missCount: number;
+  noteCount: number | null;
+  createdAt: Date;
+  importedAt: Date;
+};
+
+/** A play with everything a row shows worked out. */
+export type ShownPlay<T> = T & {
+  /** Carried so the list and countingPlaces settle a tie the same way. */
+  id: number;
+  exp: number;
+  places: Place[];
+  fresh: "new" | "improved" | null;
+};
+
+/**
+ * A profile's two lists, from one pass over the player's plays.
+ *
+ * `recent` keeps the order it was given, which is when the plays were set:
+ * it is a history, so it reads newest first whatever the plays are worth.
+ * `top` is the same plays by what they are worth, under byWorth, which is
+ * the order countingPlaces numbers them in. Sorting the list one way and
+ * numbering it another is what drew a #1 underneath the #2 it tied with, so
+ * the two come from here together rather than being worked out apart.
+ */
+export function profileLists<T extends PlayForProfile>(
+  plays: readonly T[],
+  seenAt: Date | null,
+): { recent: Array<ShownPlay<T>>; top: Array<ShownPlay<T>> } {
+  const places = countingPlaces(plays.map((p) => ({ ...p, id: p.scoreId })));
+  const recent = plays.map((p) => ({
+    ...p,
+    id: p.scoreId,
+    exp: playExp(p.tierOrder, p.grade, p.missCount, p.noteCount),
+    places: places.get(p.scoreId) ?? [],
+    fresh: freshness(p, seenAt),
+  }));
+  return { recent, top: recent.slice().sort(byWorth) };
 }

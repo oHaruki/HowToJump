@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { BEST_PLAYS, MAIN_LEVEL } from "@/lib/levels";
+import { MAIN_LEVEL, progressText } from "@/lib/levels";
 import {
   getPlayerTallies, getRankOf, getRankings, type PlayerTally, type RankingRow,
 } from "@/lib/queries";
@@ -39,10 +39,7 @@ export default async function LeaderboardPage({
 
   return (
     <div className="view">
-      <SectionHead label="Leaderboard" title="Rankings">
-        Every player by EXP: the best {BEST_PLAYS} plays in each of the five
-        categories, added together. A play on a map in two categories adds once.
-      </SectionHead>
+      <SectionHead label="Leaderboard" title="Project Aim Leaderboard" />
 
       {board.rows.length ? (
         <RankTable rows={board.rows} tallies={tallies} me={session?.userId ?? null} />
@@ -121,7 +118,7 @@ function RankTable({
                   <span
                     className="b-level"
                     style={{ "--fill": tier ? tierFill(tier) : "#777" } as CSSProperties}
-                    title={next ? (r.progress ?? 0) + "/100 to " + next.name : "Top of the ladder"}
+                    title={next ? progressText(r.progress) + " to " + next.name : "Top pack"}
                   >
                     <span className="dot" style={{ background: tier ? tierFill(tier) : "transparent" }} />
                     <span className="b-level-name">{tier ? tier.name : "Unranked"}</span>

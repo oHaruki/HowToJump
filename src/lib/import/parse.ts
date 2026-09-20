@@ -321,7 +321,7 @@ export function classify(rows: ParsedRow[], existingKeys: Set<string>): ParsedRo
     const key = entryKey(r.beatmapId, r.mod);
     if (existingKeys.has(key)) {
       r.status = "exists";
-      r.notes = ["Already on the ladder under " + r.mod];
+      r.notes = ["Already in the bank under " + r.mod];
       continue;
     }
     if (seen.has(key)) {

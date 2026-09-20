@@ -450,7 +450,7 @@ export function gradeText(s: { grade: string; missCount: number }): string {
   return s.grade + " (" + s.missCount + (s.missCount === 1 ? " miss)" : " misses)");
 }
 
-/** Per entry leaderboard: best grade first, accuracy as the tie break. */
+/** Per entry leaderboard: best grade first, then misses, then accuracy. */
 const boardScore = {
   scoreId: scores.id,
   userId: users.id,
@@ -489,22 +489,27 @@ const onBoard = (entryId: number) =>
   and(eq(scores.entryId, entryId), eq(scores.isHidden, false), isNull(users.bannedAt));
 
 /**
- * A map's leaderboard, osu! style: best grade first, accuracy to split a
- * grade, and on a dead heat whoever set it first. The same order ranks a
- * single player in getEntryRankOf, so the two can never disagree.
+ * How a map's leaderboard is ordered, osu! style: best grade first, then the
+ * misscount, then accuracy, and on a dead heat whoever set it first. The
+ * misscount is what the site grades on and a grade covers a band, so 21
+ * misses has to stand above 24 even where 24 carried the better accuracy.
+ *
+ * One fragment, read both by the list below and by the row_number that ranks
+ * a single player, so a change to one can never leave the other behind.
  */
+export const boardOrder = raw`${scores.gradeRank}, ${scores.missCount}, ${scores.accuracy} desc nulls last, ${scores.playedAt} asc nulls last, ${scores.id}`;
+
+/** A player's place on a board, counted under that same order. */
+export const boardRank = raw<number>`(row_number() over (order by ${boardOrder}))::int`;
+
+/** A map's leaderboard, best first. */
 export async function getEntryLeaderboard(entryId: number, limit = 50): Promise<BoardScore[]> {
   const rows = await db
     .select(boardScore)
     .from(scores)
     .innerJoin(users, eq(scores.userId, users.id))
     .where(onBoard(entryId))
-    .orderBy(
-      asc(scores.gradeRank),
-      raw`${scores.accuracy} desc nulls last`,
-      raw`${scores.playedAt} asc nulls last`,
-      asc(scores.id),
-    )
+    .orderBy(boardOrder)
     .limit(limit);
   return rows.map((r, i) => ({ ...r, rank: i + 1 }));
 }
@@ -517,8 +522,7 @@ export async function getEntryRankOf(entryId: number, userId: number): Promise<B
       // Both tables have an id; inside a subquery each needs its own name.
       scoreId: raw<number>`${scores.id}`.as("score_id"),
       userId: raw<number>`${users.id}`.as("user_id"),
-      rank: raw<number>`(row_number() over (order by ${scores.gradeRank},
-        ${scores.accuracy} desc nulls last, ${scores.playedAt} asc nulls last, ${scores.id}))::int`.as("rank"),
+      rank: boardRank.as("rank"),
     })
     .from(scores)
     .innerJoin(users, eq(scores.userId, users.id))

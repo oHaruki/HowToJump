@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { levelValue } from "@/lib/levels";
+import { levelValue, progressText } from "@/lib/levels";
 import { tierByOrder, tierFill, type Tier } from "@/lib/tiers";
 import { ladderPosition } from "@/components/LevelView";
 
@@ -51,11 +51,11 @@ function changesBetween(
   });
 }
 
-/** "Topaz 7/100", or "GOAT" at the top of the ladder. */
+/** "Topaz 7/100%", or "GOAT" at the top pack. */
 function describe(level: Level): string {
   const tier = tierByOrder(level.tierOrder);
   if (tier && level.progress == null) return tier.name;
-  return (tier ? tier.name : "Unranked") + " " + (level.progress ?? 0) + "/100";
+  return (tier ? tier.name : "Unranked") + " " + progressText(level.progress);
 }
 
 function send(snapshot: Snapshot, renderedAt: string, beacon: boolean) {
@@ -235,11 +235,11 @@ function Summary({
     improved ? improved + " improved" : "",
   ].filter(Boolean);
   const sameTier = main.from.tierOrder === main.to.tierOrder;
-  // "Topaz 7/100 → 93/100" within a pack; at the top there is no way to go,
-  // so just the pack.
+  // "Topaz 7/100% → 93/100%" within a pack; at the top there is no way to
+  // go, so just the pack.
   const within = main.to.progress == null
     ? describe(main.to)
-    : describe(main.from) + " → " + main.to.progress + "/100";
+    : describe(main.from) + " → " + progressText(main.to.progress);
 
   return (
     <>
@@ -497,10 +497,10 @@ function MainFill({ change, skip, onDone }: { change: Change; skip: boolean; onD
         <span>
           {next ? (
             <>
-              {progress}/100 to <b>{next.name}</b>
+              {progressText(progress)} to <b>{next.name}</b>
             </>
           ) : (
-            "Top of the ladder"
+            "Top pack"
           )}
         </span>
         <span>{fmt(exp)} EXP</span>

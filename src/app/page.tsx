@@ -30,17 +30,17 @@ export default async function OverviewPage() {
             width={691}
             height={900}
           />
-          <span className="lbl">osu! aim progression</span>
-          <h1>Sixteen packs. Stone to GOAT.</h1>
+          <span className="lbl">Project Aim</span>
+          <h1>Ranked osu! Aim</h1>
           <p className="lede">
-            A judged ladder through osu! aim. Every map belongs to exactly one pack
-            under one mod, and every clear is graded on a single number: how many
-            notes you dropped. Climb the ladder and watch your own progression fill
-            itself in.
+            16 packs, filled to the brim with aim maps. Compete in an environment
+            where only your misscount matters. Level up specific aiming skills and
+            conquer the leaderboards. Join the discord and participate in community
+            aim competitions and tourneys.
           </p>
           <div className="row" style={{ marginTop: 4 }}>
             <Link className="btn btn-primary" href="/ladder">
-              See the ladder
+              See the packs
             </Link>
             <Link className="btn" href="/maps">
               Browse the bank
@@ -54,7 +54,7 @@ export default async function OverviewPage() {
       <div className="stat-strip">
         <Stat label="packs" value={16} />
         <Stat label="grades" value={18} />
-        <Stat label="entries on the ladder" value={stats.total} />
+        <Stat label="entries in the bank" value={stats.total} />
         <Stat
           label="hardest star rating"
           value={stats.hardest ? stats.hardest.toFixed(2) : "0.00"}
@@ -63,12 +63,11 @@ export default async function OverviewPage() {
 
       <div className="stack-lg">
         <div className="section-head">
-          <span className="lbl">The ladder</span>
+          <span className="lbl">Packs</span>
           <h2>Difficulty you can actually feel</h2>
           <p className="lede">
             Each pack is one step up, placed by hand rather than by star rating
-            alone. Stone is where everybody starts. GOAT is where almost nobody
-            finishes.
+            alone. GOAT is where almost nobody finishes.
           </p>
         </div>
         <LadderGrid counts={counts} />
@@ -77,7 +76,7 @@ export default async function OverviewPage() {
       {recent.length ? (
         <div className="stack-lg">
           <div className="section-head">
-            <span className="lbl">On the ladder now</span>
+            <span className="lbl">Packs</span>
             <h2>Recently judged</h2>
           </div>
           <div className="grid-auto">

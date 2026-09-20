@@ -8,7 +8,7 @@ import { NavLinks } from "@/components/NavLinks";
 export const metadata: Metadata = {
   title: "HowToJump",
   description:
-    "A judged ladder through osu! aim. Sixteen packs from Stone to GOAT, graded on misscount, tracked automatically from your osu! account.",
+    "Ranked osu! aim. Sixteen packs of aim maps from Stone to GOAT, graded on misscount and tracked automatically from your osu! account.",
 };
 
 export default async function RootLayout({
@@ -23,7 +23,7 @@ export default async function RootLayout({
   const links = [
     { href: "/", label: "Overview" },
     { href: "/maps", label: "Map bank" },
-    { href: "/ladder", label: "Ladder" },
+    { href: "/ladder", label: "Packs" },
     { href: "/leaderboard", label: "Leaderboard" },
     { href: "/info", label: "Info" },
   ];

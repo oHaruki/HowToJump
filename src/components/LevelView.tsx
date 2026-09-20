@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { levelValue } from "@/lib/levels";
+import { levelValue, progressText } from "@/lib/levels";
 import { TIERS, tierByOrder, tierFill } from "@/lib/tiers";
 
 /**
@@ -63,10 +63,10 @@ export function LevelBar({
       <span className="lvl-foot">
         {next ? (
           <>
-            {level.progress ?? 0}/100 to <b>{next.name}</b>
+            {progressText(level.progress)} to <b>{next.name}</b>
           </>
         ) : (
-          "Top of the ladder"
+          "Top pack"
         )}
       </span>
       <span className="lvl-exp">

@@ -1,6 +1,6 @@
 import {
   pgTable, serial, integer, bigint, text, varchar, boolean, timestamp,
-  doublePrecision, jsonb, uniqueIndex, index, primaryKey,
+  doublePrecision, numeric, jsonb, uniqueIndex, index, primaryKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -277,8 +277,13 @@ export const gradeRules = pgTable("grade_rules", {
   maxMiss: integer("max_miss"),
   requiresFc: boolean("requires_fc").notNull().default(false),
   requiresPerfect: boolean("requires_perfect").notNull().default(false),
-  /** Share of a map's pack EXP the grade earns, as a percentage. */
-  expPercent: integer("exp_percent").notNull().default(0),
+  /**
+   * Share of a map's pack EXP the grade earns, as a percentage. Fractional:
+   * the bottom bands are worth well under one percent of a pack.
+   */
+  expPercent: numeric("exp_percent", { precision: 6, scale: 3, mode: "number" })
+    .notNull()
+    .default(0),
 });
 
 /** Editable site copy, so the rules page is not hardcoded. */

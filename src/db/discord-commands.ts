@@ -10,7 +10,7 @@ import "./env";
 const commands = [
   {
     name: "rs",
-    description: "Pull a player's recent plays onto the ladder now",
+    description: "Pull a player's recent plays in now",
     type: 1,
     options: [
       { type: 3, name: "player", description: "Their osu! username", required: true },

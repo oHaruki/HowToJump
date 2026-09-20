@@ -163,7 +163,7 @@ test("identity is beatmap plus mod, so the same map under HR is new", () => {
   assert.equal(rows[2].status, "duplicate");  // NM again
 });
 
-test("rows already on the ladder are flagged, not re-imported", () => {
+test("rows already in the bank are flagged, not re-imported", () => {
   const { rows } = parsePaste(HEADER + "\n" + ROW_LUNATICON);
   classify(rows, new Set(["4679115|NM"]));
   assert.equal(rows[0].status, "exists");

@@ -64,7 +64,7 @@ export default async function StaffDashboard() {
 
       <div className="grid-4">
         <StatCard label="in the queue" value={stats.pending} />
-        <StatCard label="entries on the ladder" value={stats.bank} />
+        <StatCard label="entries in the bank" value={stats.bank} />
         <StatCard label="need a pack" value={stats.needPack} />
         <StatCard label="players" value={stats.players} />
       </div>

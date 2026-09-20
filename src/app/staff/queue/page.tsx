@@ -9,7 +9,7 @@ export default async function QueuePage() {
   return (
     <>
       <SectionHead label="Staff" title="Review queue">
-        Approving writes the entry onto the ladder. A pack has to be set first.
+        Approving writes the entry into the bank. A pack has to be set first.
       </SectionHead>
       <QueueTable rows={rows.map((r) => ({ ...r, createdAt: String(r.createdAt) }))} />
     </>

@@ -132,7 +132,7 @@ export default function InfoPage() {
           </p>
           <hr className="sep" />
           <p className="small">
-            Almost every map on the ladder is graveyard, so there is no beatmap
+            Almost every map in the bank is graveyard, so there is no beatmap
             leaderboard to read. Recent plays come back as plays rather than
             leaderboard entries, so they cover graveyard maps fine, on stable and
             lazer. It is the same data <code>&gt;rs</code> reads. The site checks
@@ -146,7 +146,7 @@ export default function InfoPage() {
           <span className="lbl">Rules</span>
           <h3>Getting a score counted</h3>
           <p>
-            Play a map on the ladder with the right mods. That is the whole rule.
+            Play a map from the bank with the right mods. That is the whole rule.
             There is no screenshot, no clip and no review queue, because the score
             comes from osu! rather than from a picture of osu!.
           </p>

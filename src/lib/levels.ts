@@ -127,14 +127,15 @@ export function bestExp(plays: Array<Omit<LevelPlay, "categories">>): number {
  * Renamed labels stay in the database until staff touch the row, so a play
  * on an entry still saying "Raw Aim" counts toward "Aim - raw mechanic".
  * Plays on entries carrying a dropped category count toward none until the
- * map is judged again. Ties go to the older id, so places never swap between
+ * map is judged again. Ordered by byWorth, so places never swap between
  * renders and the total below always adds up the same plays.
  */
 function countingByCategory(plays: readonly LevelPlay[]): Map<string, number[]> {
   const scored = plays.map((p, i) => ({
     i,
-    tie: p.id ?? i,
+    id: p.id ?? i,
     exp: expOf(p),
+    missCount: p.missCount,
     categories: new Set(p.categories.map((c) => normalizeCategory(c))),
   }));
   const out = new Map<string, number[]>();
@@ -143,7 +144,7 @@ function countingByCategory(plays: readonly LevelPlay[]): Map<string, number[]> 
       c,
       scored
         .filter((p) => p.categories.has(c))
-        .sort((a, b) => b.exp - a.exp || a.tie - b.tie)
+        .sort(byWorth)
         .slice(0, BEST_PLAYS)
         .map((p) => p.i),
     );
@@ -175,6 +176,21 @@ export function totalExp(plays: readonly LevelPlay[]): number {
   return [...counted].reduce((sum, i) => sum + expOf(plays[i]), 0);
 }
 
+/** A play as anything ordering plays by what they are worth reads it. */
+export type WorthShape = { exp: number; missCount: number; id: number };
+
+/**
+ * Best first: EXP, then the real misscount, then the older score.
+ *
+ * Everything that orders a player's plays reads this, so the places printed
+ * on them and the order they are drawn in cannot disagree. Two plays worth
+ * the same EXP were listed newest first and numbered oldest first, which drew
+ * a #1 underneath the #2 it tied with.
+ */
+export function byWorth(a: WorthShape, b: WorthShape): number {
+  return b.exp - a.exp || a.missCount - b.missCount || a.id - b.id;
+}
+
 /** Where a play stands in one category it counts toward. */
 export type Place = { category: string; place: number };
 
@@ -203,6 +219,11 @@ export function countingPlaces(plays: Array<LevelPlay & { id: number }>): Map<nu
  */
 export function levelValue(level: { tierOrder: number | null; progress: number | null }): number {
   return (level.tierOrder ?? 0) + (level.progress ?? 0) / 100;
+}
+
+/** How far through a pack, the way every bar reads it out: "17/100%". */
+export function progressText(progress: number | null | undefined): string {
+  return (progress ?? 0) + "/100%";
 }
 
 /**

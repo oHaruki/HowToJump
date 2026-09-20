@@ -114,7 +114,7 @@ async function recentScoresReply(name: string): Promise<string> {
   const r = await syncUser(user.id, user.osuUserId);
   if (r.error) return "Couldn't read " + who + "'s plays from osu!: " + r.error;
   if (!r.imported.length) {
-    return "Nothing new on the ladder in " + who + "'s last " + r.playsSeen + " plays.";
+    return "Nothing new from the bank in " + who + "'s last " + r.playsSeen + " plays.";
   }
   const lines = await describeScores(r.imported);
   return fitLines(["Imported for " + who + ":", ...lines.map(scoreLine)]);

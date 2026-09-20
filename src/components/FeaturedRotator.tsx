@@ -35,7 +35,7 @@ export function FeaturedRotator({
       <div className="box feat">
         <div className="feat-body">
           <span className="lbl">Nothing banked yet</span>
-          <h3>The ladder is empty</h3>
+          <h3>The bank is empty</h3>
           <p className="small">Staff add the first entries from the Add maps screen.</p>
         </div>
       </div>
@@ -65,7 +65,7 @@ export function FeaturedRotator({
           label={false}
         />
         <div className="feat-body">
-          <span className="lbl">Newest on the ladder</span>
+          <span className="lbl">Newest in the bank</span>
           <h3>
             <a
               href={url}

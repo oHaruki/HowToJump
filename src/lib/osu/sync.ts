@@ -5,7 +5,7 @@ import {
 } from "@/lib/schema";
 import { MAIN_LEVEL, categoryLevels, levelRules, mainLevel, totalExp } from "@/lib/levels";
 import { fetchPlayCounts, fetchRecentPlays, type PlayFacts } from "@/lib/osu/client";
-import { gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
+import { compareResults, gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
 import { normalizeMod } from "@/lib/mods";
 import { announceScores } from "@/lib/discord";
 import { planPass, type SyncReason } from "@/lib/osu/plan";
@@ -111,11 +111,9 @@ async function upsertScore(
     return grade;
   }
 
-  // Keep the better result. Grade first, then accuracy as the tie break.
-  const better =
-    rank < existing.gradeRank ||
-    (rank === existing.gradeRank && play.accuracy > (existing.accuracy ?? 0));
-  if (!better) return null;
+  // Keep the better result: grade, then misses, then accuracy.
+  const candidate = { gradeRank: rank, missCount: play.missCount, accuracy: play.accuracy };
+  if (compareResults(candidate, existing) >= 0) return null;
 
   await db.update(scores).set(values).where(eq(scores.id, existing.id));
   return grade;

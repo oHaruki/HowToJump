@@ -20,7 +20,7 @@ async function main() {
   const [{ n }] = await db
     .select({ n: raw<number>`count(*)::int` })
     .from(entries);
-  console.log("Done. " + n + " entries on the ladder.");
+  console.log("Done. " + n + " entries in the bank.");
   await sql.end();
 }
 

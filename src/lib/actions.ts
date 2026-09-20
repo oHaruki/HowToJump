@@ -452,7 +452,7 @@ export async function updateEntry(
     const clash = await db.query.entries.findFirst({
       where: and(eq(entries.beatmapId, current.beatmapId), eq(entries.mod, nextMod)),
     });
-    if (clash) throw new Error("This map is already on the ladder under " + nextMod);
+    if (clash) throw new Error("This map is already in the bank under " + nextMod);
 
     const adjusted = applyMod(
       {

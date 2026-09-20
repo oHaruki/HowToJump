@@ -30,7 +30,7 @@ const SPEED_HINT = scaleHint(SPEED_SCALE, "BPM");
 
 const STATUS_CHIP: Record<string, [string, string]> = {
   new: ["ok", "Ready"],
-  exists: ["", "On ladder"],
+  exists: ["", "In bank"],
   duplicate: ["warn", "Duplicate"],
   attention: ["warn", "Needs info"],
   error: ["bad", "Error"],
