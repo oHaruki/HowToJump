@@ -502,6 +502,14 @@ export const boardOrder = raw`${scores.gradeRank}, ${scores.missCount}, ${scores
 /** A player's place on a board, counted under that same order. */
 export const boardRank = raw<number>`(row_number() over (order by ${boardOrder}))::int`;
 
+/**
+ * That order in words, for the caption over a board. It lives here beside
+ * the SQL rather than in the page, because it went stale the moment the
+ * misscount was added and nothing said so.
+ */
+export const BOARD_ORDER_TEXT =
+  "Best grade first, then the misscount, then accuracy. A tie goes to whoever set it first.";
+
 /** A map's leaderboard, best first. */
 export async function getEntryLeaderboard(entryId: number, limit = 50): Promise<BoardScore[]> {
   const rows = await db

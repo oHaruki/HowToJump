@@ -8,8 +8,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  GRADE_RULES, MISS_KNEE, MISS_SLOPE, THRESHOLD_MISSES, THRESHOLD_SHARE, compareResults,
-  expPercentFor, expShare, gradeFor, missFactor, scaledMisses, shareForMisses,
+  GRADE_RULES, MISS_ACCEL, MISS_ACCEL_CAP, MISS_KNEE, MISS_SLOPE, THRESHOLD_MISSES,
+  THRESHOLD_SHARE, compareResults, expPercentFor, expShare, gradeFor, missFactor,
+  scaledMisses, shareForMisses,
 } from "./grading";
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.01, a + " is not " + b);
@@ -186,17 +187,30 @@ test("EXP falls on a curve, not in the grade's steps", () => {
   assert.equal(new Set(inside).size, 25, "a band still pays one flat number");
   for (let i = 1; i < inside.length; i++) assert.ok(inside[i] < inside[i - 1]);
 
-  // No cliff anywhere, at a band edge or inside one: what each extra miss
-  // costs only ever eases off, from the first miss down to the flat tail.
+  // No cliff anywhere, at a band edge or inside one. Nothing like the old
+  // table, where one more miss at the wrong moment halved a play.
   const drop = (m: number) => 1 - shareForMisses(m) / shareForMisses(m - 1);
-  assert.ok(drop(1) < 0.17, "the first miss costs " + (drop(1) * 100).toFixed(1) + "%");
-  for (let m = 2; m <= 300; m++) {
-    assert.ok(
-      drop(m) <= drop(m - 1) + 1e-12,
-      "miss " + m + " costs more than miss " + (m - 1) + " did",
-    );
+  for (let m = 1; m <= 400; m++) {
+    assert.ok(drop(m) < 0.17, "miss " + m + " costs " + (drop(m) * 100).toFixed(1) + "%");
   }
-  assert.ok(drop(300) > 0.04, "the tail should keep falling, not flatten out");
+  assert.ok(drop(400) > 0.04, "the tail should keep falling, not flatten out");
+});
+
+test("each miss costs more than the last, until there is nothing left", () => {
+  // The flat fall was the whole problem: every miss cost the same share of
+  // what was left, so thirty misses and fifty were only a third apart, and
+  // a map survived rather than cleared still paid like a clear.
+  const drop = (m: number) => 1 - shareForMisses(m) / shareForMisses(m - 1);
+  assert.ok(drop(40) > drop(20), "a fortieth miss should cost more than a twentieth");
+  assert.ok(drop(20) > drop(10), "a twentieth miss should cost more than a tenth");
+  // Past the cap it levels off: the share is already near nothing, and it
+  // still has to keep falling so two hopeless passes never tie.
+  assert.ok(drop(MISS_ACCEL_CAP + 1) < drop(MISS_ACCEL_CAP));
+  assert.ok(shareForMisses(MISS_ACCEL_CAP) < 0.5, "the cap should sit where nothing is left");
+  assert.ok(MISS_ACCEL > 0, "without this the fall is flat again");
+
+  // Thirty misses against fifty: an order of magnitude apart, not a third.
+  assert.ok(shareForMisses(30) / shareForMisses(50) > 8);
 });
 
 test("the curve is anchored where the pack thresholds read it", () => {
@@ -208,15 +222,18 @@ test("the curve is anchored where the pack thresholds read it", () => {
   // The knee and the slope are the two numbers Kayrem retunes.
   assert.ok(MISS_KNEE > 0 && MISS_SLOPE > 0);
 
-  // Fitted to the table it replaced, so nothing moved by much where a
-  // misscount still says something about the play.
+  // Clean play is where Kayrem drew the line, so the first dozen misses are
+  // still worth about what the hand written table paid them.
   const was: Array<[number, number]> = [[1, 85], [2, 75], [3, 65], [6, 50], [9, 44], [13, 36]];
   for (const [m, before] of was) {
     const now = shareForMisses(m);
     assert.ok(Math.abs(now - before) < 6, m + " misses moved from " + before + " to " + now);
   }
-  // And a sandbagged pass is worth almost nothing.
-  assert.ok(shareForMisses(150) < 0.1, "150 misses still earns " + shareForMisses(150) + "%");
+  // Past that it collapses: a map survived rather than cleared pays nothing
+  // like a clear, which is what two rounds of feedback were about.
+  assert.ok(shareForMisses(36) < 5, "36 misses still earns " + shareForMisses(36) + "%");
+  assert.ok(shareForMisses(52) < 1, "52 misses still earns " + shareForMisses(52) + "%");
+  assert.ok(shareForMisses(150) < 0.01, "150 misses still earns " + shareForMisses(150) + "%");
 });
 
 test("the share beside a grade is the most that grade pays", () => {

@@ -6,6 +6,9 @@ import { TIERS, tierByName } from "@/lib/tiers";
 import { SectionHead } from "@/components/ui";
 
 const fmt = (n: number) => n.toLocaleString("en");
+/* The curve gives shares from 120 down to hundredths of a percent, so the
+   small ones keep a second decimal rather than rounding away to nothing. */
+const share = (n: number) => (n < 1 ? +n.toFixed(2) : +n.toFixed(1));
 const standard = GRADE_RULES.find((g) => g.grade === THRESHOLD_GRADE);
 const packLine = (name: string) => {
   const t = tierByName(name);
@@ -43,9 +46,7 @@ export default function InfoPage() {
             <div className="grade" key={g.grade}>
               <span className="grade-badge">{g.grade}</span>
               <span className="grade-cond">{g.label}</span>
-              {/* One decimal: the curve gives shares like 39.592, which
-                  is more precision than a grade chip wants to carry. */}
-              <span className="grade-exp num">{+g.expPercent.toFixed(1)}%</span>
+              <span className="grade-exp num">{share(g.expPercent)}%</span>
             </div>
           ))}
         </div>

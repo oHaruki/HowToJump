@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 
 process.env.DATABASE_URL ??= "postgres://unused:unused@127.0.0.1:5432/unused";
 
-const { boardOrder, boardRank } = await import("./queries");
+const { boardOrder, boardRank, BOARD_ORDER_TEXT } = await import("./queries");
 const { db } = await import("./db");
 const { scores } = await import("./schema");
 
@@ -50,6 +50,25 @@ test("the misscount is read ascending, so the cleaner run stands above", () => {
 test("the row_number that places one player reads that same order", () => {
   assert.match(ranked, /row_number\(\) over \(order by /);
   assert.deepEqual(ordering(ranked), EXPECTED);
+});
+
+test("the caption over a board names everything the SQL orders by", () => {
+  // The caption said "grade first, then accuracy" for a whole commit after
+  // the misscount went into the order by. Every column the SQL sorts on has
+  // to show up in the sentence players read above the table.
+  const inWords: Record<string, string> = {
+    grade_rank: "grade",
+    miss_count: "misscount",
+    accuracy: "accuracy",
+    played_at: "set it first",
+    id: "set it first",
+  };
+  const caption = BOARD_ORDER_TEXT.toLowerCase();
+  for (const column of ordering(listed)) {
+    const word = inWords[column];
+    assert.ok(word, "no wording is defined for " + column);
+    assert.ok(caption.includes(word), "the caption never mentions " + column);
+  }
 });
 
 test("the list and the placing are built from one fragment, not two copies", () => {

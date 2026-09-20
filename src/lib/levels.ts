@@ -1,7 +1,7 @@
 import { CATEGORIES, TIERS, normalizeCategory, tierByOrder } from "@/lib/tiers";
 import {
-  GRADE_RULES, MISS_CURVE, MISS_KNEE, MISS_SLOPE, REFERENCE_NOTES, THRESHOLD_MISSES,
-  expShare,
+  GRADE_RULES, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE, MISS_SLOPE,
+  REFERENCE_NOTES, THRESHOLD_MISSES, expShare,
 } from "@/lib/grading";
 
 /**
@@ -42,7 +42,7 @@ export function levelRules(): string {
     packs: TIERS.map((t) => [t.order, t.exp]),
     grades: GRADE_RULES.map((g) => [g.grade, g.expPercent]),
     missScaling: [REFERENCE_NOTES, MISS_CURVE],
-    missShape: [MISS_KNEE, MISS_SLOPE, THRESHOLD_MISSES],
+    missShape: [MISS_KNEE, MISS_SLOPE, MISS_ACCEL, MISS_ACCEL_CAP, THRESHOLD_MISSES],
   });
 }
 

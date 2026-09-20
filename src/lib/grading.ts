@@ -34,23 +34,36 @@ export type GradeRule = {
  * grade letter still comes from the bands, osu! style; only the EXP is
  * continuous.
  *
- * The shape is a knee and a slope. MISS_KNEE sets how sharply the first few
- * misses bite, MISS_SLOPE how steadily it falls after that, both in halvings
- * of the map's pack EXP. It was fitted to the table Kayrem signed off, so
- * nothing moved by much; the numbers stay his to retune.
+ * Three numbers, all halvings of the map's pack EXP. MISS_KNEE sets how
+ * sharply the first few misses bite. MISS_SLOPE is the steady fall after
+ * that. MISS_ACCEL is what each miss costs on top of the last one, and it
+ * is the one that matters most: without it the fall is flat, every miss
+ * costing the same 4.5% of what is left however many have gone already, so
+ * going from thirty misses to fifty only cost a third of the play. Thirty
+ * misses and fifty are both a map survived rather than cleared, and the gap
+ * between them and a clean clear has to say so.
+ *
+ * Past MISS_ACCEL_CAP the acceleration stops: there is nothing left to take,
+ * and the share still has to fit grade_rules.exp_percent and keep falling
+ * so that two hopeless passes are never worth exactly the same.
  */
 export const MISS_KNEE = 0.8;
 export const MISS_SLOPE = 0.0664;
+export const MISS_ACCEL = 0.001;
+export const MISS_ACCEL_CAP = 60;
 
 /** A pack is reached at BEST_PLAYS plays of this misscount on it. */
 export const THRESHOLD_MISSES = 2;
 export const THRESHOLD_SHARE = 75;
 
+/** What the acceleration has cost by this misscount, and no more after the cap. */
+const accelerated = (misses: number) => MISS_ACCEL * Math.pow(Math.min(misses, MISS_ACCEL_CAP), 2);
+
 /* Pinned rather than fitted, so THRESHOLD_MISSES pays THRESHOLD_SHARE to the
    last decimal. Every pack's threshold is read from that one number, and a
    pack boundary landing on 74.98% of where it is written would be a puzzle. */
 const MISS_KNEE_WEIGHT =
-  (Math.log2(100 / THRESHOLD_SHARE) - MISS_SLOPE * THRESHOLD_MISSES) /
+  (Math.log2(100 / THRESHOLD_SHARE) - MISS_SLOPE * THRESHOLD_MISSES - accelerated(THRESHOLD_MISSES)) /
   Math.log2(1 + THRESHOLD_MISSES / MISS_KNEE);
 
 /**
@@ -59,7 +72,10 @@ const MISS_KNEE_WEIGHT =
  */
 export function shareForMisses(misses: number): number {
   if (!Number.isFinite(misses) || misses <= 0) return 100;
-  const halvings = MISS_KNEE_WEIGHT * Math.log2(1 + misses / MISS_KNEE) + MISS_SLOPE * misses;
+  const halvings =
+    MISS_KNEE_WEIGHT * Math.log2(1 + misses / MISS_KNEE) +
+    MISS_SLOPE * misses +
+    accelerated(misses);
   return 100 * Math.pow(2, -halvings);
 }
 

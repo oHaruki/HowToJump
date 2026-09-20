@@ -6,8 +6,8 @@ import { missFactor } from "@/lib/grading";
 import { playExp } from "@/lib/levels";
 import { normalizeMod } from "@/lib/mods";
 import {
-  getBeatmapPage, getEntryLeaderboard, getEntryPlayerCount, getEntryRankOf,
-  type BeatmapEntry, type BoardScore,
+  BOARD_ORDER_TEXT, getBeatmapPage, getEntryLeaderboard, getEntryPlayerCount,
+  getEntryRankOf, type BeatmapEntry, type BoardScore,
 } from "@/lib/queries";
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
@@ -86,7 +86,7 @@ export default async function BeatmapPage({
               {fmt(players)} {players === 1 ? "player" : "players"}
             </h2>
           </div>
-          <p className="small">Best grade first, then accuracy. A tie goes to whoever set it first.</p>
+          <p className="small">{BOARD_ORDER_TEXT}</p>
         </div>
 
         {board.length ? (
