@@ -1,5 +1,8 @@
 import { CATEGORIES, TIERS, normalizeCategory, tierByOrder } from "@/lib/tiers";
-import { GRADE_RULES, MISS_CURVE, REFERENCE_NOTES, expShare } from "@/lib/grading";
+import {
+  GRADE_RULES, MISS_CURVE, MISS_KNEE, MISS_SLOPE, REFERENCE_NOTES, THRESHOLD_MISSES,
+  expShare,
+} from "@/lib/grading";
 
 /**
  * Skill levels, as Kayrem set them out.
@@ -21,8 +24,9 @@ export const MAIN_LEVEL = "main";
  * Bump when the formula itself changes, such as the main level moving from
  * an average to a sum. Changed numbers are noticed without it. 2: a map can
  * sit in several categories. 3: misses cost EXP by the map's note count.
+ * 4: EXP falls on a curve rather than in the grade's steps.
  */
-export const LEVEL_RULES_VERSION = 3;
+export const LEVEL_RULES_VERSION = 4;
 
 /**
  * Everything a stored level depends on, as one string. Each deploy compares
@@ -38,14 +42,16 @@ export function levelRules(): string {
     packs: TIERS.map((t) => [t.order, t.exp]),
     grades: GRADE_RULES.map((g) => [g.grade, g.expPercent]),
     missScaling: [REFERENCE_NOTES, MISS_CURVE],
+    missShape: [MISS_KNEE, MISS_SLOPE, THRESHOLD_MISSES],
   });
 }
 
 /**
- * A pack is reached when the best plays add up to BEST_PLAYS plays at this
- * grade on it. Two misses keeps pack names honest: a full combo on the pack
- * below is worth at most 70% of this pack's value, under this grade's 75%, so
- * no number of them reaches the next pack, however big packs grow.
+ * A pack is reached when the best plays add up to BEST_PLAYS plays of
+ * THRESHOLD_MISSES misses on it, which is this grade. Two misses keeps pack
+ * names honest: ten 100% runs on the pack below come to 12 times its value
+ * against the 7.5 this pack asks, and a pack is worth 1.7 times the one
+ * below, so 12 / 1.7 falls short however the packs are renumbered.
  */
 export const THRESHOLD_GRADE = "A";
 
@@ -75,14 +81,17 @@ export type LevelPlay = {
 };
 
 /**
- * EXP for one play: the pack's value times the share the play earns. Without
- * misses and a note count it is the grade's share as the table has it, which
- * is what a pack's threshold and a full combo's worth are read from.
+ * EXP for one play: the pack's value times the share the play earns.
+ *
+ * The misscount is what sets the share, off the curve, so it is asked for
+ * rather than defaulted: a zero would quietly pay a sloppy clear as a clean
+ * one. The grade only decides whether this is a 100% run or a full combo,
+ * which are the two results not read off the misscount.
  */
 export function playExp(
   tierOrder: number,
   grade: string,
-  missCount = 0,
+  missCount: number,
   noteCount: number | null = null,
 ): number {
   const tier = tierByOrder(tierOrder);
@@ -92,9 +101,9 @@ export function playExp(
 const expOf = (p: Omit<LevelPlay, "categories">) =>
   playExp(p.tierOrder, p.grade, p.missCount, p.noteCount);
 
-/** EXP needed to reach a pack. */
+/** EXP needed to reach a pack: BEST_PLAYS two-miss plays on it. */
 export function threshold(tierOrder: number): number {
-  return BEST_PLAYS * playExp(tierOrder, THRESHOLD_GRADE);
+  return BEST_PLAYS * playExp(tierOrder, THRESHOLD_GRADE, THRESHOLD_MISSES, null);
 }
 
 /** Where an EXP total sits: the pack it reached and the way to the next. */

@@ -67,15 +67,16 @@ test("a score is new, improved, or old news, against when the player last looked
   assert.equal(freshness({ createdAt: after, importedAt: after }, null), null);
 });
 
-// These all have a zero misscount, so the tie falls through to the older id.
+// The two 2-miss plays are worth the same, and neither is the cleaner, so
+// the tie falls through to the older id.
 test("counting places: each category's best ten by EXP, older id last on a tie", () => {
   const plays = [
-    { id: 1, tierOrder: 13, categories: [RAW], grade: "A", missCount: 0, noteCount: null },
+    { id: 1, tierOrder: 13, categories: [RAW], grade: "A", missCount: 2, noteCount: null },
     { id: 2, tierOrder: 14, categories: [RAW], grade: "SS", missCount: 0, noteCount: null },
-    { id: 3, tierOrder: 13, categories: [RAW], grade: "A", missCount: 0, noteCount: null },
+    { id: 3, tierOrder: 13, categories: [RAW], grade: "A", missCount: 2, noteCount: null },
     { id: 4, tierOrder: 13, categories: ["Raw Aim"], grade: "SS", missCount: 0, noteCount: null }, // old spelling, same category
     { id: 5, tierOrder: 16, categories: ["Flow Aim"], grade: "SSS", missCount: 0, noteCount: null }, // dropped, counts nowhere
-    ...Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, tierOrder: 1, categories: [RAW], grade: "Pass", missCount: 0, noteCount: null })),
+    ...Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, tierOrder: 1, categories: [RAW], grade: "Pass", missCount: 101, noteCount: null })),
   ];
   const place = (id: number) => countingPlaces(plays).get(id)?.map((p) => p.place);
   assert.deepEqual(place(2), [1]);
@@ -154,10 +155,11 @@ test("the history keeps the order it was given, whatever the plays are worth", (
 });
 
 test("the screenshot case: the cleaner of two tied plays leads and is #1", () => {
-  // Both B on a 1,500 note map, so both earn 50% of Emerald. The seven miss
-  // run was set first, which used to win it #1 while being drawn underneath.
+  // Misses count by map length, so six on a 1,500 note map and twelve on a
+  // 6,000 note one are worth the same. The twelve was set first, which used
+  // to win it #1 while being drawn underneath.
   const plays = newestFirst([
-    play(12, 7, { at: "2026-09-01T00:00:00Z" }),
+    play(12, 12, { at: "2026-09-01T00:00:00Z", noteCount: 6000 }),
     play(40, 6, { at: "2026-09-20T00:00:00Z" }),
   ]);
   const { recent, top } = profileLists(plays, null);

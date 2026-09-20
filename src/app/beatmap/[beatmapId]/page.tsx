@@ -237,7 +237,7 @@ function Header({
             </div>
             <div className="bm-worth">
               <span>A full combo here is worth</span>
-              <b>{fmt(playExp(map.tierOrder, "SS"))} EXP</b>
+              <b>{fmt(playExp(map.tierOrder, "SS", 0))} EXP</b>
             </div>
             {map.noteCount ? <MissNote notes={map.noteCount} /> : null}
           </aside>

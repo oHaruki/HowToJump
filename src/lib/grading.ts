@@ -12,13 +12,59 @@ export type GradeRule = {
   requiresFc: boolean;
   requiresPerfect: boolean;
   /**
-   * The share of a map's pack EXP this grade earns, as a percentage. Kayrem's
-   * scale: a 100% run earns a fifth more than the map is worth, a full combo
-   * or zero misses all of it, then less for every miss band. Fractions of a
-   * percent are allowed and used, so the bottom bands can fall far enough.
+   * The share of a map's pack EXP this grade earns, as a percentage.
+   *
+   * A 100% run earns a fifth more than the map is worth and a full combo all
+   * of it; those two are set by hand. Every band of misses takes the share
+   * the curve gives its cleanest misscount, so what is shown beside a grade
+   * is the best that grade pays. EXP itself is read off the curve at the
+   * play's own misscount, not out of this column.
    */
   expPercent: number;
 };
+
+/* ------------------------------------------------ what a misscount costs */
+
+/**
+ * EXP falls away with the misscount on one smooth curve.
+ *
+ * It used to be read out of the band table below, which meant two plays on
+ * the same pack could be worth exactly the same despite one dropping thirty
+ * more notes, and one extra miss at a band edge could halve a play. The
+ * grade letter still comes from the bands, osu! style; only the EXP is
+ * continuous.
+ *
+ * The shape is a knee and a slope. MISS_KNEE sets how sharply the first few
+ * misses bite, MISS_SLOPE how steadily it falls after that, both in halvings
+ * of the map's pack EXP. It was fitted to the table Kayrem signed off, so
+ * nothing moved by much; the numbers stay his to retune.
+ */
+export const MISS_KNEE = 0.8;
+export const MISS_SLOPE = 0.0664;
+
+/** A pack is reached at BEST_PLAYS plays of this misscount on it. */
+export const THRESHOLD_MISSES = 2;
+export const THRESHOLD_SHARE = 75;
+
+/* Pinned rather than fitted, so THRESHOLD_MISSES pays THRESHOLD_SHARE to the
+   last decimal. Every pack's threshold is read from that one number, and a
+   pack boundary landing on 74.98% of where it is written would be a puzzle. */
+const MISS_KNEE_WEIGHT =
+  (Math.log2(100 / THRESHOLD_SHARE) - MISS_SLOPE * THRESHOLD_MISSES) /
+  Math.log2(1 + THRESHOLD_MISSES / MISS_KNEE);
+
+/**
+ * The share of a map's pack EXP a misscount earns, as a percentage. Zero
+ * misses is the whole of it, and it falls away from there without a step.
+ */
+export function shareForMisses(misses: number): number {
+  if (!Number.isFinite(misses) || misses <= 0) return 100;
+  const halvings = MISS_KNEE_WEIGHT * Math.log2(1 + misses / MISS_KNEE) + MISS_SLOPE * misses;
+  return 100 * Math.pow(2, -halvings);
+}
+
+/** Rounded to what grade_rules.exp_percent keeps, so the two cannot differ. */
+const stored = (share: number) => Math.round(share * 1000) / 1000;
 
 const miss = (
   grade: string,
@@ -26,49 +72,33 @@ const miss = (
   label: string,
   minMiss: number | null,
   maxMiss: number | null,
-  expPercent: number,
 ): GradeRule => ({
   grade, sortOrder, label, minMiss, maxMiss,
-  requiresFc: false, requiresPerfect: false, expPercent,
+  requiresFc: false, requiresPerfect: false,
+  // The best this grade pays: its cleanest misscount, off the same curve.
+  expPercent: stored(shareForMisses(minMiss ?? 0)),
 });
 
 export const GRADE_RULES: GradeRule[] = [
   { grade: "SSS", sortOrder: 1, label: "100%", minMiss: null, maxMiss: null, requiresFc: false, requiresPerfect: true, expPercent: 120 },
   { grade: "SS", sortOrder: 2, label: "Full combo", minMiss: null, maxMiss: null, requiresFc: true, requiresPerfect: false, expPercent: 100 },
-  miss("S", 3, "0 miss", 0, 0, 100),
-  miss("A+", 4, "1 miss", 1, 1, 85),
-  miss("A", 5, "2 miss", 2, 2, 75),
-  miss("A-", 6, "3 miss", 3, 3, 65),
-  miss("B+", 7, "4-5 miss", 4, 5, 55),
-  miss("B", 8, "6-7 miss", 6, 7, 50),
-  miss("B-", 9, "8-10 miss", 8, 10, 44),
-  miss("C+", 10, "11-15 miss", 11, 15, 36),
-  miss("C", 11, "16-20 miss", 16, 20, 29),
-  miss("C-", 12, "21-30 miss", 21, 30, 18),
-  miss("D+", 13, "31-40 miss", 31, 40, 12),
-  miss("D", 14, "41-50 miss", 41, 50, 7),
-  miss("D-", 15, "51-60 miss", 51, 60, 4),
-  miss("F+", 16, "61-80 miss", 61, 80, 1.8),
-  miss("F", 17, "81-100 miss", 81, 100, 0.6),
-  miss("Pass", 18, "100+ miss pass", 101, null, 0.2),
+  miss("S", 3, "0 miss", 0, 0),
+  miss("A+", 4, "1 miss", 1, 1),
+  miss("A", 5, "2 miss", 2, 2),
+  miss("A-", 6, "3 miss", 3, 3),
+  miss("B+", 7, "4-5 miss", 4, 5),
+  miss("B", 8, "6-7 miss", 6, 7),
+  miss("B-", 9, "8-10 miss", 8, 10),
+  miss("C+", 10, "11-15 miss", 11, 15),
+  miss("C", 11, "16-20 miss", 16, 20),
+  miss("C-", 12, "21-30 miss", 21, 30),
+  miss("D+", 13, "31-40 miss", 31, 40),
+  miss("D", 14, "41-50 miss", 41, 50),
+  miss("D-", 15, "51-60 miss", 51, 60),
+  miss("F+", 16, "61-80 miss", 61, 80),
+  miss("F", 17, "81-100 miss", 81, 100),
+  miss("Pass", 18, "100+ miss pass", 101, null),
 ];
-
-/*
- * Why the bottom of the table falls away so much faster than the top.
- *
- * Each pack is worth twice the one below, so a grade's share reads straight
- * off as packs: 50% is one pack down, 25% is two, 12.5% is three. That makes
- * the top of the table easy to reason about and the bottom of it unforgiving,
- * because keeping a sandbagged pass under a clean clear takes six or seven
- * packs of distance, and that is well under one percent.
- *
- * So the table is left alone for as long as a misscount still says something
- * about how the map was played, and only falls away past about twenty, where
- * a clear stops being skill and turns into persistence. A 150 miss pass on a
- * Diamond map used to earn 16,384, beating a clean Titanium full combo; it
- * earns 3,277 now, about what a clean Gold one is worth. Nothing at twenty
- * misses or under moved.
- */
 
 export type PlayShape = {
   missCount: number;
@@ -166,10 +196,12 @@ export function scaledMisses(missCount: number, noteCount: number | null | undef
 }
 
 /**
- * The share of a map's pack EXP a play earns. 100% runs, full combos and
- * zero-miss passes keep their own share. Anything with misses earns what its
- * scaled misses would, read off the same table. A map still waiting for its
- * note count earns what the grade says, as every map did before.
+ * The share of a map's pack EXP a play earns.
+ *
+ * A 100% run and a full combo are not about misses, so they keep the share
+ * set against their own rule. Everything else is the curve read at the
+ * play's misses as they count on a map that size, which is the real
+ * misscount on a 1,500 note map and on a map with no count yet.
  */
 export function expShare(
   grade: string,
@@ -177,10 +209,7 @@ export function expShare(
   noteCount: number | null | undefined,
   rules: GradeRule[] = GRADE_RULES,
 ): number {
-  if (missCount <= 0 || !noteCount) return expPercentFor(grade, rules);
-  const scaled = gradeFor(
-    { missCount: scaledMisses(missCount, noteCount), isFc: false, isPerfect: false },
-    rules,
-  );
-  return expPercentFor(scaled, rules);
+  const own = rules.find((r) => r.grade === grade && (r.requiresFc || r.requiresPerfect));
+  if (own) return own.expPercent;
+  return shareForMisses(scaledMisses(missCount, noteCount));
 }

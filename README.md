@@ -1,6 +1,6 @@
 # HowToJump
 
-A judged ladder through osu! aim. Sixteen packs from Stone to GOAT, graded on
+Ranked osu! aim. Sixteen packs from Stone to GOAT, graded on
 misscount, with scores tracked automatically from players' osu! accounts.
 
 ## How it works

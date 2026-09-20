@@ -27,8 +27,9 @@ export default function InfoPage() {
             Your grade comes from your misscount, with two exceptions at the top:
             hold the combo and you take SS, and a 100% takes SSS.
             Thresholds are stored as data, so staff retune them without a deploy.
-            The percentage beside each grade is the share of a map&apos;s EXP it
-            earns on a normal {fmt(REFERENCE_NOTES)} note map.
+            EXP does not step from grade to grade: it falls with every miss on
+            one curve, so the percentage beside each grade is the most that
+            grade pays, on a normal {fmt(REFERENCE_NOTES)} note map.
           </p>
           <p className="lede">
             Staying clean is easier on a short map, so there misses cost more EXP:
@@ -42,7 +43,9 @@ export default function InfoPage() {
             <div className="grade" key={g.grade}>
               <span className="grade-badge">{g.grade}</span>
               <span className="grade-cond">{g.label}</span>
-              <span className="grade-exp num">{g.expPercent}%</span>
+              {/* One decimal: the curve gives shares like 39.592, which
+                  is more precision than a grade chip wants to carry. */}
+              <span className="grade-exp num">{+g.expPercent.toFixed(1)}%</span>
             </div>
           ))}
         </div>

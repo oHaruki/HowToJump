@@ -8,8 +8,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  GRADE_RULES, compareResults, expPercentFor, expShare, gradeFor, missFactor,
-  scaledMisses,
+  GRADE_RULES, MISS_KNEE, MISS_SLOPE, THRESHOLD_MISSES, THRESHOLD_SHARE, compareResults,
+  expPercentFor, expShare, gradeFor, missFactor, scaledMisses, shareForMisses,
 } from "./grading";
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.01, a + " is not " + b);
@@ -35,12 +35,15 @@ test("scaled misses round, and a miss never counts as none", () => {
 });
 
 test("misses earn the share of what they count as", () => {
-  assert.equal(expShare("A+", 1, 150), 65); // counts as 3: A-
-  assert.equal(expShare("A", 2, 150), 50); // counts as 6: B
-  assert.equal(expShare("A+", 1, 500), 75); // counts as 2: A
-  assert.equal(expShare("A+", 1, 1500), 85); // as it is
-  assert.equal(expShare("A", 2, 3000), 85); // counts as 1: A+
-  assert.equal(expShare("A", 2, null), 75); // no count yet
+  const at = (m: number) => shareForMisses(m);
+  assert.equal(expShare("A+", 1, 150), at(3)); // counts as 3
+  assert.equal(expShare("A", 2, 150), at(6)); // counts as 6
+  assert.equal(expShare("A+", 1, 500), at(2)); // counts as 2
+  assert.equal(expShare("A+", 1, 1500), at(1)); // as it is
+  assert.equal(expShare("A", 2, 3000), at(1)); // counts as 1
+  assert.equal(expShare("A", 2, null), at(2)); // no count yet
+  // Two misses on a 1,500 note map is the anchor every threshold reads.
+  assert.equal(expShare("A", THRESHOLD_MISSES, 1500), THRESHOLD_SHARE);
 });
 
 test("full combos, 100% runs and clean passes are never scaled", () => {
@@ -167,35 +170,66 @@ test("the same misses on a longer map never earn less", () => {
   }
 });
 
-test("a 1,500 note map is the one that pays exactly what the grade says", () => {
+test("a 1,500 note map is the one that pays the misscount as it stands", () => {
   for (let m = 0; m <= 200; m++) {
-    assert.equal(expShare(plain(m), m, 1500), expPercentFor(plain(m)));
+    assert.equal(expShare(plain(m), m, 1500), shareForMisses(m));
     // A map osu! has not given a count for is read the same way.
-    assert.equal(expShare(plain(m), m, null), expPercentFor(plain(m)));
+    assert.equal(expShare(plain(m), m, null), shareForMisses(m));
   }
 });
 
-test("the tail Kayrem asked for: clean play untouched, sandbagging gutted", () => {
-  // Nothing at twenty misses or under moved from the original scale.
+test("EXP falls on a curve, not in the grade's steps", () => {
+  // Every misscount is worth its own number, so two plays on one pack are
+  // no longer worth the same for landing in the same band. That is what put
+  // 36 and 52 misses on identical EXP on a profile.
+  const inside = Array.from({ length: 25 }, (_, i) => shareForMisses(21 + i));
+  assert.equal(new Set(inside).size, 25, "a band still pays one flat number");
+  for (let i = 1; i < inside.length; i++) assert.ok(inside[i] < inside[i - 1]);
+
+  // No cliff anywhere, at a band edge or inside one: what each extra miss
+  // costs only ever eases off, from the first miss down to the flat tail.
+  const drop = (m: number) => 1 - shareForMisses(m) / shareForMisses(m - 1);
+  assert.ok(drop(1) < 0.17, "the first miss costs " + (drop(1) * 100).toFixed(1) + "%");
+  for (let m = 2; m <= 300; m++) {
+    assert.ok(
+      drop(m) <= drop(m - 1) + 1e-12,
+      "miss " + m + " costs more than miss " + (m - 1) + " did",
+    );
+  }
+  assert.ok(drop(300) > 0.04, "the tail should keep falling, not flatten out");
+});
+
+test("the curve is anchored where the pack thresholds read it", () => {
+  assert.equal(shareForMisses(0), 100);
+  assert.equal(shareForMisses(THRESHOLD_MISSES), THRESHOLD_SHARE);
+  // Nonsense in, a clean clear out, rather than something off the bottom.
+  assert.equal(shareForMisses(-4), 100);
+  assert.equal(shareForMisses(Number.NaN), 100);
+  // The knee and the slope are the two numbers Kayrem retunes.
+  assert.ok(MISS_KNEE > 0 && MISS_SLOPE > 0);
+
+  // Fitted to the table it replaced, so nothing moved by much where a
+  // misscount still says something about the play.
+  const was: Array<[number, number]> = [[1, 85], [2, 75], [3, 65], [6, 50], [9, 44], [13, 36]];
+  for (const [m, before] of was) {
+    const now = shareForMisses(m);
+    assert.ok(Math.abs(now - before) < 6, m + " misses moved from " + before + " to " + now);
+  }
+  // And a sandbagged pass is worth almost nothing.
+  assert.ok(shareForMisses(150) < 0.1, "150 misses still earns " + shareForMisses(150) + "%");
+});
+
+test("the share beside a grade is the most that grade pays", () => {
   assert.equal(expPercentFor("SSS"), 120);
   assert.equal(expPercentFor("SS"), 100);
   assert.equal(expPercentFor("S"), 100);
-  assert.equal(expPercentFor("A+"), 85);
-  assert.equal(expPercentFor("A"), 75);
-  assert.equal(expPercentFor("A-"), 65);
-  assert.equal(expPercentFor("B+"), 55);
-  assert.equal(expPercentFor("B"), 50);
-  assert.equal(expPercentFor("B-"), 44);
-  assert.equal(expPercentFor("C+"), 36);
-  assert.equal(expPercentFor("C"), 29);
-  // Past twenty a clear stops being skill, and the share falls away.
-  assert.equal(expPercentFor("C-"), 18);
-  assert.equal(expPercentFor("D+"), 12);
-  assert.equal(expPercentFor("D"), 7);
-  assert.equal(expPercentFor("D-"), 4);
-  assert.equal(expPercentFor("F+"), 1.8);
-  assert.equal(expPercentFor("F"), 0.6);
-  assert.equal(expPercentFor("Pass"), 0.2);
+  for (const g of bands) {
+    assert.equal(g.expPercent, Math.round(shareForMisses(g.minMiss!) * 1000) / 1000);
+    // Where a band covers more than one misscount, the rest of it pays less.
+    if (g.maxMiss != null && g.maxMiss > g.minMiss!) {
+      assert.ok(shareForMisses(g.maxMiss) < g.expPercent, g.grade + " is flat across its band");
+    }
+  }
   // A label the team has dropped earns nothing rather than throwing.
   assert.equal(expPercentFor("Flow"), 0);
 });
