@@ -67,7 +67,7 @@ export default async function OverviewPage() {
           <h2>Difficulty you can actually feel</h2>
           <p className="lede">
             Each pack is one step up, placed by hand rather than by star rating
-            alone. GOAT is where almost nobody finishes.
+            alone.
           </p>
         </div>
         <LadderGrid counts={counts} />
