@@ -3,7 +3,7 @@ import { GRADE_RULES, MIN_MISS_FACTOR, REFERENCE_NOTES, missFactor } from "@/lib
 import { BEST_PLAYS, THRESHOLD_GRADE, threshold } from "@/lib/levels";
 import { MODS, modLabel } from "@/lib/mods";
 import { TIERS, tierByName } from "@/lib/tiers";
-import { SectionHead } from "@/components/ui";
+import { GradeLetter, SectionHead } from "@/components/ui";
 
 const fmt = (n: number) => n.toLocaleString("en");
 /* The curve gives shares from 120 down to hundredths of a percent, so the
@@ -48,7 +48,7 @@ export default function InfoPage() {
         <div className="grade-grid">
           {GRADE_RULES.map((g) => (
             <div className="grade" key={g.grade}>
-              <span className="grade-badge">{g.grade}</span>
+              <GradeLetter grade={g.grade} />
               <span className="grade-cond">{g.label}</span>
               <span className="grade-exp num">{share(g.expPercent)}%</span>
             </div>

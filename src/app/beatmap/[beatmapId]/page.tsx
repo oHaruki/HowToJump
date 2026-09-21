@@ -99,7 +99,7 @@ export default async function BeatmapPage({
           </>
         ) : (
           <div className="sb-empty">
-            <GradeLetter grade="S" big />
+            <GradeLetter grade="S" size="big" />
             <p>Nobody has a score on this map yet. The top spot is open.</p>
           </div>
         )}
@@ -303,7 +303,7 @@ function ScoreCard({
           <span className="sb-card-kind">{kind === "top" ? "Top score" : "Your best"}</span>
           <span className="sb-card-rank">#{fmt(s.rank)}</span>
         </div>
-        <GradeLetter grade={s.grade} big />
+        <GradeLetter grade={s.grade} size="big" />
         <div className="sb-card-who">
           {s.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element

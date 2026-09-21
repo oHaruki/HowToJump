@@ -6,7 +6,7 @@ import {
   getPlayerTallies, getRankOf, getRankings, type PlayerTally, type RankingRow,
 } from "@/lib/queries";
 import { tierByOrder, tierFill } from "@/lib/tiers";
-import { Flag, SectionHead } from "@/components/ui";
+import { Flag, GradeLetter, SectionHead } from "@/components/ui";
 import { BankPager } from "@/components/BankPager";
 
 export const dynamic = "force-dynamic";
@@ -89,9 +89,9 @@ function RankTable({
             <th className="r">EXP</th>
             <th className="r hide-sm">Clears</th>
             <th className="r hide-sm">FCs</th>
-            <th className="r hide-sm">SSS</th>
-            <th className="r hide-sm">SS</th>
-            <th className="r hide-sm">S</th>
+            <th className="r hide-sm"><GradeLetter grade="SSS" size="sm" /></th>
+            <th className="r hide-sm"><GradeLetter grade="SS" size="sm" /></th>
+            <th className="r hide-sm"><GradeLetter grade="S" size="sm" /></th>
           </tr>
         </thead>
         <tbody>

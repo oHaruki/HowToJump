@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { GradeBadge, ModChip, mapHref } from "@/components/ui";
+import { GradeLetter, ModChip, mapHref } from "@/components/ui";
 import type { Place } from "@/lib/levels";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 
@@ -118,7 +118,7 @@ function PlayRow({ play: p }: { play: PlayView }) {
           </div>
         </div>
         <div className="play-score">
-          <GradeBadge grade={p.grade} />
+          <GradeLetter grade={p.grade} />
           <span className="play-acc">
             {p.accuracy != null ? p.accuracy.toFixed(2) + "%" : "·"}
             <br />

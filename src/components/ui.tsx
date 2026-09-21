@@ -166,19 +166,27 @@ function gradeTone(grade: string): string {
 }
 
 /**
- * A grade drawn the way osu! draws one on a scoreboard: a big slanted letter
- * in its family's colours, no box around it.
+ * A grade drawn the way osu! draws one on a scoreboard: a slanted letter in
+ * its family's colours, no box around it. This is the only way a grade is
+ * written on the site, so the colour alone says how good a play was before
+ * the letter is read at all.
+ *
+ * Sized rather than restyled, because the same mark has to carry a hero score
+ * and a row in a long list: "big" heads a scoreboard, "sm" is for the places
+ * they arrive by the dozen, where a full glow on every line would smear.
  */
-export function GradeLetter({ grade, big }: { grade: string; big?: boolean }) {
+export function GradeLetter({
+  grade,
+  size,
+}: {
+  grade: string;
+  size?: "sm" | "big";
+}) {
   return (
-    <span className={"gl" + (big ? " big" : "")} data-tone={gradeTone(grade)}>
+    <span className={"gl" + (size ? " " + size : "")} data-tone={gradeTone(grade)}>
       {grade}
     </span>
   );
-}
-
-export function GradeBadge({ grade }: { grade: string }) {
-  return <span className="grade-badge">{grade}</span>;
 }
 
 export function StatCard({ label, value }: { label: string; value: string | number }) {

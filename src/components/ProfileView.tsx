@@ -8,7 +8,7 @@ import { GRADE_RULES } from "@/lib/grading";
 import { BEST_PLAYS, MAIN_LEVEL, levelValue } from "@/lib/levels";
 import { PROFILE_SCOPES, profileLists, readSnapshot, snapshotOf } from "@/lib/progress";
 import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
-import { Flag, GradeBadge } from "@/components/ui";
+import { Flag, GradeLetter } from "@/components/ui";
 import { LevelBar, SkillRadar } from "@/components/LevelView";
 import { LevelUp } from "@/components/LevelUp";
 import { LiveRefresh } from "@/components/ProfileLive";
@@ -208,7 +208,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
       <div className="pf-grades">
         {GRADE_TALLY.map((g) => (
           <span className="pf-grade" key={g.label}>
-            <GradeBadge grade={g.label} />
+            <GradeLetter grade={g.label} />
             <b className="num">{plays.filter((p) => g.grades.includes(p.grade)).length}</b>
           </span>
         ))}
@@ -288,7 +288,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
                 <div className="pk-top">
                   <span className="pk-gem" style={{ background: tierFill(t) }} />
                   <span className="pk-name">{t.name}</span>
-                  {best ? <GradeBadge grade={best.grade} /> : null}
+                  {best ? <GradeLetter grade={best.grade} /> : null}
                 </div>
                 <div className="pk-bar">
                   <i style={{ width: (total ? (done / total) * 100 : 0) + "%" }} />

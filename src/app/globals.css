@@ -424,12 +424,12 @@ tbody tr:hover { background: var(--bg-c); }
   background: var(--bg-b); border: var(--border-width) solid var(--border);
   border-radius: var(--control-radius); corner-shape: var(--corner-shape);
 }
-.grade-badge {
-  font-family: var(--font-mono); font-weight: 700; min-width: 48px; text-align: center;
-  color: var(--text-focus); padding: 3px 7px; background: var(--bg-d);
-  border-radius: 7px; corner-shape: var(--corner-shape);
-  border: var(--border-width) solid var(--border);
-}
+/*
+ * The letters are not all one width -- Pass is nearly twice S -- so anywhere
+ * a column of them has to line up, the mark reserves the widest one's room
+ * instead of letting the text beside it go ragged.
+ */
+.grade .gl { min-width: 62px; }
 .grade-cond { font-size: var(--font-size-small); color: var(--text-dark); }
 .grade-exp { margin-left: auto; font-size: var(--font-size-small); }
 
@@ -1267,6 +1267,7 @@ a.pager-page:hover, a.pager-step:hover {
 }
 .play-sub .chip-mod { padding: 0 7px; font-size: 12px; }
 .play-score { grid-area: score; display: flex; align-items: center; gap: 12px; }
+.play-score .gl { min-width: 80px; text-align: center; font-size: 33px; }
 .play-acc {
   font-family: var(--font-mono); font-size: var(--font-size-small);
   color: var(--text); text-align: right; line-height: 1.35; white-space: nowrap;
@@ -1315,7 +1316,7 @@ a.pager-page:hover, a.pager-step:hover {
 @media (max-width: 560px) {
   .pf-packs { gap: 8px; }
   .pk { padding: 11px 12px; gap: 8px; }
-  .pk-top .grade-badge { min-width: 0; }
+  .pk-top .gl { min-width: 0; }
 }
 .pk {
   display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;
@@ -1332,7 +1333,7 @@ a.pager-page:hover, a.pager-step:hover {
   outline: var(--border-width) solid var(--scrim);
 }
 .pk-name { flex: 1; color: var(--text-focus); font-weight: 600; }
-.pk-top .grade-badge { min-width: 40px; padding: 1px 6px; font-size: var(--font-size-small); }
+.pk-top .gl { min-width: 56px; text-align: right; font-size: 28px; }
 .pk-bar { height: 5px; background: var(--bg-d); border-radius: 99px; overflow: hidden; }
 .pk-bar i { display: block; height: 100%; border-radius: 99px; background: var(--fill); }
 .pk-count { font-family: var(--font-mono); font-size: var(--font-size-small); color: var(--text); }
@@ -1574,6 +1575,7 @@ table.board { font-size: var(--font-size-body); }
 table.board tbody td { padding: 9px 16px; }
 table.board tbody tr:nth-child(even) { background: color-mix(in srgb, var(--bg-c) 45%, transparent); }
 table.board .r { text-align: right; }
+table.board thead th .gl { vertical-align: middle; }
 table.board td.num, table.board td.r { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .b-rank { width: 72px; font-family: var(--font-mono); color: var(--text-focus); white-space: nowrap; }
 tr[data-top="1"] .b-rank { color: #f5c542; }
@@ -1609,12 +1611,23 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
  */
 .gl {
   display: inline-block; padding-right: 0.08em;
+  /* Pinned, not inherited: these sit inside a mono table head too. */
+  font-family: var(--font-body);
   font-size: 23px; line-height: 1; font-weight: 800; font-style: italic;
   letter-spacing: -0.03em; white-space: nowrap;
   background: var(--gl); -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 0 7px color-mix(in srgb, var(--glow) 45%, transparent));
 }
 .gl.big { font-size: 58px; letter-spacing: -0.04em; }
+/*
+ * Where grades arrive by the dozen -- a play list, a column head -- the glow
+ * is pulled back. Fifty of them at full strength turns a scrolling list into
+ * a smear, and the colour carries the meaning on its own at this size.
+ */
+.gl.sm {
+  font-size: 17px;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--glow) 30%, transparent));
+}
 .gl[data-tone="sss"] { --gl: linear-gradient(180deg, #ffffff 10%, #fff1a8 50%, #e8c253 95%); --glow: #fff1a8; }
 .gl[data-tone="ss"] { --gl: linear-gradient(180deg, #fff6c2, #f5c542 80%); --glow: #f5c542; }
 .gl[data-tone="s"] { --gl: linear-gradient(180deg, #ffd88a, #ff9b1a 85%); --glow: #ffb13b; }
