@@ -8,9 +8,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  GRADE_RULES, MISS_ACCEL, MISS_ACCEL_CAP, MISS_KNEE, MISS_SLOPE, THRESHOLD_MISSES,
-  THRESHOLD_SHARE, compareResults, expPercentFor, expShare, gradeFor, missFactor,
-  scaledMisses, shareForMisses,
+  GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_KNEE, MISS_SLOPE,
+  THRESHOLD_MISSES, THRESHOLD_SHARE, compareResults, expPercentFor, expShare, gradeFor,
+  missFactor, scaledMisses, shareForMisses,
 } from "./grading";
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.01, a + " is not " + b);
@@ -19,10 +19,30 @@ test("a 1,500 note map counts ×1, a 150 note map about ×3", () => {
   assert.equal(missFactor(1500), 1);
   near(missFactor(150), 3.16);
   near(missFactor(500), 1.73);
-  near(missFactor(3000), 0.71);
   // A map osu! has not given a count for yet counts as it always did.
   assert.equal(missFactor(null), 1);
   assert.equal(missFactor(0), 1);
+});
+
+test("a long map forgives a miss by a fifth at most, however long it runs", () => {
+  // Unbounded, this swallowed the whole miss curve: thirty misses on a
+  // 6,000 note map counted as fifteen and paid like a clean clear.
+  assert.equal(missFactor(3000), MIN_MISS_FACTOR);
+  assert.equal(missFactor(6000), MIN_MISS_FACTOR);
+  assert.equal(missFactor(100_000), MIN_MISS_FACTOR);
+  assert.ok(MIN_MISS_FACTOR < 1, "a long map should still forgive something");
+
+  // Short maps are untouched, which is the half of the rule that was meant.
+  assert.ok(missFactor(150) > 3);
+  assert.ok(missFactor(500) > 1.7);
+
+  // Nothing between the two ends jumps: the factor only ever eases off.
+  let last = Number.POSITIVE_INFINITY;
+  for (let notes = 50; notes <= 20_000; notes += 25) {
+    const f = missFactor(notes);
+    assert.ok(f <= last + 1e-12, "the factor rose at " + notes + " notes");
+    last = f;
+  }
 });
 
 test("scaled misses round, and a miss never counts as none", () => {
@@ -31,8 +51,11 @@ test("scaled misses round, and a miss never counts as none", () => {
   assert.equal(scaledMisses(2, 150), 6);
   assert.equal(scaledMisses(2, 1500), 2);
   assert.equal(scaledMisses(1, 3000), 1);
-  assert.equal(scaledMisses(2, 3000), 1);
+  assert.equal(scaledMisses(2, 3000), 2);
   assert.equal(scaledMisses(3, 3000), 2);
+  // A map long enough to hit the floor forgives a fifth, and no more.
+  assert.equal(scaledMisses(30, 6000), 24);
+  assert.equal(scaledMisses(30, 60_000), 24);
 });
 
 test("misses earn the share of what they count as", () => {
@@ -41,7 +64,7 @@ test("misses earn the share of what they count as", () => {
   assert.equal(expShare("A", 2, 150), at(6)); // counts as 6
   assert.equal(expShare("A+", 1, 500), at(2)); // counts as 2
   assert.equal(expShare("A+", 1, 1500), at(1)); // as it is
-  assert.equal(expShare("A", 2, 3000), at(1)); // counts as 1
+  assert.equal(expShare("A", 2, 3000), at(2)); // a long map forgives a fifth
   assert.equal(expShare("A", 2, null), at(2)); // no count yet
   // Two misses on a 1,500 note map is the anchor every threshold reads.
   assert.equal(expShare("A", THRESHOLD_MISSES, 1500), THRESHOLD_SHARE);

@@ -155,11 +155,11 @@ test("the history keeps the order it was given, whatever the plays are worth", (
 });
 
 test("the screenshot case: the cleaner of two tied plays leads and is #1", () => {
-  // Misses count by map length, so six on a 1,500 note map and twelve on a
-  // 6,000 note one are worth the same. The twelve was set first, which used
+  // Misses count by map length, so six on a 1,500 note map and eight on a
+  // 3,000 note one are worth the same. The eight was set first, which used
   // to win it #1 while being drawn underneath.
   const plays = newestFirst([
-    play(12, 12, { at: "2026-09-01T00:00:00Z", noteCount: 6000 }),
+    play(12, 8, { at: "2026-09-01T00:00:00Z", noteCount: 3000 }),
     play(40, 6, { at: "2026-09-20T00:00:00Z" }),
   ]);
   const { recent, top } = profileLists(plays, null);

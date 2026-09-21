@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { GRADE_RULES, REFERENCE_NOTES, missFactor } from "@/lib/grading";
+import { GRADE_RULES, MIN_MISS_FACTOR, REFERENCE_NOTES, missFactor } from "@/lib/grading";
 import { BEST_PLAYS, THRESHOLD_GRADE, threshold } from "@/lib/levels";
 import { MODS, modLabel } from "@/lib/mods";
 import { TIERS, tierByName } from "@/lib/tiers";
@@ -29,16 +29,20 @@ export default function InfoPage() {
           <p className="lede">
             Your grade comes from your misscount, with two exceptions at the top:
             hold the combo and you take SS, and a 100% takes SSS.
-            Thresholds are stored as data, so staff retune them without a deploy.
-            EXP does not step from grade to grade: it falls with every miss on
-            one curve, so the percentage beside each grade is the most that
-            grade pays, on a normal {fmt(REFERENCE_NOTES)} note map.
           </p>
           <p className="lede">
-            Staying clean is easier on a short map, so there misses cost more EXP:
-            on a short map of 150 notes each miss counts
-            ×{missFactor(150).toFixed(1)}, and on a 3,000 note map
-            ×{missFactor(3000).toFixed(1)}. The grade still shows your real misses.
+            EXP does not step from grade to grade. It falls with every miss on
+            one curve, and each miss costs a little more than the one before,
+            so a map survived is worth nothing like a map cleared. The
+            percentage beside a grade is the most that grade pays, on a normal{" "}
+            {fmt(REFERENCE_NOTES)} note map.
+          </p>
+          <p className="lede">
+            Staying clean is easier on a short map, so there each miss costs
+            more: on a 150 note map it counts ×{missFactor(150).toFixed(1)}. A
+            long map forgives, but only so far, never under{" "}
+            ×{MIN_MISS_FACTOR.toFixed(1)}, so a marathon is not a way around the
+            curve. The grade always shows your real misses.
           </p>
         </div>
         <div className="grade-grid">

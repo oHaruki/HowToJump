@@ -12,7 +12,10 @@ import {
   BEST_PLAYS, bestExp, byWorth, categoryLevels, countingPlaces, levelFromExp, levelRules,
   mainLevel, playExp, progressText, threshold, totalExp, type Level, type LevelPlay,
 } from "./levels";
-import { GRADE_RULES, gradeFor } from "./grading";
+import {
+  GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE,
+  MISS_SLOPE, REFERENCE_NOTES, THRESHOLD_MISSES, gradeFor,
+} from "./grading";
 import { CATEGORIES, TIERS, tierByName } from "./tiers";
 
 const order = (name: string) => tierByName(name)!.order;
@@ -132,20 +135,20 @@ test("adding a play never lowers a level", () => {
 });
 
 test("plays worth the same EXP are ordered and numbered the same way", () => {
-  // Misses count by map size, so six on a 1,500 note map and twelve on a
-  // 6,000 note one both count as six and are worth the same. The cleaner
+  // Misses count by map size, so six on a 1,500 note map and eight on a
+  // 3,000 note one both count as six and are worth the same. The cleaner
   // real misscount leads; the older score used to take #1 underneath it.
   const six: LevelPlay & { id: number } =
     { id: 40, tierOrder: order("Emerald"), categories: [RAW], grade: "B", missCount: 6, noteCount: 1500 };
-  const twelve: LevelPlay & { id: number } =
-    { id: 12, tierOrder: order("Emerald"), categories: [RAW], grade: "C+", missCount: 12, noteCount: 6000 };
+  const eight: LevelPlay & { id: number } =
+    { id: 12, tierOrder: order("Emerald"), categories: [RAW], grade: "B-", missCount: 8, noteCount: 3000 };
   const exp = (p: LevelPlay) => playExp(p.tierOrder, p.grade, p.missCount, p.noteCount);
-  assert.equal(exp(six), exp(twelve));
+  assert.equal(exp(six), exp(eight));
 
-  const listed = [twelve, six].map((p) => ({ ...p, exp: exp(p) })).sort(byWorth);
+  const listed = [eight, six].map((p) => ({ ...p, exp: exp(p) })).sort(byWorth);
   assert.deepEqual(listed.map((p) => p.id), [40, 12]);
 
-  const places = countingPlaces([twelve, six]);
+  const places = countingPlaces([eight, six]);
   assert.deepEqual(places.get(40), [{ category: RAW, place: 1 }]);
   assert.deepEqual(places.get(12), [{ category: RAW, place: 2 }]);
 });
@@ -246,7 +249,7 @@ test("misses cost EXP by map size, while the pack's bar stays put", () => {
   // Amethyst, one miss: a 30 second map counts it about three times.
   assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 150)), 674_195); // counts as 3
   assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 1500)), 833_927);
-  assert.equal(Math.round(playExp(order("Amethyst"), "A", 2, 3000)), 833_927); // counts as 1
+  assert.equal(playExp(order("Amethyst"), "A", 2, 3000), 742_500); // forgives a fifth
   // Full combos and 100% runs are never scaled.
   assert.equal(playExp(order("Amethyst"), "SS", 0, 150), 990_000);
   assert.equal(playExp(order("Amethyst"), "SSS", 0, 150), 1_188_000);
@@ -317,17 +320,17 @@ const listed = (plays: Array<LevelPlay & { id: number }>) =>
 test("the screenshot case: tied EXP, and the cleaner run leads and is #1", () => {
   // EXP follows the misscount as the map's length counts it, so a tie now
   // means two plays whose misses count the same: six on a 1,500 note map,
-  // twelve on a 6,000 note one. The twelve is the older score, which used
-  // to take #1 while being drawn underneath.
+  // eight on a 3,000 note one. The eight is the older score, which used to
+  // take #1 while being drawn underneath.
   const six = graded(40, "Emerald", 6, 1500);
-  const twelve = graded(12, "Emerald", 12, 6000);
-  assert.equal(expOf(six), expOf(twelve));
+  const eight = graded(12, "Emerald", 8, 3000);
+  assert.equal(expOf(six), expOf(eight));
   // The grade letters differ, because a grade always reads the real misses.
   assert.equal(six.grade, "B");
-  assert.equal(twelve.grade, "C+");
+  assert.equal(eight.grade, "B-");
 
-  assert.deepEqual(listed([twelve, six]).map((p) => p.id), [40, 12]);
-  const places = countingPlaces([twelve, six]);
+  assert.deepEqual(listed([eight, six]).map((p) => p.id), [40, 12]);
+  const places = countingPlaces([eight, six]);
   assert.deepEqual(places.get(40), [{ category: RAW, place: 1 }]);
   assert.deepEqual(places.get(12), [{ category: RAW, place: 2 }]);
 });
@@ -370,19 +373,19 @@ test("however the plays fall, the list order and the printed places agree", () =
 
 test("on a tie for the last counting place, the cleaner play takes it", () => {
   // Eleven plays whose misses all count as six: five that really are six on
-  // a 1,500 note map, six that are twelve on a 6,000 note one.
+  // a 1,500 note map, six that are eight on a 3,000 note one.
   const six = [1, 2, 3, 4, 5].map((i) => graded(i, "Emerald", 6, 1500));
-  const twelve = [6, 7, 8, 9, 10, 11].map((i) => graded(i, "Emerald", 12, 6000));
-  const all = [...six, ...twelve];
+  const eight = [6, 7, 8, 9, 10, 11].map((i) => graded(i, "Emerald", 8, 3000));
+  const all = [...six, ...eight];
   assert.equal(new Set(all.map(expOf)).size, 1, "they have to all be worth the same");
 
   const places = countingPlaces(all);
-  // The six miss runs take places 1 to 5, then the five oldest twelve miss ones.
+  // The six miss runs take places 1 to 5, then the five oldest eight miss ones.
   assert.deepEqual(
     all.filter((p) => places.has(p.id)).map((p) => p.id),
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
   );
-  assert.equal(places.has(11), false, "the newest twelve miss run should be the one dropped");
+  assert.equal(places.has(11), false, "the newest eight miss run should be the one dropped");
   assert.equal(
     Math.round(categoryLevels(all)[RAW].exp),
     Math.round(BEST_PLAYS * expOf(six[0])),
@@ -466,6 +469,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
     packs: Array<[number, number]>;
     bestPlays: number;
     missShape: number[];
+    missScaling: number[];
   };
   assert.equal(rules.grades.length, GRADE_RULES.length);
   for (const g of GRADE_RULES) {
@@ -474,9 +478,12 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
   assert.equal(rules.packs.length, TIERS.length);
   assert.deepEqual(rules.packs.find(([o]) => o === order("GOAT")), [order("GOAT"), 2_860_000]);
   assert.equal(rules.bestPlays, BEST_PLAYS);
-  // The curve's own numbers are in there too, so retuning it rebuilds levels
-  // even where every grade's headline share happens to round the same way.
-  assert.equal(rules.missShape.length, 5);
+  // Every number a stored level was worked out from has to be in here, or
+  // a deploy that retunes one leaves everyone on the old figure. The grade
+  // shares alone are not enough: they are read at one misscount each, and
+  // nothing about map length shows up in them at all.
+  assert.deepEqual(rules.missShape, [MISS_KNEE, MISS_SLOPE, MISS_ACCEL, MISS_ACCEL_CAP, THRESHOLD_MISSES]);
+  assert.deepEqual(rules.missScaling, [REFERENCE_NOTES, MISS_CURVE, MIN_MISS_FACTOR]);
 });
 
 test("sandbagging a pack is worth far less than playing the one you are on", () => {

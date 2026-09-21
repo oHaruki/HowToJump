@@ -1,7 +1,12 @@
 /**
- * The grading scale is data, not code, so staff can retune a threshold
- * without a deploy. This array seeds the grade_rules table and is also the
- * fallback the app grades against when the table has not been seeded.
+ * The grading scale.
+ *
+ * This array is what the app grades against, and db:deploy seeds it into the
+ * grade_rules table so the numbers can be read from the database. Nothing
+ * reads that table back, so retuning a grade is a code change: the deploy
+ * reseeds the table and recomputes every stored level, which is all a retune
+ * takes. It used to say staff could retune without a deploy, which was never
+ * true of anything the app actually read.
  */
 export type GradeRule = {
   grade: string;
@@ -195,14 +200,23 @@ export function compareResults(a: ResultShape, b: ResultShape): number {
  * That's the gentle curve Kayrem picked: a 30 second map of about 150 notes
  * counts each miss about three times, rather than the ten that plain division
  * would give.
+ *
+ * MIN_MISS_FACTOR is how far that can go the other way. The rule was only
+ * ever that a short map punishes misses more; a long map paying less just
+ * fell out of the same formula, and unbounded it swallowed the whole miss
+ * curve. Thirty misses on a 6,000 note map counted as fifteen and earned
+ * what a clean Emerald full combo does. A long map may now discount a miss
+ * by a fifth at most, which still pays a clean marathon for the stamina
+ * without handing a sloppy one a way around the curve.
  */
 export const REFERENCE_NOTES = 1500;
 export const MISS_CURVE = 0.5;
+export const MIN_MISS_FACTOR = 0.8;
 
 /** How many misses one miss counts as on a map this size; 1 when unknown. */
 export function missFactor(noteCount: number | null | undefined): number {
   if (!noteCount || noteCount <= 0) return 1;
-  return Math.pow(REFERENCE_NOTES / noteCount, MISS_CURVE);
+  return Math.max(MIN_MISS_FACTOR, Math.pow(REFERENCE_NOTES / noteCount, MISS_CURVE));
 }
 
 /** Misses as they count on a map this size: rounded, and never below one. */
