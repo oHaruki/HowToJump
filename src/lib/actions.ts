@@ -307,8 +307,15 @@ async function ensureBeatmap(osuBeatmapId: number): Promise<number> {
   return created.id;
 }
 
+/**
+ * Admin only, unlike the rest of the queue.
+ *
+ * This is the single place anything is written into entries, so it is the
+ * only door into the bank. Helpers fill the queue and set a pack on what
+ * they put there; deciding what the ladder actually holds is an admin's.
+ */
 export async function approveSuggestions(ids: number[]) {
-  const staff = await requireStaff();
+  const admin = await requireAdmin();
   if (!ids.length) return { approved: 0 };
 
   const rows = await db.select().from(suggestions).where(inArray(suggestions.id, ids));
@@ -339,19 +346,19 @@ export async function approveSuggestions(ids: number[]) {
         cs: s.cs,
         ar: s.ar,
         od: s.od,
-        judgedById: staff.id,
-        judgedByName: staff.name ?? null,
+        judgedById: admin.id,
+        judgedByName: admin.name ?? null,
       })
       .onConflictDoNothing();
 
     await db
       .update(suggestions)
-      .set({ status: "approved", reviewerId: staff.id, reviewedAt: new Date() })
+      .set({ status: "approved", reviewerId: admin.id, reviewedAt: new Date() })
       .where(eq(suggestions.id, s.id));
     approved += 1;
   }
 
-  await record(staff.id, staff.name ?? undefined, "suggestions.approve", "suggestion", null, {
+  await record(admin.id, admin.name ?? undefined, "suggestions.approve", "suggestion", null, {
     ids,
     approved,
   });

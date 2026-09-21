@@ -32,7 +32,18 @@ export type QueueRow = {
   submittedBy: string | null;
 };
 
-export function QueueTable({ rows }: { rows: QueueRow[] }) {
+export function QueueTable({
+  rows,
+  canApprove,
+}: {
+  rows: QueueRow[];
+  /**
+   * Admins only. The server action refuses a helper either way; this keeps a
+   * button a helper cannot use off the screen rather than letting them find
+   * out by being thrown an error.
+   */
+  canApprove: boolean;
+}) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [pending, start] = useTransition();
@@ -94,14 +105,16 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
           >
             {allSelected ? "Select none" : "Select all"}
           </button>
-          <button
-            className="btn btn-sm btn-ok"
-            type="button"
-            disabled={pending || !approvable.length}
-            onClick={() => run(() => approveSuggestions(approvable))}
-          >
-            Approve selected
-          </button>
+          {canApprove ? (
+            <button
+              className="btn btn-sm btn-ok"
+              type="button"
+              disabled={pending || !approvable.length}
+              onClick={() => run(() => approveSuggestions(approvable))}
+            >
+              Approve selected
+            </button>
+          ) : null}
           <button
             className="btn btn-sm btn-no"
             type="button"
@@ -167,15 +180,17 @@ export function QueueTable({ rows }: { rows: QueueRow[] }) {
             }
             actions={
               <>
-                <button
-                  className="btn btn-sm btn-ok"
-                  type="button"
-                  disabled={pending || r.tierOrder == null}
-                  title={r.tierOrder == null ? "Set a pack first" : undefined}
-                  onClick={() => run(() => approveSuggestions([r.id]))}
-                >
-                  Approve
-                </button>
+                {canApprove ? (
+                  <button
+                    className="btn btn-sm btn-ok"
+                    type="button"
+                    disabled={pending || r.tierOrder == null}
+                    title={r.tierOrder == null ? "Set a pack first" : undefined}
+                    onClick={() => run(() => approveSuggestions([r.id]))}
+                  >
+                    Approve
+                  </button>
+                ) : null}
                 <button
                   className="btn btn-sm btn-no"
                   type="button"
