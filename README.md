@@ -1,4 +1,4 @@
-# HowToJump
+# Project Aim
 
 Ranked osu! aim. Sixteen packs from Stone to GOAT, graded on
 misscount, with scores tracked automatically from players' osu! accounts.

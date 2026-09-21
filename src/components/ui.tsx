@@ -308,9 +308,8 @@ export function Empty({ children }: { children: React.ReactNode }) {
  * The site's own art rather than a generic spinner, cropped to the figure and
  * served at a fourteenth of the hero's weight, since an icon that says the
  * page is still working should not itself be the download. She is mid leap
- * already, so the loop bobs her instead of rotating: on a site called
- * HowToJump a jump reads as motion where a spinning character would only
- * read as a spinning character.
+ * already, so the loop bobs her instead of rotating: a jump reads as motion
+ * where a spinning character would only read as a spinning character.
  *
  * role="status" so the wait is announced rather than being a silent gap, and
  * the bob is an animation, which the reduced motion rule already turns off.

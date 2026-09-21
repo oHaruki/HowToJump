@@ -6,7 +6,7 @@ import { AuthButton } from "@/components/AuthButton";
 import { NavLinks } from "@/components/NavLinks";
 
 export const metadata: Metadata = {
-  title: "HowToJump",
+  title: "Project Aim",
   description:
     "Ranked osu! aim. Sixteen packs of aim maps from Stone to GOAT, graded on misscount and tracked automatically from your osu! account.",
 };
@@ -35,7 +35,7 @@ export default async function RootLayout({
           <div className="wrap nav-in">
             <Link className="brand" href="/">
               <span className="brand-mark" />
-              HowToJump
+              Project Aim
             </Link>
             <NavLinks links={links} />
             <div className="nav-tools">
@@ -61,7 +61,7 @@ export default async function RootLayout({
         <footer className="wrap">
           <div className="row spread">
             <span>
-              HowToJump
+              Project Aim
               <span className="small" style={{ marginLeft: 10 }}>
                 art by MeiQuing
               </span>
