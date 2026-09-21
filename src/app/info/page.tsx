@@ -22,7 +22,7 @@ export default function InfoPage() {
         The grading scale, the mods, the rules, and what the site does on its own.
       </SectionHead>
 
-      <div className="stack-lg">
+      <div className="grade-split">
         <div className="section-head">
           <span className="lbl">Grading</span>
           <h2>One number decides it</h2>
