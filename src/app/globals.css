@@ -523,7 +523,36 @@ tbody tr:hover { background: var(--bg-c); }
   object-fit: cover; outline: var(--border-width) solid var(--border);
 }
 .av-lg { width: 44px; height: 44px; }
-.userbtn { display: inline-flex; align-items: center; gap: 8px; padding: 4px 11px 4px 5px; }
+
+/*
+ * Part of the nav rather than a control parked in it: no box of its own, and
+ * the same quiet-to-lit hover the nav links use. The box only shows on hover
+ * and while the menu is open, which is what an active nav link does too.
+ * Padding matches .nav-btn so the hover shape lines up with the link beside it.
+ */
+.userbtn {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 6px 11px 6px 6px;
+  font-size: var(--font-size-body);
+  background: transparent; border-color: transparent;
+}
+.userbtn:hover, .userbtn[aria-expanded="true"] {
+  background: var(--bg-c); border-color: transparent; color: var(--text-focus);
+}
+/*
+ * Squircled like every other corner on the site -- a circle was the one round
+ * thing in the chrome. Drained of colour at rest too, so a full-colour photo
+ * stops being the loudest thing in a near-monochrome bar; it comes back the
+ * moment you reach for it.
+ */
+.userbtn .av {
+  width: 26px; height: 26px;
+  border-radius: 8px; corner-shape: var(--corner-shape);
+  outline-color: var(--border-soft);
+  filter: grayscale(1) contrast(0.92); opacity: 0.72;
+  transition: filter var(--dur-fast), opacity var(--dur-fast);
+}
+.userbtn:hover .av, .userbtn[aria-expanded="true"] .av { filter: none; opacity: 1; }
 
 footer {
   border-top: var(--border-width) solid var(--border);

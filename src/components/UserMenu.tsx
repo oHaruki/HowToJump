@@ -62,8 +62,7 @@ export function UserMenu({
           // eslint-disable-next-line @next/next/no-img-element
           <img className="av" src={user.image} alt="" />
         ) : null}
-        <span style={{ color: "var(--text-focus)" }}>{user.name}</span>
-        <span className="caret" aria-hidden="true" />
+        <span>{user.name}</span>
       </button>
 
       {open ? (
