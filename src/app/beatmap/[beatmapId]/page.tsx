@@ -321,16 +321,16 @@ function ScoreCard({
         </div>
         <dl className="sb-card-stats">
           <div>
-            <dt>Accuracy</dt>
-            <dd>{s.accuracy != null ? s.accuracy.toFixed(2) + "%" : "·"}</dd>
+            <dt>Misses</dt>
+            <dd>{s.missCount}</dd>
           </div>
           <div>
             <dt>Max combo</dt>
             <dd data-fc={s.isFc || undefined}>{s.maxCombo != null ? fmt(s.maxCombo) + "x" : "·"}</dd>
           </div>
           <div>
-            <dt>Misses</dt>
-            <dd>{s.missCount}</dd>
+            <dt>Accuracy</dt>
+            <dd>{s.accuracy != null ? s.accuracy.toFixed(2) + "%" : "·"}</dd>
           </div>
           <div>
             <dt>Mods</dt>
@@ -363,10 +363,10 @@ function Scoreboard({
       <div className="sb-row sb-cols" role="row">
         <span role="columnheader">Rank</span>
         <span role="columnheader" className="c">Grade</span>
-        <span role="columnheader" className="c">Accuracy</span>
+        <span role="columnheader" className="c">Misses</span>
         <span role="columnheader">Player</span>
         <span role="columnheader" className="c sb-opt">Max combo</span>
-        <span role="columnheader" className="c sb-opt">Misses</span>
+        <span role="columnheader" className="c sb-opt">Accuracy</span>
         <span role="columnheader" className="c sb-end">EXP</span>
         <span role="columnheader" className="r sb-opt">Set</span>
         <span role="columnheader" className="r sb-opt">Mods</span>
@@ -383,8 +383,8 @@ function Scoreboard({
           <span role="cell" className="c">
             <GradeLetter grade={s.grade} />
           </span>
-          <span role="cell" className="c sb-num">
-            {s.accuracy != null ? s.accuracy.toFixed(2) + "%" : "·"}
+          <span role="cell" className="c sb-num" data-zero={s.missCount === 0 || undefined}>
+            {s.missCount}
           </span>
           <span role="cell" className="sb-who">
             <Player s={s} avatar />
@@ -392,8 +392,8 @@ function Scoreboard({
           <span role="cell" className="c sb-num sb-opt" data-fc={s.isFc || undefined}>
             {s.maxCombo != null ? fmt(s.maxCombo) + "x" : "·"}
           </span>
-          <span role="cell" className="c sb-num sb-opt" data-zero={s.missCount === 0 || undefined}>
-            {s.missCount}
+          <span role="cell" className="c sb-num sb-opt">
+            {s.accuracy != null ? s.accuracy.toFixed(2) + "%" : "·"}
           </span>
           <span role="cell" className="c sb-num sb-exp sb-end">{fmt(expOf(s))}</span>
           <span role="cell" className="r small sb-opt">{timeAgo(s.playedAt)}</span>
