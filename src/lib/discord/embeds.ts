@@ -2,7 +2,7 @@ import type { BankRow, ScoreLine } from "@/lib/queries";
 import { entryName, gradeText } from "@/lib/queries";
 import { playExp } from "@/lib/levels";
 import { shortCategory, tierByOrder } from "@/lib/tiers";
-import { clamp, fitLines, md, type Embed, type Message } from "@/lib/discord/api";
+import { clamp, fitLines, md, type Embed, type EmbedField, type Message } from "@/lib/discord/api";
 
 /** Every message the bot sends, as the shapes Discord draws. */
 
@@ -96,7 +96,7 @@ export function scoreLine(s: ScoreLine): string {
 
 /* ------------------------------------------------------------ the feed */
 
-/** One score, the way the feed and /rs both draw it. */
+/** One score, the way the feed and /sync both draw it. */
 export function scoreEmbed(who: PlayerLike, s: ScoreLine): Embed {
   const skills = categoryText(s.categories);
   const mapper = s.mapper ? " · mapped by " + s.mapper : "";
@@ -132,6 +132,71 @@ export function scoresMessage(who: PlayerLike, lines: ScoreLine[]): Message {
         description: fitLines(lines.map(scoreLine)),
       },
     ],
+  };
+}
+
+/* ---------------------------------------------------------- recent play */
+
+/** A player's newest play as /rs draws it, on a bank map or not. */
+export type RecentPlay = {
+  osuBeatmapId: number;
+  osuBeatmapsetId: number | null;
+  artist: string | null;
+  title: string;
+  version: string | null;
+  mapper: string | null;
+  /** The mods as played, for the title: "HDDT", or "NM" for none. */
+  mod: string;
+  stars: number | null;
+  /** The entry it landed on, when the map is in the bank under these mods. */
+  entry: { mod: string; tierOrder: number; categories: string[] } | null;
+  passed: boolean;
+  grade: string;
+  missCount: number;
+  accuracy: number;
+  combo: number;
+  mapCombo: number | null;
+  /** How much of the map a fail got through, in percent. */
+  completion: number | null;
+  playedAt: Date | null;
+  /** What a pass on a bank entry is worth. */
+  exp: number | null;
+  /** Where the play stands: on the profile, not yet, or why it does not count. */
+  note: string;
+};
+
+/** A player's newest play, for /rs. */
+export function recentEmbed(who: PlayerLike, p: RecentPlay): Embed {
+  const result = p.passed
+    ? gradeText(p)
+    : "Failed" + (p.completion == null ? "" : " at " + Math.floor(p.completion) + "%");
+  const combo = fmt(p.combo) + "x" + (p.mapCombo ? " / " + fmt(p.mapCombo) + "x" : "");
+  const fields: EmbedField[] = [
+    { name: "Grade", value: result, inline: true },
+    { name: "Accuracy", value: p.accuracy.toFixed(2) + "%", inline: true },
+    { name: "Combo", value: combo, inline: true },
+  ];
+  if (p.entry) {
+    fields.push(
+      { name: "EXP", value: p.exp == null ? "—" : fmt(p.exp), inline: true },
+      { name: "Pack", value: tierByOrder(p.entry.tierOrder)?.name ?? "?", inline: true },
+    );
+  }
+  if (p.playedAt) {
+    const at = Math.floor(p.playedAt.getTime() / 1000);
+    fields.push({ name: "Played", value: "<t:" + at + ":R>", inline: true });
+  }
+  const skills = p.entry ? " · " + categoryText(p.entry.categories) : "";
+  const mapper = p.mapper ? " · mapped by " + p.mapper : "";
+  return {
+    color: tierColor(p.entry?.tierOrder),
+    author: playerAuthor(who, "most recent"),
+    title: mapTitle(p),
+    url: p.entry ? mapUrl({ ...p, mod: p.entry.mod }) : osuBeatmapUrl(p),
+    thumbnail: cover(p.osuBeatmapsetId),
+    description: p.note,
+    fields,
+    footer: { text: stars(p.stars) + skills + mapper },
   };
 }
 

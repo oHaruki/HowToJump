@@ -2,8 +2,8 @@ import { after, NextResponse } from "next/server";
 import { cooldownLeft, syncUser } from "@/lib/osu/sync";
 import { describeScores } from "@/lib/queries";
 import {
-  editReply, findPlayer, md, profileReply, scoresMessage, unknownPlayer, verifyInteraction,
-  type Message,
+  editReply, findPlayer, md, profileReply, recentReply, scoresMessage, unknownPlayer,
+  verifyInteraction, type Message,
 } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
@@ -22,24 +22,24 @@ type Interaction = {
   data?: { name?: string; options?: Array<{ name: string; value?: unknown }> };
 };
 
-/*
- * Every player has their own cooldown, but /rs takes any name, so a burst of
- * different names could still queue enough syncs to crowd out the worker in
- * the shared osu! budget. This caps the command as a whole.
- */
-const RS_PER_MINUTE = 10;
-let rsWindowStart = 0;
-let rsUsed = 0;
-
-function rsAllowed(now = Date.now()): boolean {
-  if (now - rsWindowStart >= 60_000) {
-    rsWindowStart = now;
-    rsUsed = 0;
-  }
-  if (rsUsed >= RS_PER_MINUTE) return false;
-  rsUsed += 1;
-  return true;
+/** Allows at most `limit` uses a minute, counted across everyone. */
+function perMinute(limit: number) {
+  let windowStart = 0;
+  let used = 0;
+  return (now = Date.now()): boolean => {
+    if (now - windowStart >= 60_000) {
+      windowStart = now;
+      used = 0;
+    }
+    if (used >= limit) return false;
+    used += 1;
+    return true;
+  };
 }
+
+// Both read osu! for any name, out of the budget the sync worker shares.
+const rsAllowed = perMinute(20);
+const syncAllowed = perMinute(10);
 
 function option(interaction: Interaction, name: string): string {
   return String(interaction.data?.options?.find((o) => o.name === name)?.value ?? "").trim();
@@ -87,7 +87,12 @@ export async function POST(req: Request) {
 
   if (interaction.data?.name === "rs") {
     if (!rsAllowed()) return reply("Lots of /rs right now. Try again in a minute.");
-    return deferred(interaction.token, () => recentScoresReply(player));
+    return deferred(interaction.token, () => recentReply(player));
+  }
+
+  if (interaction.data?.name === "sync") {
+    if (!syncAllowed()) return reply("Lots of /sync right now. Try again in a minute.");
+    return deferred(interaction.token, () => syncReply(player));
   }
 
   if (interaction.data?.name === "profile") {
@@ -97,8 +102,9 @@ export async function POST(req: Request) {
   return reply("Unknown command.");
 }
 
-async function recentScoresReply(name: string): Promise<Message> {
-  if (!name) return { content: "Give an osu! name: `/rs player:<name>`" };
+/** /sync: pulls a player's recent plays in now and names what was kept. */
+async function syncReply(name: string): Promise<Message> {
+  if (!name) return { content: "Give an osu! name: `/sync player:<name>`" };
 
   const user = await findPlayer(name);
   if (!user) return { content: unknownPlayer(name) };

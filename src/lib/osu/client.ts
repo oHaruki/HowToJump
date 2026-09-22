@@ -261,7 +261,15 @@ export type OsuScore = {
   /** 0 is osu!standard. Older replies say mode_int instead. */
   ruleset_id?: number;
   mode_int?: number;
-  beatmap?: { id: number };
+  beatmap?: {
+    id: number;
+    version?: string;
+    difficulty_rating?: number;
+    count_circles?: number;
+    count_sliders?: number;
+    count_spinners?: number;
+  };
+  beatmapset?: { id: number; artist?: string; title?: string; creator?: string };
   beatmap_id?: number;
   accuracy: number;
   max_combo: number;
@@ -271,6 +279,8 @@ export type OsuScore = {
   rank: string;
   mods: Array<{ acronym: string }> | string[];
   statistics: OsuScoreStatistics;
+  /** What a full run would have judged; how far a fail got is read against it. */
+  maximum_statistics?: OsuScoreStatistics;
   created_at?: string;
   ended_at?: string;
   passed?: boolean;
@@ -329,6 +339,23 @@ export async function fetchRecentPlays(
     token,
   );
   return (rows ?? []).map(toPlay).filter((p) => p.osuBeatmapId > 0);
+}
+
+/** How much of the map a play got through, in percent, or null when it can't be told. */
+export function completionOf(score: OsuScore, noteCount: number | null): number | null {
+  const s = score.statistics ?? {};
+  const judged = (s.great ?? 0) + (s.ok ?? 0) + (s.meh ?? 0) + (s.miss ?? s.count_miss ?? 0);
+  const total = score.maximum_statistics?.great ?? noteCount;
+  if (!total) return null;
+  return Math.min(100, (judged / total) * 100);
+}
+
+/** A player's newest play in the last day, fails included, or null when there is none. */
+export async function fetchLatestScore(osuUserId: number): Promise<OsuScore | null> {
+  const rows = await apiGet<OsuScore[]>(
+    "/users/" + osuUserId + "/scores/recent?include_fails=1&mode=osu&limit=1",
+  );
+  return rows?.[0] ?? null;
 }
 
 /**

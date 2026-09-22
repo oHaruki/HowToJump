@@ -8,7 +8,7 @@ import {
   fetchPlayCounts, fetchRecentPlays, fetchScore, toPlay, type OsuScore, type PlayFacts,
 } from "@/lib/osu/client";
 import { compareResults, gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
-import { normalizeMod } from "@/lib/mods";
+import { modsText, normalizeMod } from "@/lib/mods";
 import { announceRecords, announceScores, type RecordTaken } from "@/lib/discord";
 import { getEntryLeader, getTopRanked } from "@/lib/queries";
 import { planPass, type SyncReason } from "@/lib/osu/plan";
@@ -394,14 +394,6 @@ export type BackfillResult =
   | { ok: true; imported: ImportedScore; improved: boolean }
   | { ok: false; error: string };
 
-const modText = (mod: string) => (mod === "NM" ? "nomod" : "+" + mod);
-
-/** "nomod", "nomod and +HR", "nomod, +HR and +DT". */
-const modList = (mods: string[]) =>
-  mods.length < 2
-    ? mods.map(modText).join("")
-    : mods.slice(0, -1).map(modText).join(", ") + " and " + modText(mods[mods.length - 1]);
-
 /**
  * Adds one of the player's own scores by its osu! ID. It is kept like a
  * synced play: their pass, on a listed entry, under that entry's mods.
@@ -446,8 +438,8 @@ export async function backfillScore(
     return {
       ok: false,
       error:
-        "That map is in the bank as " + modList(banked.map((e) => normalizeMod(e.mod))) +
-        ", but this score is " + modText(play.mods) + ".",
+        "That map is in the bank as " + modsText(banked.map((e) => normalizeMod(e.mod))) +
+        ", but this score is " + modsText([play.mods]) + ".",
     };
   }
 

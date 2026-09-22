@@ -160,7 +160,7 @@ export default function InfoPage() {
                 leaderboard entries, so they cover graveyard maps fine, on stable and
                 lazer. It is the same data <code>&gt;rs</code> reads. The site checks
                 every minute who has played, so a score usually shows up within a
-                minute. In a hurry? Sync now on your page, or <code>/rs</code> in the
+                minute. In a hurry? Sync now on your page, or <code>/sync</code> in the
                 Discord, pulls it straight away.
               </p>
               <p className="small">

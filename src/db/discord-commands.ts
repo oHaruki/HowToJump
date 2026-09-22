@@ -18,6 +18,12 @@ const player = {
 const commands = [
   {
     name: "rs",
+    description: "A player's most recent play",
+    type: 1,
+    options: [player],
+  },
+  {
+    name: "sync",
     description: "Pull a player's recent plays in now",
     type: 1,
     options: [player],

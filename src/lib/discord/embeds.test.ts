@@ -7,6 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { BankRow, ScoreLine } from "../queries";
+import type { RecentPlay } from "./embeds";
 
 process.env.DATABASE_URL ??= "postgres://unused:unused@127.0.0.1:5432/unused";
 process.env.AUTH_URL = "https://howtojump.test";
@@ -93,6 +94,61 @@ test("a score names its pack, its grade and what it is worth", () => {
   assert.equal(embed.value, "SS (FC)");
   const worth = E.scoreEmbed(who, score()).fields?.find((f) => f.name === "EXP");
   assert.ok(Number(worth?.value.replace(/,/g, "")) > 0);
+});
+
+const recent = (over: Partial<RecentPlay> = {}): RecentPlay => ({
+  osuBeatmapId: 100,
+  osuBeatmapsetId: 200,
+  artist: "Camellia",
+  title: "Ghost",
+  version: "Extra",
+  mapper: "Sotarks",
+  mod: "HDDT",
+  stars: 7.5,
+  entry: { mod: "DT", tierOrder: 10, categories: ["Aim - raw mechanic"] },
+  passed: true,
+  grade: "A",
+  missCount: 2,
+  accuracy: 97.126,
+  combo: 812,
+  mapCombo: 1204,
+  completion: null,
+  playedAt: new Date("2026-09-23T10:00:00Z"),
+  exp: 11640,
+  note: "On their profile.",
+  ...over,
+});
+
+test("a recent play on a bank map shows its grade, EXP and pack, and links to its board", () => {
+  const embed = E.recentEmbed(who, recent());
+  // The title keeps the mods as played; the link goes to the entry they landed on.
+  assert.equal(embed.title, "Camellia - Ghost [Extra] +HDDT");
+  assert.equal(embed.url, "https://howtojump.test/beatmap/100?mod=DT");
+  assert.equal(embed.color, E.tierColor(10));
+  assert.equal(embed.author?.name, "Kayrem (DE) · most recent");
+  assert.equal(embed.description, "On their profile.");
+  assert.deepEqual(embed.fields?.map((f) => f.name), ["Grade", "Accuracy", "Combo", "EXP", "Pack", "Played"]);
+  const value = (name: string) => embed.fields?.find((f) => f.name === name)?.value;
+  assert.equal(value("Grade"), "A (2 misses)");
+  assert.equal(value("Accuracy"), "97.13%");
+  assert.equal(value("Combo"), "812x / 1,204x");
+  assert.equal(value("EXP"), "11,640");
+  assert.equal(value("Pack"), "Topaz");
+  assert.equal(value("Played"), "<t:" + Date.parse("2026-09-23T10:00:00Z") / 1000 + ":R>");
+});
+
+test("a fail says how far it got, and a map off the bank carries no EXP or pack", () => {
+  const fail = E.recentEmbed(who, recent({ passed: false, completion: 63.8, exp: null }));
+  assert.equal(fail.fields?.find((f) => f.name === "Grade")?.value, "Failed at 63%");
+
+  const off = E.recentEmbed(
+    who,
+    recent({ entry: null, exp: null, mapCombo: null, note: "Not a bank map, so it doesn't count." }),
+  );
+  assert.deepEqual(off.fields?.map((f) => f.name), ["Grade", "Accuracy", "Combo", "Played"]);
+  assert.equal(off.url, "https://osu.ppy.sh/beatmapsets/200#osu/100");
+  assert.equal(off.color, E.tierColor(null));
+  assert.equal(off.fields?.find((f) => f.name === "Combo")?.value, "812x");
 });
 
 test("a few new maps are drawn one by one, and many are listed by pack", () => {

@@ -55,8 +55,24 @@ export function modsFromApi(
   return normalizeMod(acronyms.join(""));
 }
 
+/** The mods a score was played with, as osu! lists them, less the classic marker: "HDDT", or "NM". */
+export function modsAsPlayed(mods: Array<{ acronym: string }> | string[] | null | undefined): string {
+  const list = (mods ?? []) as Array<{ acronym: string } | string>;
+  const acronyms = list
+    .map((m) => (typeof m === "string" ? m : m.acronym))
+    .filter((a) => a && a.toUpperCase() !== "CL");
+  return acronyms.length ? acronyms.join("").toUpperCase() : "NM";
+}
+
 export function modLabel(m: string): string {
   return MOD_NAMES[m] ?? m;
+}
+
+/** Canonical mod strings as words: "nomod", "nomod and +HR", "nomod, +HR and +DT". */
+export function modsText(mods: string[]): string {
+  const one = (m: string) => (m === "NM" ? "nomod" : "+" + m);
+  if (mods.length < 2) return mods.map(one).join("");
+  return mods.slice(0, -1).map(one).join(", ") + " and " + one(mods[mods.length - 1]);
 }
 
 /** Splits a canonical mod string into the acronyms the osu! API expects. */

@@ -11,7 +11,7 @@ import { timeAgo } from "@/lib/time";
 import { md, type Message } from "@/lib/discord/api";
 import { profileEmbed } from "@/lib/discord/embeds";
 
-/** What /profile and /rs both start from: a player, by their osu! name. */
+/** What every command starts from: a player, by their osu! name. */
 
 /**
  * A player by name, matched exactly but ignoring case. ilike would treat
