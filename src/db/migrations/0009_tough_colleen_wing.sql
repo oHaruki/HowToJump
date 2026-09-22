@@ -1,0 +1,1 @@
+CREATE INDEX "user_levels_rank_idx" ON "user_levels" USING btree ("scope","exp" DESC NULLS LAST);

@@ -21,17 +21,10 @@ export const users = pgTable(
     /** Newest play seen, fails included. Tells a sync whether a play arrived. */
     lastPlayedAt: timestamp("last_played_at", { withTimezone: true }),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-    /**
-     * osu!'s own play count, which rises with every play, graveyard maps
-     * included. A rise between two checks is what makes a player due a sync.
-     */
+    /** osu!'s own play count. A rise between checks makes a player due a sync. */
     osuPlayCount: integer("osu_play_count"),
     playCountCheckedAt: timestamp("play_count_checked_at", { withTimezone: true }),
-    /**
-     * The levels as the player last saw them on their profile, and when. The
-     * profile animates from here to where they are now, and marks scores
-     * imported since as new.
-     */
+    /** The levels as the player last saw them, and when. */
     progressSeen: jsonb("progress_seen").$type<Record<string, unknown>>(),
     progressSeenAt: timestamp("progress_seen_at", { withTimezone: true }),
     bannedAt: timestamp("banned_at", { withTimezone: true }),
@@ -84,10 +77,7 @@ export const beatmaps = pgTable(
 
 /* ------------------------------------------------------------ bank entries */
 
-/**
- * One row is a beatmap *under a specific mod*. The same map with DT is a
- * separate entry with its own pack and its own leaderboard.
- */
+/** One row is a beatmap under a specific mod, with its own pack and board. */
 export const entries = pgTable(
   "entries",
   {
@@ -120,12 +110,8 @@ export const entries = pgTable(
     index("entries_tier_idx").on(t.tierOrder),
     index("entries_categories_idx").using("gin", t.categories),
     index("entries_active_idx").on(t.isActive),
-    /*
-     * The public bank reads one page at a time, filtered to active rows and
-     * ordered by pack then stars. These three cover that: the sort index so
-     * the page can be read straight off it rather than sorting the whole
-     * bank first, the other two for the dropdowns that narrow it.
-     */
+    /* Covers the public bank: the sort index for pack-then-stars paging,
+       the other two for the dropdowns that narrow it. */
     index("entries_bank_sort_idx").on(t.isActive, t.tierOrder, t.stars),
     index("entries_bank_mod_idx").on(t.isActive, t.mod),
     index("entries_bank_pacing_idx").on(t.isActive, t.lengthBucket, t.speedBucket),
@@ -246,10 +232,7 @@ export const userTierProgress = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.tierOrder] })],
 );
 
-/**
- * Skill levels, one row per category plus "main". Rebuilt alongside the pack
- * rollup, so a profile, and later a Discord role, reads one row per level.
- */
+/** Skill levels, one row per category plus "main". */
 export const userLevels = pgTable(
   "user_levels",
   {
@@ -263,7 +246,12 @@ export const userLevels = pgTable(
     progress: integer("progress"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.scope] })],
+  (t) => [
+    primaryKey({ columns: [t.userId, t.scope] }),
+    /* The leaderboard's order, and the one a profile's place is read from.
+       Descending, since every reader wants the top. */
+    index("user_levels_rank_idx").on(t.scope, t.exp.desc()),
+  ],
 );
 
 /* ------------------------------------------------------------------ config */
@@ -277,10 +265,7 @@ export const gradeRules = pgTable("grade_rules", {
   maxMiss: integer("max_miss"),
   requiresFc: boolean("requires_fc").notNull().default(false),
   requiresPerfect: boolean("requires_perfect").notNull().default(false),
-  /**
-   * Share of a map's pack EXP the grade earns, as a percentage. Fractional:
-   * the bottom bands are worth well under one percent of a pack.
-   */
+  /** Share of a map's pack EXP the grade earns, as a percentage. Fractional. */
   expPercent: numeric("exp_percent", { precision: 6, scale: 3, mode: "number" })
     .notNull()
     .default(0),

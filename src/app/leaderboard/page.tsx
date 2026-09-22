@@ -8,6 +8,7 @@ import {
 import { tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, SectionHead } from "@/components/ui";
 import { BankPager } from "@/components/BankPager";
+import { LiveRefresh } from "@/components/LiveRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function LeaderboardPage({
 
   return (
     <div className="view">
+      <LiveRefresh />
       <SectionHead label="Leaderboard" title="Project Aim Leaderboard" />
 
       {board.rows.length ? (

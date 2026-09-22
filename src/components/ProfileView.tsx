@@ -11,8 +11,10 @@ import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/t
 import { Flag, GradeLetter } from "@/components/ui";
 import { LevelBar, SkillRadar } from "@/components/LevelView";
 import { LevelUp } from "@/components/LevelUp";
-import { LiveRefresh } from "@/components/ProfileLive";
-import { PlayList, timeAgo, type PlayView } from "@/components/PlayList";
+import { LiveRefresh } from "@/components/LiveRefresh";
+import { PlayList } from "@/components/PlayList";
+import type { PlayView } from "@/components/PlayRow";
+import { timeAgo } from "@/lib/time";
 import { SyncButton } from "@/components/SyncButton";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
@@ -33,8 +35,9 @@ const GRADE_TALLY = [
  */
 export async function ProfileView({ userId, owner }: { userId: number; owner: boolean }) {
   const renderedAt = new Date();
-  const [me] = await db.select().from(users).where(eq(users.id, userId));
-  const [packRows, plays, levelRows, standing] = await Promise.all([
+  // One round trip: nothing in the batch needs the player's own row.
+  const [[me], packRows, plays, levelRows, standing] = await Promise.all([
+    db.select().from(users).where(eq(users.id, userId)),
     db.select().from(userTierProgress).where(eq(userTierProgress.userId, userId)),
     getProfilePlays(userId),
     db.select().from(userLevels).where(eq(userLevels.userId, userId)),
@@ -63,9 +66,9 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
 
   return (
     <div className="view">
+      <LiveRefresh />
       {owner ? (
         <>
-          <LiveRefresh />
           <LevelUp
             before={previous ?? snapshotOf([])}
             after={current}
@@ -251,6 +254,8 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
           </div>
           <PlayList
             plays={top}
+            userId={userId}
+            list="top"
             empty={owner ? "No plays yet. Play any map from the bank." : "No plays yet."}
           />
         </section>
@@ -262,6 +267,8 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
           </div>
           <PlayList
             plays={views}
+            userId={userId}
+            list="recent"
             empty={owner ? "Nothing yet. Scores show up here a minute after you set them." : "Nothing yet."}
           />
         </section>

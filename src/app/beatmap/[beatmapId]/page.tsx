@@ -12,7 +12,7 @@ import {
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, ModChip, PacingChips, mapHref } from "@/components/ui";
-import { timeAgo } from "@/components/PlayList";
+import { timeAgo } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
