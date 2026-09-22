@@ -4,13 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { CATEGORIES, isCategory, normalizeCategories, shortCategory } from "@/lib/tiers";
 
 /**
- * Categories as a set rather than one choice: a map can train more than one
- * skill, so it can sit in several. The button names what is ticked, short
- * form, and the list stays open while staff tick, since picking two is the
- * point.
- *
- * A label the grading team has dropped stays listed while a row carries it,
- * marked as such, so staff can untick it rather than have it vanish unseen.
+ * Categories as a set, since a map can train several skills. The button
+ * names what is ticked and the list stays open while staff tick. A dropped
+ * label stays listed, marked as such, while a row carries it.
  */
 export function CategoryPicker({
   value,

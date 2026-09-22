@@ -4,12 +4,9 @@ import { NONE } from "@/components/ui";
 import { tierByOrder, tierFill } from "@/lib/tiers";
 
 /**
- * One card, used by every surface that shows a map.
- *
- * Cover art fills it and fades to solid at the right, the pack sits on the
- * left, the map and its chips next, the figures right. The slots are what
- * differ: the bank shows the pack as a tile, staff screens put a control
- * there instead and add actions on the end.
+ * One card, used by every surface that shows a map: art behind, the pack
+ * left, the map and its chips next, the figures right. The bank shows the
+ * pack as a tile; staff screens put a control there and add actions.
  */
 export function MapCard({
   osuBeatmapId,
@@ -134,19 +131,8 @@ export function MapCard({
 
 /**
  * The art behind a card: a pack tinted gradient with the cover over it.
- *
- * osu! serves every set from a predictable URL, but old sets genuinely have
- * no cover uploaded and 404 there, and nothing in the metadata says which.
- * The gradient is painted underneath rather than swapped in, so a 404 just
- * leaves it showing.
- *
- * Doing it this way, instead of with Cover's onError, fixes the case that
- * matters and drops the client component. An image that 404s does so while
- * the page is still loading, before React has attached anything, so the
- * error never reaches a handler: the fallback only ever fired for a set with
- * no ID at all, and a real 404 sat there showing the browser's broken image
- * icon. The gradient under a failed image needs no JavaScript, and a bank
- * page is forty eight cards that no longer wait on hydration to look right.
+ * Sets with no cover 404, so the gradient is painted underneath rather than
+ * swapped in, which needs no JavaScript and no hydration.
  */
 function CardArt({
   setId,

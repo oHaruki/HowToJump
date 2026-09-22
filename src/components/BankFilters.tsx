@@ -39,24 +39,13 @@ const VALUE_LABELS: Record<string, string> = {
   labels: "Stale label",
 };
 
-/*
- * Search is the only field that flexes. Every dropdown is sized to its own
- * widest option and refuses to shrink, because a squeezed select shows
- * "Any mo" with no sign it has been cut; the staff bar carries eight of them
- * and wraps to a second line instead, where a field that could grow would
- * stretch across the whole width on its own.
- */
+/* Search is the only field that flexes. Each dropdown is sized to its own
+   widest option and wraps rather than shrinking. */
 
 /**
- * Filters live in the URL so a filtered bank can be linked and shared, and so
- * the server does the filtering rather than shipping the whole bank down.
- *
- * The bar sticks below the nav, because the list is now long enough that the
- * controls would otherwise be a scroll away from whatever you were looking
- * at. What is applied reads back as a row of chips underneath: six dropdowns
- * sitting at their placeholder look the same as six with nothing set, so the
- * chips are the only place that says what is actually narrowing the list, and
- * each one comes off on its own rather than only all at once.
+ * Filters live in the URL, so a filtered bank can be linked and the server
+ * does the filtering. The bar sticks below the nav, and what is applied
+ * reads back as a row of chips underneath, each removable on its own.
  */
 export function BankFilters({
   basePath = "/maps",
@@ -77,13 +66,7 @@ export function BankFilters({
   lengths: string[];
   speeds: string[];
   current: Current;
-  /**
-   * How many entries the filters match, kept in view while scrolling.
-   *
-   * A node rather than a number because it comes from the same query as the
-   * list: the page hands over a suspended count so the bar can be on screen
-   * and usable while that query is still running.
-   */
+  /** How many entries the filters match. A node, so it can arrive suspended. */
   count?: ReactNode;
   /** Adds the two filters only staff have any use for. */
   staff?: boolean;
@@ -97,8 +80,7 @@ export function BankFilters({
       const next = new URLSearchParams(params.toString());
       if (value) next.set(key, value);
       else next.delete(key);
-      // A narrower list has different pages, so changing a filter starts the
-      // list over rather than landing on a page that no longer exists.
+      // A narrower list has different pages, so a filter change starts over.
       next.delete("page");
       startTransition(() => {
         router.replace(
@@ -109,12 +91,7 @@ export function BankFilters({
     [params, router, basePath],
   );
 
-  /*
-   * The search box is controlled rather than defaulted: removing its chip or
-   * pressing Clear changes the URL without a keystroke, and an uncontrolled
-   * input would sit there still showing the word that is no longer filtering
-   * anything.
-   */
+  /* Controlled, so removing its chip or pressing Clear empties the box. */
   const [draft, setDraft] = useState(current.q);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => setDraft(current.q), [current.q]);

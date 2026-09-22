@@ -15,12 +15,9 @@ export type PlayCountReading = {
 
 /**
  * Decides who a pass syncs, in order: players whose play count rose, then
- * players still waiting for a play to show up, then the backstop sweep.
- *
- * A first reading, with nothing stored to compare against, only records the
- * count. Players over the cap who played are handed back as `deferred`, so
- * the next pass takes them first rather than waiting for another play;
- * backstop players over the cap need no such help, as they stay overdue.
+ * players still waiting for a play to show up, then the backstop sweep. A
+ * first reading only records the count. Players over the cap who played
+ * come back as `deferred`, so the next pass takes them first.
  */
 export function planPass(input: {
   readings: PlayCountReading[];

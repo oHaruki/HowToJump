@@ -1,8 +1,4 @@
-/**
- * The sixteen packs, ascending. A four column grid lays these out in the
- * bands the sheet uses: Stone-Bronze, Silver-Titanium, Rhodonite-Sapphire,
- * Emerald-GOAT.
- */
+/** The sixteen packs, ascending. */
 export type Tier = {
   order: number;
   name: string;
@@ -11,19 +7,7 @@ export type Tier = {
   gradient?: string;
   /** Former names, so older spreadsheet rows still resolve. */
   aliases?: string[];
-  /**
-   * EXP for a full combo on one of this pack's maps.
-   *
-   * Each pack is worth about 1.7 times the one below, so what you play at
-   * your limit still carries a level while the packs you have outgrown fall
-   * away. Doubling was too steep: a pack is only worth as much as the gap it
-   * opens over the one below, and at twice the value the pack a map sits in
-   * swamped how the map was actually played. The whole miss curve, from a
-   * clean clear down to sixty misses, is worth about six packs at 1.7 and
-   * only four and a half at two, which let a sandbagged clear five packs up
-   * outrank a clean one. Nothing below 1.6 works either: ten 100% runs on
-   * the pack below would reach the next pack.
-   */
+  /** EXP for a full combo on one of this pack's maps, about 1.7x the pack below. */
   exp: number;
 };
 
@@ -41,7 +25,6 @@ export const TIERS: Tier[] = [
     name: "Rhodonite",
     slug: "rhodonite",
     color: "#f19bc2",
-    // The sheet still calls this pack Opal, so pasted rows keep resolving.
     aliases: ["Opal"],
     exp: 70000,
   },
@@ -57,7 +40,6 @@ export const TIERS: Tier[] = [
     slug: "goat",
     color: "#c7e9e4",
     exp: 2860000,
-    // The iridescent fill this ladder used to give the Opal pack.
     gradient:
       "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",
   },
@@ -89,11 +71,7 @@ export function tierFill(t: Tier | null): string {
   return t.gradient ?? t.color;
 }
 
-/**
- * The skills a map is judged on, as the grading team lists them. Flow Aim and
- * Speed were dropped when Anti-aim and Aim control were added, so an entry
- * still carrying one of those needs judging again rather than a rename.
- */
+/** The skills a map is judged on. */
 export const CATEGORIES = [
   "Aim - consistency",
   "Aim - raw mechanic",
@@ -105,12 +83,8 @@ export const CATEGORIES = [
 /* ------------------------------------------------------------ pacing scales */
 
 /**
- * Length by drain time and speed by BPM, as the grading scale defines them.
- *
- * `upTo` is the highest value the bucket still covers, so a boundary belongs
- * to the longer or faster bucket: 1:00 is TV Size rather than Cut Ver., and
- * 170 BPM is Low rather than Very low. Keeping the bounds next to the names
- * means the dropdowns and the auto fill cannot drift apart.
+ * Length by drain time and speed by BPM. `upTo` is the highest value the
+ * bucket covers, so a boundary belongs to the longer or faster bucket.
  */
 export type Bucket = { name: string; upTo: number; range: string };
 
@@ -147,10 +121,8 @@ export function bucketFor(scale: Bucket[], v: number): string {
   return scale[scale.length - 1].name;
 }
 
-/* Pasted cells arrive in whatever spelling the sheet used, and the scale has
-   been renamed before ("Short" is now "Cut Ver."), so both resolve to one
-   canonical label. A plus sign survives the key, or Extreme+ and Extreme
-   would collide. */
+/* Folds a pasted spelling to one key. The plus sign survives, or Extreme+
+   and Extreme would collide. */
 const bucketKey = (s: string) =>
   String(s ?? "").toLowerCase().replace(/[^a-z0-9+]/g, "");
 
@@ -177,7 +149,7 @@ function canonical(
   if (!k) return "";
   const hit = names.find((n) => bucketKey(n) === k);
   if (hit) return hit;
-  // Anything unrecognised is kept verbatim, so a paste is never silently reworded.
+  // Anything unrecognised is kept verbatim.
   return aliases[k] ?? String(input).trim();
 }
 
@@ -188,9 +160,8 @@ export function normalizeSpeed(input: string | null | undefined): string {
   return canonical(SPEEDS, SPEED_ALIASES, input);
 }
 
-/* Two categories were only renamed, so older rows resolve to the new wording.
-   The two that were dropped are deliberately absent: silently folding them
-   into a surviving category would be a judgement call, not a rename. */
+/* Renamed categories only. Dropped ones are absent, so a row carrying one
+   resolves to nothing and needs judging again. */
 const CATEGORY_ALIASES: Record<string, string> = {
   rawaim: "Aim - raw mechanic",
   rawmechanic: "Aim - raw mechanic",
@@ -205,10 +176,9 @@ export function normalizeCategory(input: string | null | undefined): string {
 }
 
 /**
- * A map's categories, however they arrive: a list, or one sheet cell holding
- * several ("Raw Aim / Consistency"). Each is normalised, repeats go, and they
- * come back in the scale's order, so the same set always reads the same way.
- * Hyphens are not a separator, since "Aim - raw mechanic" has one.
+ * A map's categories, from a list or from one cell holding several. Each is
+ * normalised, repeats dropped, returned in the scale's order. Hyphens are
+ * not a separator, since "Aim - raw mechanic" has one.
  */
 export function normalizeCategories(input: string | readonly string[] | null | undefined): string[] {
   const parts = typeof input === "string" ? input.split(/[/,;+&|\n]/) : (input ?? []);
@@ -216,7 +186,7 @@ export function normalizeCategories(input: string | readonly string[] | null | u
   return orderByScale([...out], CATEGORIES);
 }
 
-/** Short labels where the full one would crowd, like a chart axis or a row. */
+/** Short labels for where the full one would crowd. */
 const CATEGORY_SHORT: Record<string, string> = {
   "Aim - consistency": "Consistency",
   "Aim - raw mechanic": "Raw mechanic",
@@ -236,10 +206,8 @@ export function isCategory(input: string | null | undefined): boolean {
 }
 
 /**
- * Orders values the way the list they come from does rather than
- * alphabetically, so a filter reads Very low to Extreme+ instead of Extreme
- * to Very low. Values from outside the list sort last, keeping their own
- * order, since those are the ones that need a staff eye.
+ * Orders values by the scale they come from rather than alphabetically.
+ * Values from outside it sort last, keeping their own order.
  */
 export function orderByScale(values: string[], order: string[]): string[] {
   const rank = new Map(order.map((n, i) => [n, i]));

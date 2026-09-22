@@ -111,11 +111,7 @@ export function Importer() {
     setRows((prev) => revalidate(prev.map((r) => (r.uid === uid ? { ...r, ...change } : r))));
   }, []);
 
-  /**
-   * Mods change the values a player actually sees, so the row is recomputed
-   * from its nomod base. Everything but star rating is arithmetic and happens
-   * here; the rating needs osu!'s difficulty calculator, so it follows.
-   */
+  /** Recomputes the row from its nomod base. Star rating follows from the server. */
   const changeMod = useCallback((uid: string, mod: string) => {
     setRows((prev) =>
       revalidate(
@@ -585,10 +581,7 @@ export function Importer() {
   );
 }
 
-/**
- * Mirrors the server's checks so the preview updates the moment staff change a
- * dropdown. The server re-validates on import, so this is purely for feel.
- */
+/** Mirrors the server's checks for the preview. The server re-validates on import. */
 function revalidate(rows: Row[]): Row[] {
   const seen = new Set<string>();
   return rows.map((r) => {

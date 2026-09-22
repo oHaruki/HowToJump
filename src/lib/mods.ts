@@ -1,7 +1,6 @@
 /**
- * A bank entry is a beatmap plus a mod, so mods are part of an entry's
- * identity rather than a label on it. The same map under DT is a separate
- * entry with its own pack and its own leaderboard.
+ * A bank entry is a beatmap plus a mod, so the same map under DT is a
+ * separate entry with its own pack and leaderboard.
  */
 export const MODS = ["NM", "HR", "DT", "HT", "EZ", "FL", "HRDT"];
 
@@ -18,19 +17,12 @@ export const MOD_NAMES: Record<string, string> = {
 /** Canonical ordering, so HRDT and DTHR resolve to the same entry. */
 const ORDER = ["EZ", "HT", "HR", "DT", "FL"];
 
-/**
- * Mods that do not change where the notes are, so they never split an entry.
- * Hidden is one of them: it takes the approach circles away, but a DTHR map
- * played with DTHRHD is the same aim, so it counts on the DTHR entry.
- */
+/** Mods that do not move the notes, so they never split an entry. */
 const COSMETIC = new Set([
   "HD", "CL", "NF", "SO", "SD", "PF", "MR", "TD", "AT", "CP", "DA", "AC", "RX", "AP",
 ]);
 
-/**
- * Normalise any mod string into the canonical form used in an entry key.
- * Accepts "hd,dt", "DTHD", "HD DT" and similar.
- */
+/** Any mod string into the canonical entry key. Accepts "hd,dt", "DTHD", "HD DT". */
 export function normalizeMod(input: string | null | undefined): string {
   const raw = String(input ?? "").toUpperCase().replace(/[^A-Z]/g, "");
   if (!raw) return "NM";

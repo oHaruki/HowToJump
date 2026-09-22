@@ -6,19 +6,10 @@ import { tierByOrder, tierFill, type Tier } from "@/lib/tiers";
 import { ladderPosition } from "@/components/LevelView";
 
 /**
- * The level up popup.
- *
- * When a player comes back to their profile having gained EXP or reached a
- * pack, this says so first, and plays nothing: the page may have been
- * sitting open in a background tab while scores came in. It waits until the
- * player is actually on the page, tab showing and window focused, then
- * shows what they gained. Pressing the button is what plays it: the bar
- * fills with the EXP, bursting and changing colour at every pack reached,
- * then each category that moved fills in turn.
- *
- * Only when the popup is closed is this marked as seen. Leave without
- * opening it and it is still waiting next time, added to whatever comes in
- * before then.
+ * The level up popup, shown when a player returns to their profile having
+ * gained EXP or reached a pack. Waits for the tab to be showing and focused
+ * before it offers anything, and plays only when the button is pressed.
+ * Marked as seen on close, so leaving it unopened keeps it waiting.
  */
 
 type Level = { exp: number; tierOrder: number | null; progress: number | null };
@@ -303,9 +294,8 @@ function Summary({
 
 /**
  * A value walked from one point on the ladder to another once `run` turns
- * true, eased so the fill is watchable, and snapped to the end on `skip`.
- * Deliberately not stopped by reduced motion: the player asked to see it,
- * and the bar is the content; the bursts around it are what that turns off.
+ * true, and snapped to the end on `skip`. Not stopped by reduced motion —
+ * the bar is the content; the bursts around it are what that turns off.
  */
 function useFill(
   from: number[],

@@ -1,10 +1,6 @@
 /**
- * The bank's filters as they travel in the URL.
- *
- * Both banks read the same query keys, so the parsing lives here rather than
- * twice: the public page and the staff page cannot drift into disagreeing
- * about what `?length=Long` means, and the pager builds its links from the
- * same list the bar writes.
+ * The bank's filters as they travel in the URL. Both banks and the pager
+ * read the same query keys from here.
  */
 import { tierBySlug } from "@/lib/tiers";
 import type { BankFilters, BankStatus } from "@/lib/queries";
@@ -21,12 +17,8 @@ export const FILTER_KEYS = [
 ] as const;
 
 /**
- * Turns the query string into filters.
- *
- * `staff` gates the two filters that can reach entries taken off the ladder.
- * Without it `?status=all` on the public bank would list what staff removed,
- * so the flag is what makes that URL inert rather than the page remembering
- * not to pass it on.
+ * Turns the query string into filters. `staff` gates the two filters that
+ * can reach entries taken off the ladder.
  */
 export function bankFiltersFrom(sp: Search, staff = false): BankFilters {
   const pack = tierBySlug(one(sp.pack));

@@ -1,12 +1,7 @@
 /**
- * The seed's steps, shared by npm run db:seed, which runs all of them, and
- * the deploy step, which refreshes the grades, fills missing note counts and
- * folds entries whose mod no longer stands on its own every time, but only
- * seeds the sheet's maps into an empty bank.
- *
- * If osu! credentials are present the beatmap metadata is pulled fresh from
- * the API. Without them the sheet's own numbers are used, so the seed still
- * works offline.
+ * The seed's steps, shared by npm run db:seed and the deploy step. With osu!
+ * credentials the beatmap metadata is pulled fresh; without them the sheet's
+ * own numbers are used, so the seed works offline.
  */
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -45,9 +40,7 @@ const coverBase = (setId: number, kind: string) =>
   "https://assets.ppy.sh/beatmaps/" + setId + "/covers/" + kind + ".jpg";
 
 /**
- * Note counts for maps banked before they were stored, from osu! at 50 maps
- * a request. If osu! can't be reached they wait for the next deploy; until a
- * map has its count, its misses cost what they always did. Returns the
+ * Fills missing note counts from osu!, 50 maps a request. Returns the
  * beatmaps it filled, whose players then need their levels recomputed.
  */
 export async function backfillNoteCounts(): Promise<number[]> {
@@ -76,18 +69,13 @@ export async function backfillNoteCounts(): Promise<number[]> {
 }
 
 /**
- * Folds entries banked under a mod that no longer stands on its own into the
- * entry that mod now resolves to: Hidden stopped splitting entries and
- * Nightcore became Double Time, so an HDDT entry is a DT entry.
+ * Folds an entry banked under a mod that no longer stands on its own into
+ * the entry that mod resolves to. With no entry under the canonical mod the
+ * row is renamed; otherwise the scores move across, each player keeping
+ * their better result, and the emptied entry goes. The surviving row keeps
+ * its own pack and categories, and both ids go to the audit log.
  *
- * Where the beatmap has no entry under the canonical mod the row is simply
- * renamed. Where it has one, the scores move across, each player keeping
- * their better result, and the emptied entry goes. A judged entry is never
- * overwritten, so the surviving row keeps its own pack and categories, and
- * both ids are written to the audit log for staff to look over.
- *
- * Returns the players whose levels the move changed, and is safe to repeat:
- * a second run finds nothing left to fold.
+ * Returns the players whose levels changed. Safe to repeat.
  */
 export async function mergeLooseModEntries(): Promise<number[]> {
   const all = await db
@@ -136,10 +124,7 @@ export async function mergeLooseModEntries(): Promise<number[]> {
   return [...touched];
 }
 
-/**
- * Replaces the grade table with the scale in the code. One transaction, so
- * the table is never seen empty.
- */
+/** Replaces the grade table with the scale in the code, in one transaction. */
 export async function seedGradeRules() {
   console.log("Seeding grade rules");
   await db.transaction(async (tx) => {

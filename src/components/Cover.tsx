@@ -4,12 +4,8 @@ import { useState } from "react";
 import { tierByOrder } from "@/lib/tiers";
 
 /**
- * Beatmap cover art.
- *
- * osu! serves every set from a predictable URL, but old sets genuinely have
- * no cover uploaded and 404 there. There is no way to know which from the
- * metadata, so the fallback is driven by the image failing to load rather
- * than by a missing URL.
+ * Beatmap cover art. Sets with no cover uploaded 404, and the metadata does
+ * not say which, so the fallback is driven by the image failing to load.
  */
 export function Cover({
   setId,

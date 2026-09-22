@@ -22,13 +22,9 @@ export default async function MapsPage({
   const page = bankPageFrom(sp);
 
   /*
-   * Started, deliberately not awaited.
-   *
-   * This is the expensive one: it reads the rows, and the forty eight cards
-   * it produces are most of what the page weighs. Handing the promise to a
-   * suspended child instead of awaiting it here means the heading and the
-   * filter bar are sent immediately and are usable while the rows are still
-   * being fetched, rather than the whole page waiting on them.
+   * Started, deliberately not awaited. The promise goes to a suspended
+   * child, so the heading and the filter bar are sent and usable while the
+   * rows are still being fetched.
    */
   const bank = getBankPage(bankFiltersFrom(sp), page);
 

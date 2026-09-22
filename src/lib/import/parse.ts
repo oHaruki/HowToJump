@@ -4,10 +4,7 @@ import {
   type Tier,
 } from "@/lib/tiers";
 
-/**
- * Reads what staff paste: a range copied out of Google Sheets (which lands on
- * the clipboard tab separated), a CSV export, or a bare list of links and IDs.
- */
+/** Reads what staff paste: tab separated sheet cells, CSV, or bare links and IDs. */
 
 export type RowStatus = "new" | "attention" | "duplicate" | "exists" | "error";
 export type ParseMode = "sheet" | "csv" | "links" | null;
@@ -69,10 +66,7 @@ const HEADER_MAP: Record<string, string> = {
 const DQ = String.fromCharCode(34);
 const norm = (s: string) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/**
- * The sheet uses European decimal commas throughout ("9,92"). Reading these
- * with parseFloat alone would silently truncate every star rating to 9.
- */
+/** A number, accepting the sheet's European decimal commas ("9,92"). */
 export function num(v: string | null | undefined): number | null {
   if (v == null) return null;
   const s = String(v).trim().replace(/,/g, ".");
@@ -124,10 +118,7 @@ export function splitTitle(v: string | null | undefined) {
   return m ? { title: m[1].trim(), version: m[2].trim() } : { title: s, version: "" };
 }
 
-/**
- * Splits one delimited line, honouring quoted cells so a map title containing
- * a comma survives a CSV round trip.
- */
+/** Splits one delimited line, honouring quoted cells. */
 export function splitLine(line: string, delim: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -308,10 +299,7 @@ export function entryKey(beatmapId: number, mod: string): string {
   return beatmapId + "|" + normalizeMod(mod);
 }
 
-/**
- * Marks rows that repeat within the paste, and rows that already sit on the
- * ladder under the same mod.
- */
+/** Marks rows repeated within the paste, and rows already on the ladder. */
 export function classify(rows: ParsedRow[], existingKeys: Set<string>): ParsedRow[] {
   const seen = new Set<string>();
   for (const r of rows) {
@@ -334,11 +322,7 @@ export function classify(rows: ParsedRow[], existingKeys: Set<string>): ParsedRo
   return rows;
 }
 
-/**
- * Which normalisations fired, so staff can see the paste was read correctly.
- * Only the figures staff read off the card count. Drain time is converted to
- * seconds for storage as well, but that is bookkeeping and stays out of sight.
- */
+/** Which normalisations fired, for the figures staff read off the card. */
 export function normalizations(r: ParsedRow): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   const pairs: Array<[string, number | null]> = [

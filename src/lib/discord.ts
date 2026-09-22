@@ -6,9 +6,8 @@ import { describeScores, entryName, gradeText, type ScoreLine } from "@/lib/quer
 import { shortCategory, tierByOrder } from "@/lib/tiers";
 
 /**
- * Discord, spoken to over plain HTTP. The /rs command arrives as a signed
- * POST and is answered by editing the reply, and the score feed is a channel
- * webhook, so none of it needs a bot process or a gateway connection.
+ * Discord over plain HTTP: /rs arrives as a signed POST answered by editing
+ * the reply, and the score feed is a channel webhook. No bot process.
  */
 
 const API = "https://discord.com/api/v10";
@@ -55,10 +54,7 @@ export function scoreLine(s: ScoreLine): string {
   return md(entryName(s)) + " · " + gradeText(s) + " · " + pack + " · " + md(categories);
 }
 
-/**
- * Joins lines into one message, dropping whatever does not fit and saying how
- * much, since a first sync can import a lot at once.
- */
+/** Joins lines into one message, dropping what does not fit and saying how much. */
 export function fitLines(lines: string[]): string {
   const kept: string[] = [];
   let length = 0;
@@ -84,10 +80,7 @@ export async function editReply(interactionToken: string, content: string): Prom
   });
 }
 
-/**
- * Posts freshly imported scores to the feed channel, when one is set up.
- * Never throws: a Discord hiccup must not fail the sync that found the score.
- */
+/** Posts imported scores to the feed channel, if one is set up. Never throws. */
 export async function announceScores(
   userId: number,
   imported: Array<{ entryId: number; grade: string; missCount: number }>,

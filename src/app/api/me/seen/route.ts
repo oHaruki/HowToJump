@@ -8,13 +8,10 @@ import { seenBody } from "@/lib/progress";
 export const dynamic = "force-dynamic";
 
 /**
- * Records what the player's profile last showed them, sent as a beacon when
- * they leave the page, so the next visit animates from there.
- *
- * It stores the snapshot the page actually rendered, and when, rather than
- * the levels as they are now: a score that landed after the page was drawn
- * has not been seen yet and should still show up as new. An older tab
- * reporting in late cannot wind the clock back.
+ * Records what the player's profile last showed them, sent as a beacon on
+ * leaving. Stores the snapshot the page rendered and when, so a score that
+ * landed after it was drawn still reads as new. An older tab reporting in
+ * late cannot wind the clock back.
  */
 export async function POST(req: Request) {
   const session = await auth();

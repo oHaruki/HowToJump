@@ -17,8 +17,8 @@ export type MenuUser = {
 };
 
 /**
- * The avatar opens a menu rather than signing out on click, which was far too
- * easy to hit by accident. Sign out is a form posting to a server action, so
+ * The avatar opens a menu; signing out is a choice inside it. Sign out is a
+ * form posting to a server action, so
  * it still works without JavaScript.
  */
 export function UserMenu({

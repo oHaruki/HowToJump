@@ -52,11 +52,7 @@ function splitLines(text: string): string[] {
 
 export type PreviewRow = Omit<ParsedRow, "tierObj"> & {
   tierOrder: number | null;
-  /**
-   * Nomod values straight from the osu! API. Kept so that changing the mod in
-   * the preview recalculates from the real base rather than compounding on
-   * figures that were already adjusted once.
-   */
+  /** Nomod values from the osu! API, so a mod change recalculates from the base. */
   baseCs: number | null;
   baseAr: number | null;
   baseOd: number | null;
@@ -66,13 +62,9 @@ export type PreviewRow = Omit<ParsedRow, "tierObj"> & {
 };
 
 /**
- * Parses a paste, enriches every difficulty ID against the osu! API in batches
- * of 50, then applies the row's mod to the values so what staff see is what a
- * player would see.
- *
- * The API's numbers win over the sheet's. The sheet cannot say which mod its
- * figures were written for, so deriving from the nomod truth is the only way
- * to avoid applying a mod twice.
+ * Parses a paste, enriches every difficulty ID against the osu! API in
+ * batches of 50, then applies the row's mod. The API's nomod numbers win
+ * over the sheet's, so a mod is never applied twice.
  */
 export async function previewPaste(
   text: string,
@@ -173,10 +165,7 @@ export async function previewPaste(
   return { mode: parsed.mode, rows };
 }
 
-/**
- * The mod adjusted star rating for one map, for when staff change the mod on
- * a row already in the preview. Everything else recalculates in the browser.
- */
+/** Mod adjusted star rating for one map. Everything else recalculates in the browser. */
 export async function starRatingFor(
   osuBeatmapId: number,
   mod: string,
@@ -308,11 +297,8 @@ async function ensureBeatmap(osuBeatmapId: number): Promise<number> {
 }
 
 /**
- * Admin only, unlike the rest of the queue.
- *
- * This is the single place anything is written into entries, so it is the
- * only door into the bank. Helpers fill the queue and set a pack on what
- * they put there; deciding what the ladder actually holds is an admin's.
+ * Admin only. The single place anything is written into entries: helpers
+ * fill the queue, admins decide what the ladder holds.
  */
 export async function approveSuggestions(ids: number[]) {
   const admin = await requireAdmin();
@@ -403,12 +389,10 @@ export async function setSuggestionTier(id: number, tierName: string) {
 /* ------------------------------------------------------------- bank admin */
 
 /**
- * Edits everything staff assign on a banked entry.
- *
- * Changing the mod is the interesting case: it changes what the entry *is*,
- * so the figures are recalculated from the beatmap's nomod values and the
- * star rating is re-fetched. It can also collide, because a beatmap and mod
- * pair is unique, so that is checked before anything is written.
+ * Edits everything staff assign on a banked entry. Changing the mod
+ * recalculates the figures from the beatmap's nomod values and re-fetches
+ * the star rating; beatmap and mod are unique, so a collision is checked
+ * before anything is written.
  */
 export async function updateEntry(
   entryId: number,
@@ -516,13 +500,7 @@ export async function removeEntry(entryId: number) {
   revalidatePath("/ladder");
 }
 
-/**
- * Puts a removed entry back on the ladder.
- *
- * Removing only clears the flag, so the row and its scores were always still
- * there; until the staff bank could filter to them there was just no way to
- * reach one again.
- */
+/** Puts a removed entry back on the ladder. Removing only clears the flag. */
 export async function restoreEntry(entryId: number) {
   const staff = await requireStaff();
   await db
@@ -551,10 +529,7 @@ export async function setUserRole(userId: number, role: "user" | "helper" | "adm
   revalidatePath("/staff/members");
 }
 
-/**
- * Grants a role by osu! ID or username. Creates the local row when that
- * player has never signed in, so staff can be set up ahead of time.
- */
+/** Grants a role by osu! ID or username, creating the local row if needed. */
 export async function addStaffMember(
   identifier: string,
   role: "helper" | "admin",

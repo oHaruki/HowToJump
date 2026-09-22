@@ -35,11 +35,7 @@ export type BankRow = {
   isActive: boolean;
 };
 
-/**
- * Which side of `isActive` to read. Public pages only ever see "listed";
- * staff can look at what they have taken off the ladder, which is otherwise
- * invisible and so unrecoverable.
- */
+/** Which side of `isActive` to read. Public pages only see "listed". */
 export type BankStatus = "listed" | "removed" | "all";
 
 export type BankFilters = {
@@ -51,12 +47,7 @@ export type BankFilters = {
   speed?: string;
   /** Staff only. Defaults to "listed" everywhere else. */
   status?: BankStatus;
-  /**
-   * Staff only: just the entries carrying a category the team no longer
-   * judges, or none at all. Labels are left alone in the database when the
-   * scale is renamed and fixed as staff touch the rows, so this is the queue
-   * of rows that never got touched.
-   */
+  /** Staff only: entries carrying a dropped category, or none at all. */
   staleLabels?: boolean;
 };
 
@@ -141,12 +132,8 @@ function bankWhere(filters: BankFilters) {
   return and(...where);
 }
 
-/*
- * Hardest pack first, hardest map within it. The entry ID is a tiebreak
- * rather than a preference: two entries on the same stars would otherwise be
- * free to swap places between two queries, and a paged list that reorders
- * under itself shows one of them twice and drops the other.
- */
+/* Hardest pack first, hardest map within it. The entry ID breaks ties, so
+   a paged list keeps a stable order across queries. */
 const bankOrder = [desc(entries.tierOrder), desc(entries.stars), desc(entries.id)];
 
 /** The whole filtered bank. Staff screens only; public pages take a page. */
@@ -163,12 +150,9 @@ export async function getBank(filters: BankFilters = {}): Promise<BankRow[]> {
 }
 
 /**
- * One page of the bank, plus how many entries the filters match.
- *
- * The count comes first because it decides which page is actually being
- * asked for: a stale link or a hand typed number past the end shows the last
- * page rather than an empty list, and clamping after fetching would mean
- * fetching the wrong rows. Both queries are indexed and narrow.
+ * One page of the bank, plus how many entries the filters match. The count
+ * runs first and clamps the page, so a number past the end shows the last
+ * page rather than an empty list.
  */
 export async function getBankPage(
   filters: BankFilters = {},
@@ -219,9 +203,9 @@ export async function getTierCounts(
 }
 
 /**
- * Listed entries per pack and set of categories, for the staff coverage grid,
- * which counts a map once in each of its categories. Labels the grading team
- * has dropped come back as they are, so the page can count them apart.
+ * Listed entries per pack and set of categories, for the staff coverage
+ * grid. A map counts once in each of its categories, and dropped labels
+ * come back as they are.
  */
 export async function getCoverage(): Promise<
   Array<{ tierOrder: number; categories: string[]; n: number }>
@@ -249,11 +233,8 @@ export async function getBankStats() {
 }
 
 /**
- * Distinct values actually present in the bank, for the filter dropdowns.
- *
- * Distinct in SQL rather than in JS: the four columns are all short scales,
- * so what comes back is a few dozen combinations however big the bank gets,
- * where selecting the columns raw shipped one row per entry on every load.
+ * Distinct values present in the bank, for the filter dropdowns. Distinct
+ * in SQL, so this stays a few dozen rows however big the bank gets.
  */
 export async function getFacets(status: BankStatus = "listed") {
   const rows = await db
@@ -269,9 +250,7 @@ export async function getFacets(status: BankStatus = "listed") {
   const uniq = (xs: Array<string | null>) =>
     Array.from(new Set(xs.filter((x): x is string => Boolean(x)))).sort();
 
-  // Each filter lists its values in the order its dropdown does, so pacing
-  // reads Very low to Extreme+ rather than Extreme to Very low. Anything left
-  // over from an older list sorts to the end instead of hiding mid-list.
+  // Each filter in its own scale's order, with unknown values last.
   return {
     categories: orderByScale(uniq(rows.flatMap((r) => r.categories)), CATEGORIES),
     mods: uniq(rows.map((r) => r.mod)),
@@ -360,8 +339,7 @@ export async function getStaffStats() {
 
 /**
  * Every play a profile shows, newest first: visible scores on maps still on
- * the ladder. All of them rather than a page, since top plays are ranked by
- * EXP across the lot, and a player has hundreds at most.
+ * the ladder. All of them, since top plays are ranked by EXP across the lot.
  */
 export async function getProfilePlays(userId: number) {
   return db
@@ -409,10 +387,7 @@ export type ScoreLine = {
   missCount: number;
 };
 
-/**
- * The maps behind what a sync just imported, in the order it imported them,
- * for the Sync now button, the /rs reply and the score feed.
- */
+/** The maps behind a sync's imports, in the order they were imported. */
 export async function describeScores(
   imported: Array<{ entryId: number; grade: string; missCount: number }>,
 ): Promise<ScoreLine[]> {
@@ -489,24 +464,16 @@ const onBoard = (entryId: number) =>
   and(eq(scores.entryId, entryId), eq(scores.isHidden, false), isNull(users.bannedAt));
 
 /**
- * How a map's leaderboard is ordered, osu! style: best grade first, then the
- * misscount, then accuracy, and on a dead heat whoever set it first. The
- * misscount is what the site grades on and a grade covers a band, so 21
- * misses has to stand above 24 even where 24 carried the better accuracy.
- *
- * One fragment, read both by the list below and by the row_number that ranks
- * a single player, so a change to one can never leave the other behind.
+ * How a map's leaderboard is ordered: grade, then misscount, then accuracy,
+ * then whoever set it first. One fragment, read both by the list below and
+ * by the row_number that ranks a single player.
  */
 export const boardOrder = raw`${scores.gradeRank}, ${scores.missCount}, ${scores.accuracy} desc nulls last, ${scores.playedAt} asc nulls last, ${scores.id}`;
 
 /** A player's place on a board, counted under that same order. */
 export const boardRank = raw<number>`(row_number() over (order by ${boardOrder}))::int`;
 
-/**
- * That order in words, for the caption over a board. It lives here beside
- * the SQL rather than in the page, because it went stale the moment the
- * misscount was added and nothing said so.
- */
+/** That order in words, for the caption over a board. */
 export const BOARD_ORDER_TEXT =
   "Best grade first, then the misscount, then accuracy. A tie goes to whoever set it first.";
 
@@ -551,9 +518,8 @@ export async function getEntryPlayerCount(entryId: number): Promise<number> {
 }
 
 /**
- * Everything a beatmap's page shows, by osu!'s own beatmap ID so a link can
- * be typed straight from osu!. The same beatmap can be banked under more
- * than one mod, so every listed entry comes back, and the page picks one.
+ * Everything a beatmap's page shows, by osu!'s own beatmap ID. One beatmap
+ * can be banked under several mods, so every listed entry comes back.
  */
 export async function getBeatmapPage(osuBeatmapId: number) {
   return db
@@ -621,9 +587,8 @@ const inRanking = (scope: string) =>
   and(eq(userLevels.scope, scope), raw`${userLevels.exp} > 0`, isNull(users.bannedAt));
 
 /**
- * One page of the EXP leaderboard for a scope: "main" for overall, or a
- * category label. Most EXP first; on a tie the older account, so places are
- * stable from one load to the next.
+ * One page of the EXP leaderboard for a scope: "main" or a category label.
+ * Most EXP first, then the older account.
  */
 export async function getRankings(scope: string, page = 1) {
   const [counted] = await db

@@ -1,17 +1,12 @@
 /**
- * Brings the database up to this build. `docker compose up` runs it as the
- * migrate service before the app starts, on every deploy; locally it is
+ * Brings the database up to this build, as the compose migrate service or
  * npm run db:deploy. Every step is safe to repeat:
  *
- *   1. New migrations, all in one transaction, so a failure leaves the
- *      database as it was and compose leaves the running app alone.
+ *   1. New migrations, in one transaction.
  *   2. The grade table, refreshed from the code.
- *   3. The sheet's maps, but only into an empty bank, so a deploy can never
- *      undo what staff changed.
- *   4. Note counts from osu! for maps that don't have one yet, and entries
- *      folded together where a mod stopped standing on its own.
- *   5. Levels, recomputed when the numbers behind them changed, or just for
- *      the players the steps above moved.
+ *   3. The sheet's maps, into an empty bank only.
+ *   4. Missing note counts, and entries folded by mod.
+ *   5. Levels, where the rules or the players above changed.
  */
 import "./env";
 import { createHash } from "node:crypto";
@@ -31,15 +26,9 @@ const MIGRATIONS = fileURLToPath(new URL("./migrations", import.meta.url));
 type Journal = { entries: Array<{ tag: string; when: number }> };
 
 /**
- * Databases set up before migrations were tracked were built with db:push:
- * they have the tables but no migration history, so replaying the first
- * migration would fail on tables that already exist. Recording that one as
- * applied, the way drizzle's migrator records it, lets the rest run; those
- * are written to be harmless where db:push got there first.
- *
- * An empty history table counts as none. drizzle-kit migrate creates the
- * table before it runs anything, so a run that failed on those existing
- * tables leaves one behind.
+ * Marks the first migration applied on a database built with db:push, which
+ * has the tables but no history. An empty history table counts as none,
+ * since drizzle-kit creates it before it runs anything.
  */
 async function adoptPushedDatabase(): Promise<boolean> {
   const [state] = await sql`

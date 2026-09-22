@@ -11,11 +11,8 @@ import { announceScores } from "@/lib/discord";
 import { planPass, type SyncReason } from "@/lib/osu/plan";
 
 /**
- * Pulls a player's recent plays and keeps anything that lands on a bank entry.
- *
- * A play only counts for an entry when the mods match, because an entry is a
- * beatmap under one specific mod. A DT run does not count toward the nomod
- * entry, and vice versa.
+ * Pulls a player's recent plays and keeps anything landing on a bank entry.
+ * The mods have to match: an entry is a beatmap under one specific mod.
  */
 
 export type ImportedScore = {
@@ -120,10 +117,8 @@ async function upsertScore(
 }
 
 /**
- * Recomputes the per pack rollup and the skill levels the profile reads.
- *
- * Both count visible scores on entries still on the ladder, valued at the
- * entry's current pack, so re-judging a map moves every level that used it.
+ * Recomputes the per pack rollup and the skill levels a profile reads, from
+ * visible scores on listed entries valued at the entry's current pack.
  */
 export async function refreshProgress(userId: number): Promise<void> {
   const counted = and(
@@ -223,11 +218,7 @@ export async function refreshProgress(userId: number): Promise<void> {
     );
 }
 
-/**
- * Re-judging or pulling a map changes what every play on it is worth, so
- * everyone with a score on it is recomputed. Adding a map never needs this:
- * nobody has a score on it yet.
- */
+/** Recomputes everyone holding a score on an entry. For re-judging or pulling it. */
 export async function refreshEntryPlayers(entryId: number): Promise<number> {
   const players = await db
     .selectDistinct({ userId: scores.userId })
@@ -241,10 +232,9 @@ export async function refreshEntryPlayers(entryId: number): Promise<number> {
 const LEVEL_RULES_KEY = "level_rules";
 
 /**
- * Recomputes everyone's rollups when the level rules in this build differ
- * from the ones the stored levels were computed under, then records the new
- * ones. Every deploy calls it, so retuning a number needs nothing else;
- * `force` is for npm run levels:rebuild.
+ * Recomputes everyone's rollups when this build's level rules differ from
+ * the stored ones, then records the new rules. `force` is for
+ * npm run levels:rebuild.
  */
 export async function rebuildLevelsIfRulesChanged(
   force = false,
@@ -358,12 +348,8 @@ const MAX_RETRIES = 3;
 /** Arbitrary key for the advisory lock that keeps passes from overlapping. */
 const PASS_LOCK_KEY = 20260918;
 
-/*
- * Players whose count rose but whose play had not reached recent plays yet,
- * against how many retries they have used. A stable score can land there a
- * few seconds after the count moves. Kept in memory: a restart loses at most
- * a retry, and the backstop sweep covers that.
- */
+/* Players whose count rose before the play reached recent plays, against
+   retries used. In memory; the daily sweep is the backstop. */
 const retrying = new Map<number, number>();
 
 export type PassResult = {
@@ -375,16 +361,12 @@ export type PassResult = {
 };
 
 /**
- * One pass of the worker, which calls it every minute.
+ * One pass of the worker, called every minute. Reads play counts fifty
+ * players to a request and fetches recent plays only where the count rose;
+ * anyone not synced in a day is swept anyway.
  *
- * osu! cannot push a score to us, so the site asks. Reading everyone's recent
- * plays each minute would cost a request per player; instead the pass reads
- * play counts, fifty players to a request, and fetches recent plays only for
- * players whose count went up. Anyone not synced in a day is swept anyway.
- *
- * A busy pass can outlast the minute, so each one holds a transaction scoped
- * advisory lock and a pass that finds it taken returns at once. The lock goes
- * with the transaction, so a crash cannot leave it held.
+ * Holds a transaction scoped advisory lock, so a pass outlasting the minute
+ * makes the next one return at once.
  */
 export async function syncDueUsers(maxSyncs = MAX_SYNCS_PER_PASS): Promise<PassResult> {
   const outcome = await sql.begin(async (tx) => {

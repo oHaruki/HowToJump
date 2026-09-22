@@ -1,14 +1,9 @@
 import { modsFromApi } from "@/lib/mods";
 
 /**
- * osu! API v2 client.
- *
- * Two credentials paths share one rate limiter:
- *   - client_credentials for beatmap lookups (app level)
- *   - a user's access token for reading their recent plays
- *
- * osu! ask for no more than 60 requests a minute, so every call in the app
- * goes through the bucket below rather than hitting fetch directly.
+ * osu! API v2 client. Two credentials paths share one rate limiter:
+ * client_credentials for beatmap lookups, and a user's access token for
+ * their recent plays. osu! allow 60 requests a minute.
  */
 
 const API = "https://osu.ppy.sh/api/v2";
@@ -220,11 +215,8 @@ export async function fetchBeatmap(id: number): Promise<BeatmapFacts | null> {
 }
 
 /**
- * Mod adjusted star rating.
- *
- * Star rating needs the full difficulty calculator, so unlike AR, OD, CS and
- * BPM it cannot be worked out locally. osu! exposes it through a POST, one
- * beatmap and mod combination at a time.
+ * Mod adjusted star rating. Needs the full difficulty calculator, so it
+ * comes from a POST, one beatmap and mod at a time.
  */
 export async function fetchStarRating(
   osuBeatmapId: number,
@@ -317,12 +309,9 @@ export function toPlay(s: OsuScore): PlayFacts {
 }
 
 /**
- * A player's recent plays.
- *
- * This is the endpoint the whole tracker rests on. Unlike the beatmap
- * leaderboard endpoints it returns *plays*, so it covers graveyard maps,
- * which is nearly all of the ladder. Its limit is the last 100 plays or
- * 24 hours, whichever runs out first, which is what sets the sync cadence.
+ * A player's recent plays. Returns plays rather than leaderboard entries,
+ * so it covers graveyard maps. Limited to the last 100 plays or 24 hours,
+ * whichever runs out first, which sets the sync cadence.
  */
 export async function fetchRecentPlays(
   osuUserId: number,
@@ -343,12 +332,9 @@ type OsuUserWithStats = {
 };
 
 /**
- * osu! standard play counts, fifty players to a request.
- *
- * Play count rises with every play, graveyard maps included, so comparing it
- * between checks says who has played since, at a fiftieth of the cost of
- * reading everyone's recent plays. Players osu! no longer returns, such as
- * restricted or deleted accounts, are simply absent from the result.
+ * osu! standard play counts, fifty players to a request. Comparing between
+ * checks says who has played since. Restricted or deleted accounts are
+ * absent from the result.
  */
 export async function fetchPlayCounts(osuUserIds: number[]): Promise<Map<number, number>> {
   const out = new Map<number, number>();
@@ -375,10 +361,7 @@ export type OsuMe = {
   statistics?: { global_rank: number | null };
 };
 
-/**
- * Looks a player up by numeric ID or by username, so staff can be added
- * before they have ever signed in.
- */
+/** Looks a player up by numeric ID or by username. */
 export async function fetchUser(identifier: string): Promise<OsuMe | null> {
   const trimmed = identifier.trim();
   if (!trimmed) return null;

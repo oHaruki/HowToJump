@@ -1,13 +1,7 @@
 /**
- * Mod adjusted difficulty values.
- *
- * A bank entry is a beatmap under one mod, so the figures shown against it
- * have to be the ones a player actually sees. DT does not just speed the song
- * up: it shortens the approach and hit windows, which raises effective AR and
- * OD. HR scales the raw values instead.
- *
- * Star rating is the exception. It needs the full difficulty calculator, so it
- * comes from the osu! API rather than from anything here.
+ * Mod adjusted difficulty values. DT shortens the approach and hit windows,
+ * raising effective AR and OD; HR scales the raw values instead. Star
+ * rating is not here — it comes from the osu! API.
  */
 
 import { bucketFor, LENGTH_SCALE, SPEED_SCALE } from "@/lib/tiers";
@@ -50,10 +44,8 @@ export function windowToOd(window: number): number {
 }
 
 /**
- * Applies a mod to a set of nomod values.
- *
- * Difficulty multipliers (HR, EZ) are applied to the raw numbers first, then
- * the rate change converts AR and OD through their underlying timings.
+ * Applies a mod to a set of nomod values: the HR/EZ multipliers first, then
+ * the rate change through AR and OD's underlying timings.
  */
 export function applyMod(base: Diff, mod: string): Diff {
   const m = (mod || "NM").toUpperCase();
@@ -97,10 +89,8 @@ export function applyMod(base: Diff, mod: string): Diff {
 /* ------------------------------------------------------------- pacing */
 
 /**
- * Length bucket from drain time, on the scale in `LENGTH_SCALE`: under a
- * minute is a Cut Ver., up to 1:30 TV Size, up to 3:00 Medium, up to 5:00
- * Long, and anything past that a Marathon. A map shorter than the 0:30 the
- * scale starts at has nowhere else to go, so it counts as a Cut Ver. too.
+ * Length bucket from drain time, on `LENGTH_SCALE`. Anything under the
+ * scale's 0:30 floor counts as a Cut Ver.
  */
 export function lengthBucketFor(drainSeconds: number | null | undefined): string {
   if (drainSeconds == null) return "";
@@ -108,11 +98,8 @@ export function lengthBucketFor(drainSeconds: number | null | undefined): string
 }
 
 /**
- * A suggestion only, never applied silently.
- *
- * The scale reads BPM, which is all this can see, but what staff are grading
- * is note density: the sheet marks two 132 BPM maps as High. So this gives
- * the dropdown a sensible starting point and staff pick the real value.
+ * A starting point for the dropdown, never applied silently: this reads BPM,
+ * but what staff grade is note density.
  */
 export function speedGuessFor(bpm: number | null | undefined): string {
   if (bpm == null) return "";

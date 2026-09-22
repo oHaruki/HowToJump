@@ -1,9 +1,6 @@
 /**
- * Recomputes every player's pack rollup and skill levels from their scores,
- * whether or not the rules changed.
- *
- * Deploys already do this on their own whenever the pack EXP, the grade
- * percentages or the best-plays count change, so this is for anything else.
+ * Recomputes every player's pack rollup and skill levels, whether or not
+ * the rules changed. Deploys already do this when the rules change.
  *
  * Usage: npm run levels:rebuild
  */

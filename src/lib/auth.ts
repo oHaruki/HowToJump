@@ -31,10 +31,7 @@ declare module "next-auth" {
   }
 }
 
-/**
- * osu! is not a built in Auth.js provider, so it is declared here.
- * The "identify" scope is all we need: user ID, name, avatar and rank.
- */
+/** The osu! OAuth provider. "identify" covers user ID, name, avatar and rank. */
 const osu: OAuthConfig<OsuMe> = {
   id: "osu",
   name: "osu!",
@@ -65,10 +62,7 @@ const bootstrapAdmins = new Set(
     .filter(Boolean),
 );
 
-/**
- * Creates the local row on first sign in and refreshes the cached osu!
- * profile on every later one.
- */
+/** Creates the local row on first sign in, refreshes the cached profile after. */
 async function upsertUser(me: OsuMe): Promise<{ id: number; role: Role }> {
   const existing = await db.query.users.findFirst({
     where: eq(users.osuUserId, me.id),
@@ -117,10 +111,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      // The role is read from the database rather than trusted from the token.
-      // It is stamped into the JWT at sign in, so a promotion made in the
-      // Members page would otherwise not apply until that person signed out
-      // and back in. One indexed lookup keeps role changes immediate.
+      // Read from the database, not the token, so a role change applies at once.
       let role: Role = token.role ?? "user";
       if (token.userId) {
         const row = await db.query.users.findFirst({

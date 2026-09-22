@@ -1,9 +1,8 @@
 /**
  * Run with: node --import tsx --test src/lib/grading.test.ts
  *
- * Misses by map size, as Kayrem settled it: a 1,500 note map counts as it
- * is, shorter maps make each miss count more on the gentle curve, and only
- * the EXP moves. The grade always reads the real misses.
+ * Misses by map size: a 1,500 note map counts as it is, shorter maps make
+ * each miss count more, and only the EXP moves.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -82,7 +81,7 @@ test("the grade itself reads the real misses on any map", () => {
 });
 
 test("a sloppier run never takes a personal best on accuracy alone", () => {
-  // Both C-, which covers 21 to 30 misses: the 24 used to overwrite the 21.
+  // Both C-, which covers 21 to 30 misses, so the misscount settles it.
   const clean = { gradeRank: 12, missCount: 21, accuracy: 97.15 };
   const sloppy = { gradeRank: 12, missCount: 24, accuracy: 98.34 };
   assert.ok(compareResults(clean, sloppy) < 0);
@@ -203,9 +202,8 @@ test("a 1,500 note map is the one that pays the misscount as it stands", () => {
 });
 
 test("EXP falls on a curve, not in the grade's steps", () => {
-  // Every misscount is worth its own number, so two plays on one pack are
-  // no longer worth the same for landing in the same band. That is what put
-  // 36 and 52 misses on identical EXP on a profile.
+  // Every misscount is worth its own number, so two plays in one band are
+  // not worth the same.
   const inside = Array.from({ length: 25 }, (_, i) => shareForMisses(21 + i));
   assert.equal(new Set(inside).size, 25, "a band still pays one flat number");
   for (let i = 1; i < inside.length; i++) assert.ok(inside[i] < inside[i - 1]);
@@ -220,9 +218,8 @@ test("EXP falls on a curve, not in the grade's steps", () => {
 });
 
 test("each miss costs more than the last, until there is nothing left", () => {
-  // The flat fall was the whole problem: every miss cost the same share of
-  // what was left, so thirty misses and fifty were only a third apart, and
-  // a map survived rather than cleared still paid like a clear.
+  // Each miss costs more of what is left than the last, so a map survived
+  // pays nothing like a map cleared.
   const drop = (m: number) => 1 - shareForMisses(m) / shareForMisses(m - 1);
   assert.ok(drop(40) > drop(20), "a fortieth miss should cost more than a twentieth");
   assert.ok(drop(20) > drop(10), "a twentieth miss should cost more than a tenth");
@@ -252,8 +249,7 @@ test("the curve is anchored where the pack thresholds read it", () => {
     const now = shareForMisses(m);
     assert.ok(Math.abs(now - before) < 6, m + " misses moved from " + before + " to " + now);
   }
-  // Past that it collapses: a map survived rather than cleared pays nothing
-  // like a clear, which is what two rounds of feedback were about.
+  // Past that it collapses: a map survived pays nothing like a clear.
   assert.ok(shareForMisses(36) < 5, "36 misses still earns " + shareForMisses(36) + "%");
   assert.ok(shareForMisses(52) < 1, "52 misses still earns " + shareForMisses(52) + "%");
   assert.ok(shareForMisses(150) < 0.01, "150 misses still earns " + shareForMisses(150) + "%");

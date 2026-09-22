@@ -4,14 +4,13 @@ import { CATEGORIES } from "@/lib/tiers";
 
 /**
  * What a profile remembers between visits: every level as the player last
- * saw it. The page animates from there to where they are now, and sends it
- * back when they leave, so what comes back is checked rather than trusted.
+ * saw it. The page sends it back when they leave, so it is validated here.
  */
 
 export type LevelState = { exp: number; tierOrder: number | null; progress: number | null };
 export type LevelSnapshot = Record<string, LevelState>;
 
-/** The main level first, then the categories, the order a profile shows them. */
+/** The main level first, then the categories, in profile order. */
 export const PROFILE_SCOPES = [MAIN_LEVEL, ...CATEGORIES];
 
 export const UNRANKED: LevelState = { exp: 0, tierOrder: null, progress: 0 };
@@ -52,8 +51,7 @@ export type RankUp = { scope: string; from: number | null; to: number };
 
 /**
  * What moved between two snapshots: EXP gained overall, and every level
- * that reached a higher pack. A level that fell, when a map was judged
- * down, is not news to celebrate, so it is left out.
+ * that reached a higher pack. Levels that fell are left out.
  */
 export function changesSince(
   before: LevelSnapshot,
@@ -70,8 +68,8 @@ export function changesSince(
 
 /**
  * Whether a score landed since the player last looked: "new" for a map they
- * had no score on, "improved" for a better result on one they had. Nothing is
- * new on a first visit, or every score would be.
+ * had no score on, "improved" for a better result. Nothing is new on a
+ * first visit.
  */
 export function freshness(
   score: { createdAt: Date; importedAt: Date },
@@ -83,7 +81,7 @@ export function freshness(
 
 /* ------------------------------------------------ the two lists a profile draws */
 
-/** What the working below needs of a play; a caller passes whole rows. */
+/** What the working below needs of a play. */
 export type PlayForProfile = {
   scoreId: number;
   tierOrder: number;
@@ -97,7 +95,7 @@ export type PlayForProfile = {
 
 /** A play with everything a row shows worked out. */
 export type ShownPlay<T> = T & {
-  /** Carried so the list and countingPlaces settle a tie the same way. */
+  /** Settles ties the same way countingPlaces does. */
   id: number;
   exp: number;
   places: Place[];
@@ -105,14 +103,9 @@ export type ShownPlay<T> = T & {
 };
 
 /**
- * A profile's two lists, from one pass over the player's plays.
- *
- * `recent` keeps the order it was given, which is when the plays were set:
- * it is a history, so it reads newest first whatever the plays are worth.
- * `top` is the same plays by what they are worth, under byWorth, which is
- * the order countingPlaces numbers them in. Sorting the list one way and
- * numbering it another is what drew a #1 underneath the #2 it tied with, so
- * the two come from here together rather than being worked out apart.
+ * A profile's two lists, from one pass over the player's plays. `recent`
+ * keeps the order it was given; `top` is the same plays under byWorth,
+ * which is the order countingPlaces numbers them in.
  */
 export function profileLists<T extends PlayForProfile>(
   plays: readonly T[],

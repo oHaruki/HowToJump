@@ -1,10 +1,8 @@
 /**
  * Run with: node --import tsx --test src/lib/levels.test.ts
  *
- * Covers the level rule as it was agreed with Kayrem, down to the worked
- * example he was sent, plus the promises the rule makes: a new map never
- * lowers anyone, only the best plays count, and a pack's name is only
- * reached by playing that pack.
+ * The level rule and what it promises: a new map never lowers anyone, only
+ * the best plays count, and a pack is only reached by playing that pack.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -21,11 +19,8 @@ import { CATEGORIES, TIERS, tierByName } from "./tiers";
 const order = (name: string) => tierByName(name)!.order;
 const RAW = "Aim - raw mechanic";
 const CONSISTENCY = "Aim - consistency";
-/*
- * A play carries the misscount its grade starts at, because EXP is read off
- * the misscount now and the grade only names the band it lands in. No note
- * count, so misses count as they are, the same as on a 1,500 note map.
- */
+/* A play carries the misscount its grade starts at. No note count, so
+   misses count as they are. */
 const missesFor = (grade: string) => GRADE_RULES.find((g) => g.grade === grade)?.minMiss ?? 0;
 const play = (pack: string, grade: string, ...categories: string[]): LevelPlay => ({
   tierOrder: order(pack),
@@ -50,8 +45,7 @@ test("a play is worth its pack's EXP times the share its misses earn", () => {
   assert.equal(playExp(order("Emerald"), "SS", 0), 580_000);
   assert.equal(playExp(order("Amethyst"), "SSS", 0), 1_188_000);
   assert.equal(Math.round(playExp(order("Bronze"), "Pass", 101)), 2);
-  // The grade only names the band. Inside it the misscount still tells, so
-  // two plays on one pack are no longer worth the same for being both B.
+  // The grade only names the band; inside it the misscount still tells.
   assert.ok(playExp(order("Emerald"), "B", 6) > playExp(order("Emerald"), "B", 7));
 });
 
@@ -69,8 +63,7 @@ test("the worked example reads Emerald, 59/100 to Amethyst", () => {
 });
 
 test("a sandbagged pass on a hard pack stays under a clean clear well below it", () => {
-  // 150 misses on a Diamond map used to earn 16,384, beating a clean full
-  // combo on a Titanium map outright. It is worth under a Stone one now.
+  // 150 misses on a Diamond map is worth less than a clean Stone full combo.
   const pass = playExp(order("Diamond"), "Pass", 150, 1500);
   assert.equal(Math.round(pass), 62);
   assert.ok(
@@ -135,9 +128,8 @@ test("adding a play never lowers a level", () => {
 });
 
 test("plays worth the same EXP are ordered and numbered the same way", () => {
-  // Misses count by map size, so six on a 1,500 note map and eight on a
-  // 3,000 note one both count as six and are worth the same. The cleaner
-  // real misscount leads; the older score used to take #1 underneath it.
+  // Six on a 1,500 note map and eight on a 3,000 note one both count as
+  // six, so they are worth the same. The cleaner real misscount leads.
   const six: LevelPlay & { id: number } =
     { id: 40, tierOrder: order("Emerald"), categories: [RAW], grade: "B", missCount: 6, noteCount: 1500 };
   const eight: LevelPlay & { id: number } =
@@ -318,10 +310,8 @@ const listed = (plays: Array<LevelPlay & { id: number }>) =>
   plays.map((p) => ({ ...p, exp: expOf(p) })).sort(byWorth);
 
 test("the screenshot case: tied EXP, and the cleaner run leads and is #1", () => {
-  // EXP follows the misscount as the map's length counts it, so a tie now
-  // means two plays whose misses count the same: six on a 1,500 note map,
-  // eight on a 3,000 note one. The eight is the older score, which used to
-  // take #1 while being drawn underneath.
+  // A tie is two plays whose misses count the same: six on a 1,500 note
+  // map, eight on a 3,000 note one. The eight is the older score.
   const six = graded(40, "Emerald", 6, 1500);
   const eight = graded(12, "Emerald", 8, 3000);
   assert.equal(expOf(six), expOf(eight));
@@ -336,9 +326,8 @@ test("the screenshot case: tied EXP, and the cleaner run leads and is #1", () =>
 });
 
 test("however the plays fall, the list order and the printed places agree", () => {
-  // The bug was that a profile listed top plays one way and numbered them
-  // another, so a #1 could be drawn under the #2 it tied with. Both read
-  // byWorth now, which this checks over a spread wide enough to tie often.
+  // Listing and numbering both read byWorth, checked over a spread wide
+  // enough to tie often.
   let seed = 20260920;
   const rnd = (n: number) => {
     seed = (seed * 1103515245 + 12345) % 2147483648;
@@ -417,7 +406,7 @@ test("a 100+ miss pass never outranks a clean full combo three packs below", () 
       "a 150 miss pass on " + t.name + " is worth a clean " + below.name + " FC or more",
     );
   }
-  // What Kayrem reported, in full: it used to beat a clean Titanium FC.
+  // A 150 miss Diamond pass, against a clean Titanium full combo.
   const diamond = playExp(order("Diamond"), "Pass", 150, 1500);
   assert.equal(Math.round(diamond), 62);
   assert.ok(diamond < playExp(order("Stone"), "SS", 0));
@@ -425,18 +414,14 @@ test("a 100+ miss pass never outranks a clean full combo three packs below", () 
 });
 
 test("a clean clear outranks a sloppy one well above it", () => {
-  // The screenshot that started this: a 105 miss pass on a GOAT marathon,
-  // counting as about 70, stood above a 5 miss clear on a Ruby map five
-  // packs below it. The whole miss curve has to be worth more than the gap
-  // five packs open, and at 1.7 a pack it is.
+  // The whole miss curve is worth more than the gap five packs open, so a
+  // 105 miss GOAT pass stays under a 5 miss clear five packs below.
   const sandbagged = playExp(order("GOAT"), "F+", 70, 1500);
   const clean = playExp(order("Ruby"), "B-", 9, 1500);
   assert.ok(clean > sandbagged, "a 5 miss Ruby clear is still under a 70 miss GOAT one");
 
-  // Twelve misses costs about two packs: a twelve miss Diamond clear comes
-  // out level with a clean Emerald full combo, and clear of a Sapphire one.
-  // Cutting C+ to 16% put it under the Sapphire, which is what Kayrem read
-  // as too harsh on play that is still a real clear.
+  // Twelve misses costs about two packs: a twelve miss Diamond clear is
+  // level with a clean Emerald full combo and above a Sapphire one.
   const twelve = playExp(order("Diamond"), "C+", 12, 1500);
   const emerald = playExp(order("Emerald"), "SS", 0);
   assert.ok(
@@ -478,10 +463,8 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
   assert.equal(rules.packs.length, TIERS.length);
   assert.deepEqual(rules.packs.find(([o]) => o === order("GOAT")), [order("GOAT"), 2_860_000]);
   assert.equal(rules.bestPlays, BEST_PLAYS);
-  // Every number a stored level was worked out from has to be in here, or
-  // a deploy that retunes one leaves everyone on the old figure. The grade
-  // shares alone are not enough: they are read at one misscount each, and
-  // nothing about map length shows up in them at all.
+  // Every number a stored level is worked out from belongs in here, or a
+  // deploy that retunes one leaves everyone on the old figure.
   assert.deepEqual(rules.missShape, [MISS_KNEE, MISS_SLOPE, MISS_ACCEL, MISS_ACCEL_CAP, THRESHOLD_MISSES]);
   assert.deepEqual(rules.missScaling, [REFERENCE_NOTES, MISS_CURVE, MIN_MISS_FACTOR]);
 });

@@ -1,15 +1,10 @@
 /**
  * Run with: node --import tsx --test src/lib/queries.test.ts
  *
- * The one thing about a map's leaderboard that cannot be checked by reading
- * the code: that the SQL really does order by the misscount, and that the
- * query listing a board and the row_number that places one player inside it
- * say the same thing. Kayrem hit both halves of that, a 24 miss run taking a
- * 21 miss run's place and the number beside a score disagreeing with where
- * it was drawn, so neither is left to a reading.
+ * That the SQL orders a board by the misscount, and that listing a board
+ * and the row_number placing one player in it say the same thing.
  *
- * Nothing here connects to anything. postgres.js opens a socket on the first
- * query it is asked to run, and toSQL only renders one.
+ * Nothing here connects: toSQL renders a query without running it.
  */
 import test from "node:test";
 import assert from "node:assert/strict";

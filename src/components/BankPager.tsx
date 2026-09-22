@@ -1,15 +1,9 @@
 import Link from "next/link";
 
 /**
- * Numbered paging for the bank.
- *
- * Plain links rather than a client control, so the page sits in the URL like
- * every filter does: a view stays shareable, the back button walks back
- * through the pages, and Next prefetches the neighbours.
- *
- * `query` is the current filters already serialised, without a page, so
- * paging never drops a filter and page one never carries a redundant
- * `?page=1`.
+ * Numbered paging for the bank, as plain links, so the page sits in the URL
+ * like every filter does. `query` is the current filters already
+ * serialised without a page, so paging never drops one.
  */
 export function BankPager({
   basePath = "/maps",
