@@ -11,7 +11,8 @@ import { auth, requireAdmin, requireStaff } from "@/lib/auth";
 import {
   fetchBeatmaps, fetchStarRating, fetchUser, type BeatmapFacts,
 } from "@/lib/osu/client";
-import { cooldownLeft, refreshEntryPlayers, syncUser } from "@/lib/osu/sync";
+import { backfillScore, cooldownLeft, refreshEntryPlayers, syncUser } from "@/lib/osu/sync";
+import { parseScoreLink } from "@/lib/osu/backfill";
 import { modAcronyms, normalizeMod } from "@/lib/mods";
 import {
   CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
@@ -20,7 +21,7 @@ import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
 } from "@/lib/import/parse";
-import { describeScores, entryName, getExistingEntryKeys } from "@/lib/queries";
+import { describeScores, entryName, getExistingEntryKeys, gradeText } from "@/lib/queries";
 import { announceEntries } from "@/lib/discord";
 
 async function record(
@@ -618,5 +619,37 @@ export async function syncMyScores(): Promise<SyncSummary> {
   return {
     playsSeen: result.playsSeen,
     imported: lines.map((s) => entryName(s) + " · " + s.grade),
+  };
+}
+
+/* ------------------------------------------------------------ backfill */
+
+export type BackfillSummary = {
+  error?: string;
+  /** "Title [Diff] +DT · A (2 misses)" for the score that was kept. */
+  added?: string;
+  /** True when it replaced a worse score of theirs on the same map. */
+  improved?: boolean;
+};
+
+/** Adds one of the signed in player's own scores from its osu! link. */
+export async function addScoreByLink(link: string): Promise<BackfillSummary> {
+  const session = await auth();
+  if (!session?.userId) return { error: "Sign in first." };
+
+  const ref = parseScoreLink(String(link ?? "").slice(0, 300));
+  if (!ref) {
+    return { error: "That isn't a score link. It looks like https://osu.ppy.sh/scores/7534121696." };
+  }
+  if (ref.ruleset && ref.ruleset !== "osu") return { error: "Only osu!standard scores count." };
+
+  const result = await backfillScore(session.userId, session.osuUserId, ref);
+  if (!result.ok) return { error: result.error };
+  revalidatePath("/me");
+
+  const [line] = await describeScores([result.imported]);
+  return {
+    added: line ? entryName(line) + " · " + gradeText(line) : "the score",
+    improved: result.improved,
   };
 }

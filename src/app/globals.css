@@ -1470,6 +1470,15 @@ a.pager-page:hover, a.pager-step:hover {
   display: grid; gap: 28px; align-items: start;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 620px), 1fr));
 }
+
+/* The score link box on the owner's profile. */
+.backfill { display: flex; flex-direction: column; gap: 8px; max-width: 680px; }
+.backfill-row { display: flex; gap: 8px; }
+.backfill-row input { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: var(--font-size-mono); }
+.backfill-msg { font-size: var(--font-size-small); color: var(--danger); }
+.backfill-msg[data-ok="true"] { color: var(--success); }
+@media (max-width: 560px) { .backfill-row { flex-direction: column; } }
+
 .plays { display: flex; flex-direction: column; gap: 8px; }
 .play {
   position: relative; overflow: hidden;

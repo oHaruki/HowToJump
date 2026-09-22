@@ -4,12 +4,15 @@ import {
   beatmaps, entries, scores, siteConfig, syncRuns, userLevels, userTierProgress, users,
 } from "@/lib/schema";
 import { MAIN_LEVEL, categoryLevels, levelRules, mainLevel, totalExp } from "@/lib/levels";
-import { fetchPlayCounts, fetchRecentPlays, type PlayFacts } from "@/lib/osu/client";
+import {
+  fetchPlayCounts, fetchRecentPlays, fetchScore, toPlay, type OsuScore, type PlayFacts,
+} from "@/lib/osu/client";
 import { compareResults, gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
 import { normalizeMod } from "@/lib/mods";
 import { announceRecords, announceScores, type RecordTaken } from "@/lib/discord";
 import { getEntryLeader, getTopRanked } from "@/lib/queries";
 import { planPass, type SyncReason } from "@/lib/osu/plan";
+import { backfillProblem, type ScoreRef } from "@/lib/osu/backfill";
 
 /**
  * Pulls a player's recent plays and keeps anything landing on a bank entry.
@@ -118,6 +121,46 @@ async function upsertScore(
 
   await db.update(scores).set(values).where(eq(scores.id, existing.id));
   return grade;
+}
+
+/**
+ * Keeps a play if it beats what the player has on its entry, with the map's
+ * first place when it takes it.
+ */
+async function keepPlay(
+  userId: number,
+  entry: EntryRow,
+  play: PlayFacts,
+): Promise<{ imported: ImportedScore; record: RecordTaken | null } | null> {
+  // Read before the write, so the place the score took is the one it took.
+  const held = await getEntryLeader(entry.id);
+  const grade = await upsertScore(userId, entry, play);
+  if (!grade) return null;
+
+  const imported = {
+    entryId: entry.id, grade, missCount: play.missCount, accuracy: play.accuracy,
+  };
+  const took = held?.userId !== userId && (await getEntryLeader(entry.id))?.userId === userId;
+  return {
+    imported,
+    record: took ? { kind: "map", ...imported, previous: held?.username ?? null } : null,
+  };
+}
+
+/** Recomputes a player's levels, with the overall first place when they take it. */
+async function refreshWithTop(userId: number): Promise<RecordTaken | null> {
+  const before = await getTopRanked(MAIN_LEVEL);
+  await refreshProgress(userId);
+  if (before?.userId === userId) return null;
+  const after = await getTopRanked(MAIN_LEVEL);
+  if (after?.userId !== userId) return null;
+  return {
+    kind: "overall",
+    exp: after.exp,
+    tierOrder: after.tierOrder,
+    progress: after.progress,
+    previous: before?.username ?? null,
+  };
 }
 
 /**
@@ -302,43 +345,17 @@ export async function syncUser(
       if (!entry) continue;
       result.playsMatched += 1;
 
-      // Read before the write, so the place the score took is the one it took.
-      const held = await getEntryLeader(entry.id);
-      const grade = await upsertScore(userId, entry, play);
-      if (!grade) continue;
+      const kept = await keepPlay(userId, entry, play);
+      if (!kept) continue;
       result.scoresImported += 1;
-      result.imported.push({
-        entryId: entry.id, grade, missCount: play.missCount, accuracy: play.accuracy,
-      });
-
-      if (held?.userId !== userId && (await getEntryLeader(entry.id))?.userId === userId) {
-        result.records.push({
-          kind: "map",
-          entryId: entry.id,
-          grade,
-          missCount: play.missCount,
-          accuracy: play.accuracy,
-          previous: held?.username ?? null,
-        });
-      }
+      result.imported.push(kept.imported);
+      if (kept.record) result.records.push(kept.record);
     }
     result.latestPlayAt = latest;
 
     if (result.scoresImported > 0) {
-      const topBefore = await getTopRanked(MAIN_LEVEL);
-      await refreshProgress(userId);
-      if (topBefore?.userId !== userId) {
-        const topAfter = await getTopRanked(MAIN_LEVEL);
-        if (topAfter?.userId === userId) {
-          result.records.push({
-            kind: "overall",
-            exp: topAfter.exp,
-            tierOrder: topAfter.tierOrder,
-            progress: topAfter.progress,
-            previous: topBefore?.username ?? null,
-          });
-        }
-      }
+      const top = await refreshWithTop(userId);
+      if (top) result.records.push(top);
     }
 
     await db
@@ -369,6 +386,82 @@ export async function syncUser(
       .where(eq(syncRuns.id, run.id));
     return result;
   }
+}
+
+/* --------------------------------------------------------- one score by link */
+
+export type BackfillResult =
+  | { ok: true; imported: ImportedScore; improved: boolean }
+  | { ok: false; error: string };
+
+const modText = (mod: string) => (mod === "NM" ? "nomod" : "+" + mod);
+
+/** "nomod", "nomod and +HR", "nomod, +HR and +DT". */
+const modList = (mods: string[]) =>
+  mods.length < 2
+    ? mods.map(modText).join("")
+    : mods.slice(0, -1).map(modText).join(", ") + " and " + modText(mods[mods.length - 1]);
+
+/**
+ * Adds one of the player's own scores by its osu! ID. It is kept like a
+ * synced play: their pass, on a listed entry, under that entry's mods.
+ */
+export async function backfillScore(
+  userId: number,
+  osuUserId: number,
+  ref: ScoreRef,
+): Promise<BackfillResult> {
+  const [me] = await db
+    .select({ syncEnabled: users.syncEnabled, bannedAt: users.bannedAt })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!me || !me.syncEnabled || me.bannedAt) {
+    return { ok: false, error: "Your scores aren't being tracked, so none can be added." };
+  }
+
+  let score: OsuScore | null;
+  try {
+    score = await fetchScore(ref);
+  } catch {
+    return { ok: false, error: "osu! didn't answer. Try again in a minute." };
+  }
+  if (!score) return { ok: false, error: "osu! has no score with that ID." };
+  const problem = backfillProblem(score, osuUserId);
+  if (problem) return { ok: false, error: problem };
+
+  const play = toPlay(score);
+  const banked = await db
+    .select({
+      id: entries.id,
+      mod: entries.mod,
+      tierOrder: entries.tierOrder,
+      osuBeatmapId: beatmaps.osuBeatmapId,
+    })
+    .from(entries)
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .where(and(eq(beatmaps.osuBeatmapId, play.osuBeatmapId), eq(entries.isActive, true)));
+  if (!banked.length) return { ok: false, error: "That map isn't in the bank." };
+  const entry = banked.find((e) => normalizeMod(e.mod) === play.mods);
+  if (!entry) {
+    return {
+      ok: false,
+      error:
+        "That map is in the bank as " + modList(banked.map((e) => normalizeMod(e.mod))) +
+        ", but this score is " + modText(play.mods) + ".",
+    };
+  }
+
+  const had = await db.query.scores.findFirst({
+    where: and(eq(scores.userId, userId), eq(scores.entryId, entry.id)),
+    columns: { id: true },
+  });
+  const kept = await keepPlay(userId, entry, play);
+  if (!kept) return { ok: false, error: "Your score on this map is already as good or better." };
+
+  const top = await refreshWithTop(userId);
+  const records = [kept.record, top].filter((r): r is RecordTaken => r != null);
+  if (records.length) await announceRecords(userId, records);
+  return { ok: true, imported: kept.imported, improved: had != null };
 }
 
 /* ------------------------------------------------------------ the pass */

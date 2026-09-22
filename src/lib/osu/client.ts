@@ -256,6 +256,11 @@ type OsuScoreStatistics = {
 export type OsuScore = {
   id?: number;
   best_id?: number;
+  user_id?: number;
+  user?: { id: number };
+  /** 0 is osu!standard. Older replies say mode_int instead. */
+  ruleset_id?: number;
+  mode_int?: number;
   beatmap?: { id: number };
   beatmap_id?: number;
   accuracy: number;
@@ -324,6 +329,22 @@ export async function fetchRecentPlays(
     token,
   );
   return (rows ?? []).map(toPlay).filter((p) => p.osuBeatmapId > 0);
+}
+
+/**
+ * One score by its osu! ID, or null when osu! has none. An old style ID,
+ * from a /scores/osu/<id> link, is looked up under its ruleset.
+ */
+export async function fetchScore(ref: {
+  id: number;
+  ruleset: string | null;
+}): Promise<OsuScore | null> {
+  try {
+    return await apiGet<OsuScore>("/scores/" + (ref.ruleset ? ref.ruleset + "/" : "") + ref.id);
+  } catch (err) {
+    if (err instanceof NotFound) return null;
+    throw err;
+  }
 }
 
 type OsuUserWithStats = {

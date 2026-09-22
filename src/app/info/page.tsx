@@ -163,6 +163,10 @@ export default function InfoPage() {
                 minute. In a hurry? Sync now on your page, or <code>/rs</code> in the
                 Discord, pulls it straight away.
               </p>
+              <p className="small">
+                Played a bank map before you connected, or one the site missed? Paste
+                the score&apos;s osu! link on your page and it counts like any other.
+              </p>
             </div>
             <SyncFlow />
           </div>
@@ -187,7 +191,7 @@ export default function InfoPage() {
               <dt>Review</dt>
               <dd>Automatic</dd>
               <dt>History</dt>
-              <dd>Starts when you connect</dd>
+              <dd>From when you connect, plus older scores by link</dd>
               <dt>Takedowns</dt>
               <dd>Staff can hide any score</dd>
             </dl>
