@@ -2,7 +2,7 @@
 # than the bundled Caddy. The app is published on loopback only and nothing
 # here binds 80 or 443, so other sites on the box are untouched.
 #
-#   docker compose up -d --build     # postgres, migrate, app, worker
+#   docker compose up -d --build     # postgres, migrate, discord, app, worker
 #
 # To use the bundled Caddy instead, on a host with 80 and 443 free:
 #

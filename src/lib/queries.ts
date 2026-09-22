@@ -270,6 +270,18 @@ export async function getRecentEntries(limit = 4): Promise<BankRow[]> {
   return shape(rows);
 }
 
+/** Some entries by their IDs, in the bank's own order. */
+export async function getEntriesByIds(ids: number[]): Promise<BankRow[]> {
+  if (!ids.length) return [];
+  const rows = await db
+    .select(bankSelection)
+    .from(entries)
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .where(inArray(entries.id, ids))
+    .orderBy(...bankOrder);
+  return shape(rows);
+}
+
 /** Every entry key already on the ladder, so the importer can spot repeats. */
 export async function getExistingEntryKeys(): Promise<Set<string>> {
   const rows = await db
@@ -378,11 +390,17 @@ export type ProfilePlay = Awaited<ReturnType<typeof getProfilePlays>>[number];
 
 export type ScoreLine = {
   entryId: number;
+  osuBeatmapId: number;
+  osuBeatmapsetId: number | null;
+  artist: string | null;
   title: string;
   version: string | null;
+  mapper: string | null;
   mod: string;
   tierOrder: number;
   categories: string[];
+  stars: number | null;
+  noteCount: number | null;
   grade: string;
   missCount: number;
 };
@@ -395,11 +413,17 @@ export async function describeScores(
   const rows = await db
     .select({
       entryId: entries.id,
+      osuBeatmapId: beatmaps.osuBeatmapId,
+      osuBeatmapsetId: beatmaps.osuBeatmapsetId,
+      artist: beatmaps.artist,
       title: beatmaps.title,
       version: beatmaps.version,
+      mapper: beatmaps.mapper,
       mod: entries.mod,
       tierOrder: entries.tierOrder,
       categories: entries.categories,
+      stars: entries.stars,
+      noteCount: beatmaps.noteCount,
     })
     .from(entries)
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
@@ -515,6 +539,18 @@ export async function getEntryPlayerCount(entryId: number): Promise<number> {
     .innerJoin(users, eq(scores.userId, users.id))
     .where(onBoard(entryId));
   return row?.n ?? 0;
+}
+
+/** Whoever holds a map's first place, or null while nobody has a score. */
+export async function getEntryLeader(entryId: number): Promise<BoardScore | null> {
+  const [row] = await db
+    .select(boardScore)
+    .from(scores)
+    .innerJoin(users, eq(scores.userId, users.id))
+    .where(onBoard(entryId))
+    .orderBy(boardOrder)
+    .limit(1);
+  return row ? { ...row, rank: 1 } : null;
 }
 
 /**
@@ -634,6 +670,18 @@ export async function getRankOf(userId: number, scope: string): Promise<RankingR
     .as("ranked");
   const [row] = await db.select().from(ranked).where(eq(ranked.userId, userId));
   return (row as RankingRow | undefined) ?? null;
+}
+
+/** Whoever leads a scope, or null while nobody has EXP in it. */
+export async function getTopRanked(scope: string): Promise<RankingRow | null> {
+  const [row] = await db
+    .select(rankedPlayer)
+    .from(userLevels)
+    .innerJoin(users, eq(users.id, userLevels.userId))
+    .where(inRanking(scope))
+    .orderBy(desc(userLevels.exp), asc(users.id))
+    .limit(1);
+  return row ? { ...row, rank: 1 } : null;
 }
 
 export type PlayerTally = { clears: number; fcs: number; sss: number; ss: number; s: number };

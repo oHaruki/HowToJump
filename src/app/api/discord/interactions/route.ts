@@ -1,10 +1,10 @@
 import { after, NextResponse } from "next/server";
-import { sql as raw } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { users } from "@/lib/schema";
 import { cooldownLeft, syncUser } from "@/lib/osu/sync";
 import { describeScores } from "@/lib/queries";
-import { editReply, fitLines, md, scoreLine, verifyInteraction } from "@/lib/discord";
+import {
+  editReply, findPlayer, md, profileReply, scoresMessage, unknownPlayer, verifyInteraction,
+  type Message,
+} from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +41,34 @@ function rsAllowed(now = Date.now()): boolean {
   return true;
 }
 
+function option(interaction: Interaction, name: string): string {
+  return String(interaction.data?.options?.find((o) => o.name === name)?.value ?? "").trim();
+}
+
+function reply(content: string) {
+  return NextResponse.json({ type: MESSAGE, data: { content, flags: EPHEMERAL } });
+}
+
+/**
+ * Answers "thinking" at once and edits the reply once the work is done. A
+ * command has three seconds to answer, which a sync can outlast.
+ */
+function deferred(token: string, work: () => Promise<Message>) {
+  after(async () => {
+    const message = await work().catch(
+      (e): Message => ({
+        content: "Something went wrong: " + (e instanceof Error ? e.message : String(e)),
+      }),
+    );
+    await editReply(token, message);
+  });
+  return NextResponse.json({ type: DEFERRED_MESSAGE });
+}
+
 /**
  * Discord's interactions endpoint. Every request is signed and anything that
  * fails the check is refused; Discord tests exactly that with a bad signature
  * when the URL is saved in the developer portal.
- *
- * /rs has three seconds to answer and a sync can take longer, so it answers
- * "thinking" at once and edits the reply when the sync is done.
  */
 export async function POST(req: Request) {
   const body = await req.text();
@@ -60,62 +81,42 @@ export async function POST(req: Request) {
 
   const interaction = JSON.parse(body) as Interaction;
   if (interaction.type === PING) return NextResponse.json({ type: PONG });
+  if (interaction.type !== APPLICATION_COMMAND) return reply("Unknown command.");
 
-  if (interaction.type === APPLICATION_COMMAND && interaction.data?.name === "rs") {
-    if (!rsAllowed()) {
-      return NextResponse.json({
-        type: MESSAGE,
-        data: { content: "Lots of /rs right now. Try again in a minute.", flags: EPHEMERAL },
-      });
-    }
-    const player = String(
-      interaction.data.options?.find((o) => o.name === "player")?.value ?? "",
-    ).trim();
-    after(async () => {
-      const text = await recentScoresReply(player).catch(
-        (e) => "Something went wrong: " + (e instanceof Error ? e.message : String(e)),
-      );
-      await editReply(interaction.token, text);
-    });
-    return NextResponse.json({ type: DEFERRED_MESSAGE });
+  const player = option(interaction, "player");
+
+  if (interaction.data?.name === "rs") {
+    if (!rsAllowed()) return reply("Lots of /rs right now. Try again in a minute.");
+    return deferred(interaction.token, () => recentScoresReply(player));
   }
 
-  return NextResponse.json({
-    type: MESSAGE,
-    data: { content: "Unknown command.", flags: EPHEMERAL },
-  });
+  if (interaction.data?.name === "profile") {
+    return deferred(interaction.token, () => profileReply(player));
+  }
+
+  return reply("Unknown command.");
 }
 
-async function recentScoresReply(name: string): Promise<string> {
-  if (!name) return "Give an osu! name: `/rs player:<name>`";
+async function recentScoresReply(name: string): Promise<Message> {
+  if (!name) return { content: "Give an osu! name: `/rs player:<name>`" };
 
-  // Exact match ignoring case. ilike would treat the underscores common in
-  // osu! names as wildcards.
-  const [user] = await db
-    .select({
-      id: users.id,
-      osuUserId: users.osuUserId,
-      username: users.username,
-      lastSyncedAt: users.lastSyncedAt,
-      syncEnabled: users.syncEnabled,
-      bannedAt: users.bannedAt,
-    })
-    .from(users)
-    .where(raw`lower(${users.username}) = lower(${name})`)
-    .limit(1);
+  const user = await findPlayer(name);
+  if (!user) return { content: unknownPlayer(name) };
 
-  if (!user) return "**" + md(name) + "** hasn't connected their osu! account on the site yet.";
   const who = "**" + md(user.username) + "**";
-  if (!user.syncEnabled || user.bannedAt) return who + " isn't being tracked.";
+  if (!user.syncEnabled || user.bannedAt) return { content: who + " isn't being tracked." };
 
   const wait = cooldownLeft(user.lastSyncedAt);
-  if (wait > 0) return who + " was synced moments ago. Try again in " + wait + "s.";
+  if (wait > 0) {
+    return { content: who + " was synced moments ago. Try again in " + wait + "s." };
+  }
 
   const r = await syncUser(user.id, user.osuUserId);
-  if (r.error) return "Couldn't read " + who + "'s plays from osu!: " + r.error;
+  if (r.error) return { content: "Couldn't read " + who + "'s plays from osu!: " + r.error };
   if (!r.imported.length) {
-    return "Nothing new from the bank in " + who + "'s last " + r.playsSeen + " plays.";
+    return {
+      content: "Nothing new from the bank in " + who + "'s last " + r.playsSeen + " plays.",
+    };
   }
-  const lines = await describeScores(r.imported);
-  return fitLines(["Imported for " + who + ":", ...lines.map(scoreLine)]);
+  return scoresMessage(user, await describeScores(r.imported));
 }

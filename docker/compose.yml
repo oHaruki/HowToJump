@@ -46,6 +46,21 @@ services:
       OSU_CLIENT_SECRET: ${OSU_CLIENT_SECRET}
     command: npm run db:deploy
 
+  # Registers the slash commands on every `up`, so a new or changed command
+  # needs no step of its own. Quiet unless the Discord settings are set, and
+  # nothing depends on it, so a refusal from Discord cannot hold the site back.
+  discord:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: builder
+    restart: "no"
+    environment:
+      DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+    command: npm run discord:commands
+
   app:
     build:
       context: ..
@@ -67,7 +82,10 @@ services:
       SYNC_TOKEN: ${SYNC_TOKEN}
       DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID:-}
       DISCORD_PUBLIC_KEY: ${DISCORD_PUBLIC_KEY:-}
-      DISCORD_SCORES_WEBHOOK_URL: ${DISCORD_SCORES_WEBHOOK_URL:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_SCORES_CHANNEL_ID: ${DISCORD_SCORES_CHANNEL_ID:-}
+      DISCORD_RECORDS_CHANNEL_ID: ${DISCORD_RECORDS_CHANNEL_ID:-}
+      DISCORD_MAPS_CHANNEL_ID: ${DISCORD_MAPS_CHANNEL_ID:-}
     expose:
       - "3000"
 

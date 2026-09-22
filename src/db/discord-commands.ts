@@ -1,20 +1,32 @@
 /**
- * Registers the /rs command with the Discord server. Guild commands show up
- * straight away, where global ones can take an hour, so it targets one guild.
- * Re-running it replaces the set, so it is safe to run after any change.
+ * Registers the slash commands with the Discord server. Guild commands show
+ * up straight away, where global ones can take an hour, so it targets one
+ * guild. Re-running it replaces the set, so every deploy runs it and a
+ * changed command needs no step of its own.
  *
  * Usage: npm run discord:commands
  */
 import "./env";
+
+const player = {
+  type: 3,
+  name: "player",
+  description: "Their osu! username",
+  required: true,
+};
 
 const commands = [
   {
     name: "rs",
     description: "Pull a player's recent plays in now",
     type: 1,
-    options: [
-      { type: 3, name: "player", description: "Their osu! username", required: true },
-    ],
+    options: [player],
+  },
+  {
+    name: "profile",
+    description: "A player's levels, tallies and best play",
+    type: 1,
+    options: [player],
   },
 ];
 
@@ -23,7 +35,16 @@ async function main() {
   const guild = process.env.DISCORD_GUILD_ID;
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!app || !guild || !token) {
-    throw new Error("DISCORD_APPLICATION_ID, DISCORD_GUILD_ID and DISCORD_BOT_TOKEN must be set");
+    // Runs on every deploy, so a server without Discord says so and moves on.
+    const missing = Object.entries({
+      DISCORD_APPLICATION_ID: app,
+      DISCORD_GUILD_ID: guild,
+      DISCORD_BOT_TOKEN: token,
+    })
+      .filter(([, value]) => !value)
+      .map(([key]) => key);
+    console.log("not registering: " + missing.join(", ") + " not set");
+    return;
   }
 
   const res = await fetch(
@@ -35,7 +56,7 @@ async function main() {
     },
   );
   if (!res.ok) throw new Error("Discord said " + res.status + ": " + (await res.text()));
-  console.log("registered /rs in guild " + guild);
+  console.log("registered " + commands.map((c) => "/" + c.name).join(", ") + " in guild " + guild);
 }
 
 main().catch((e) => {

@@ -7,7 +7,8 @@ import { MAIN_LEVEL, categoryLevels, levelRules, mainLevel, totalExp } from "@/l
 import { fetchPlayCounts, fetchRecentPlays, type PlayFacts } from "@/lib/osu/client";
 import { compareResults, gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
 import { normalizeMod } from "@/lib/mods";
-import { announceScores } from "@/lib/discord";
+import { announceRecords, announceScores, type RecordTaken } from "@/lib/discord";
+import { getEntryLeader, getTopRanked } from "@/lib/queries";
 import { planPass, type SyncReason } from "@/lib/osu/plan";
 
 /**
@@ -27,6 +28,8 @@ export type SyncResult = {
   scoresImported: number;
   /** What was kept, so a button or a bot can say which maps moved. */
   imported: ImportedScore[];
+  /** First places this sync took, overall and on a map. */
+  records: RecordTaken[];
   /** Newest play in the fetch, fails included. */
   latestPlayAt: Date | null;
   error?: string;
@@ -278,6 +281,7 @@ export async function syncUser(
     playsMatched: 0,
     scoresImported: 0,
     imported: [],
+    records: [],
     latestPlayAt: null,
   };
 
@@ -295,15 +299,42 @@ export async function syncUser(
       const entry = index.get(play.osuBeatmapId + "|" + play.mods);
       if (!entry) continue;
       result.playsMatched += 1;
+
+      // Read before the write, so the place the score took is the one it took.
+      const held = await getEntryLeader(entry.id);
       const grade = await upsertScore(userId, entry, play);
-      if (grade) {
-        result.scoresImported += 1;
-        result.imported.push({ entryId: entry.id, grade, missCount: play.missCount });
+      if (!grade) continue;
+      result.scoresImported += 1;
+      result.imported.push({ entryId: entry.id, grade, missCount: play.missCount });
+
+      if (held?.userId !== userId && (await getEntryLeader(entry.id))?.userId === userId) {
+        result.records.push({
+          kind: "map",
+          entryId: entry.id,
+          grade,
+          missCount: play.missCount,
+          previous: held?.username ?? null,
+        });
       }
     }
     result.latestPlayAt = latest;
 
-    if (result.scoresImported > 0) await refreshProgress(userId);
+    if (result.scoresImported > 0) {
+      const topBefore = await getTopRanked(MAIN_LEVEL);
+      await refreshProgress(userId);
+      if (topBefore?.userId !== userId) {
+        const topAfter = await getTopRanked(MAIN_LEVEL);
+        if (topAfter?.userId === userId) {
+          result.records.push({
+            kind: "overall",
+            exp: topAfter.exp,
+            tierOrder: topAfter.tierOrder,
+            progress: topAfter.progress,
+            previous: topBefore?.username ?? null,
+          });
+        }
+      }
+    }
 
     await db
       .update(users)
@@ -321,6 +352,7 @@ export async function syncUser(
       .where(eq(syncRuns.id, run.id));
 
     if (result.imported.length) await announceScores(userId, result.imported);
+    if (result.records.length) await announceRecords(userId, result.records);
 
     return result;
   } catch (err) {

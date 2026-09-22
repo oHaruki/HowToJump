@@ -21,6 +21,7 @@ import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
 } from "@/lib/import/parse";
 import { describeScores, entryName, getExistingEntryKeys } from "@/lib/queries";
+import { announceEntries } from "@/lib/discord";
 
 async function record(
   actorId: number | undefined,
@@ -306,6 +307,7 @@ export async function approveSuggestions(ids: number[]) {
 
   const rows = await db.select().from(suggestions).where(inArray(suggestions.id, ids));
   let approved = 0;
+  const added: number[] = [];
 
   for (const s of rows) {
     if (s.status !== "pending") continue;
@@ -313,7 +315,7 @@ export async function approveSuggestions(ids: number[]) {
     if (!s.proposedTierOrder) continue;
 
     const beatmapRowId = await ensureBeatmap(s.osuBeatmapId);
-    await db
+    const [created] = await db
       .insert(entries)
       .values({
         beatmapId: beatmapRowId,
@@ -335,7 +337,9 @@ export async function approveSuggestions(ids: number[]) {
         judgedById: admin.id,
         judgedByName: admin.name ?? null,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: entries.id });
+    if (created) added.push(created.id);
 
     await db
       .update(suggestions)
@@ -348,6 +352,7 @@ export async function approveSuggestions(ids: number[]) {
     ids,
     approved,
   });
+  await announceEntries(added);
   revalidatePath("/staff");
   revalidatePath("/staff/queue");
   revalidatePath("/maps");
