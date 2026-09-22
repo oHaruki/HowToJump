@@ -17,6 +17,7 @@
     "seed:examples": "tsx src/db/seed-examples.ts",
     "sync": "tsx src/db/sync-cli.ts",
     "discord:commands": "tsx src/db/discord-commands.ts",
+    "discord:presence": "tsx src/db/discord-presence.ts",
     "levels:rebuild": "tsx src/db/rebuild-levels.ts",
     "test": "node --import tsx --test src/**/*.test.ts",
     "build:check": "cross-env NEXT_DIST_DIR=.next-check next build"
