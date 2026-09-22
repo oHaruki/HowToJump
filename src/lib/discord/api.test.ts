@@ -7,7 +7,7 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 
-const { postChannel } = await import("./api");
+const { editReply, postChannel } = await import("./api");
 
 type Call = { url: string; init: RequestInit };
 
@@ -69,4 +69,28 @@ test("a channel the bot cannot post in is logged rather than thrown", async (t) 
 
   assert.equal(logged.length, 1);
   assert.match(logged[0], /403/);
+});
+
+test("a reply Discord refuses is logged rather than lost", async (t) => {
+  process.env.DISCORD_APPLICATION_ID = "app";
+  capture(t, 401);
+  const logged: string[] = [];
+  t.mock.method(console, "error", (...a: unknown[]) => void logged.push(String(a[0])));
+
+  await editReply("tok", { content: "x" });
+
+  assert.equal(logged.length, 1);
+  assert.match(logged[0], /401/);
+});
+
+test("a reply goes to the interaction's own webhook, unsigned", async (t) => {
+  process.env.DISCORD_APPLICATION_ID = "app";
+  const calls = capture(t);
+
+  await editReply("tok", { content: "x" });
+
+  assert.equal(calls[0].url, "https://discord.com/api/v10/webhooks/app/tok/messages/@original");
+  assert.equal(calls[0].init.method, "PATCH");
+  // The interaction token in the URL is the credential; the bot token is not.
+  assert.equal((calls[0].init.headers as Record<string, string>).Authorization, undefined);
 });

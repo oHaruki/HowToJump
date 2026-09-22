@@ -144,14 +144,35 @@ function chunks(message: Message): Message[] {
   return out;
 }
 
-/** Replaces the "thinking" placeholder Discord shows after a deferred reply. */
+/**
+ * Replaces the "thinking" placeholder Discord shows after a deferred reply.
+ * A refusal is logged: fetch reads one as an answer, and an answer nobody
+ * checks leaves the command thinking for good with nothing said anywhere.
+ */
 export async function editReply(interactionToken: string, message: Message): Promise<void> {
   const app = process.env.DISCORD_APPLICATION_ID;
-  if (!app) return;
+  if (!app) {
+    console.error("discord: no reply sent, DISCORD_APPLICATION_ID is not set");
+    return;
+  }
   const hook = API + "/webhooks/" + app + "/" + interactionToken;
   const [first, ...rest] = chunks(message);
-  await send(hook + "/messages/@original", "PATCH", first);
-  for (const more of rest) await send(hook, "POST", more);
+  try {
+    const res = await send(hook + "/messages/@original", "PATCH", first);
+    if (!res.ok) {
+      console.error("discord: reply said " + res.status + ": " + (await res.text()));
+      return;
+    }
+    for (const more of rest) {
+      const follow = await send(hook, "POST", more);
+      if (!follow.ok) {
+        console.error("discord: follow-up said " + follow.status + ": " + (await follow.text()));
+        return;
+      }
+    }
+  } catch (e) {
+    console.error("discord: reply failed: " + (e instanceof Error ? e.message : String(e)));
+  }
 }
 
 /**
