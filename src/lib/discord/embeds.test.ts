@@ -31,10 +31,11 @@ const score = (over: Partial<ScoreLine> = {}): ScoreLine => ({
   noteCount: 1000,
   grade: "S",
   missCount: 0,
+  accuracy: null,
   ...over,
 });
 
-const row = (over: Partial<BankRow> = {}): BankRow => ({
+const row =(over: Partial<BankRow> = {}): BankRow => ({
   entryId: 1,
   osuBeatmapId: 100,
   osuBeatmapsetId: 200,

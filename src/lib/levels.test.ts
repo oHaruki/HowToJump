@@ -11,7 +11,7 @@ import {
   mainLevel, playExp, progressText, threshold, totalExp, type Level, type LevelPlay,
 } from "./levels";
 import {
-  GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE,
+  ACC_EXPONENT, GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE,
   MISS_SLOPE, REFERENCE_NOTES, THRESHOLD_MISSES, gradeFor,
 } from "./grading";
 import { CATEGORIES, TIERS, tierByName } from "./tiers";
@@ -20,7 +20,7 @@ const order = (name: string) => tierByName(name)!.order;
 const RAW = "Aim - raw mechanic";
 const CONSISTENCY = "Aim - consistency";
 /* A play carries the misscount its grade starts at. No note count, so
-   misses count as they are. */
+   misses count as they are, and no accuracy, so nothing is won back. */
 const missesFor = (grade: string) => GRADE_RULES.find((g) => g.grade === grade)?.minMiss ?? 0;
 const play = (pack: string, grade: string, ...categories: string[]): LevelPlay => ({
   tierOrder: order(pack),
@@ -28,6 +28,7 @@ const play = (pack: string, grade: string, ...categories: string[]): LevelPlay =
   grade,
   missCount: missesFor(grade),
   noteCount: null,
+  accuracy: null,
 });
 const fcs = (pack: string, n: number) => Array.from({ length: n }, () => play(pack, "SS"));
 
@@ -128,19 +129,23 @@ test("adding a play never lowers a level", () => {
 });
 
 test("plays worth the same EXP are ordered and numbered the same way", () => {
-  // Six on a 1,500 note map and eight on a 3,000 note one both count as
-  // six, so they are worth the same. The cleaner real misscount leads.
-  const six: LevelPlay & { id: number } =
-    { id: 40, tierOrder: order("Emerald"), categories: [RAW], grade: "B", missCount: 6, noteCount: 1500 };
-  const eight: LevelPlay & { id: number } =
-    { id: 12, tierOrder: order("Emerald"), categories: [RAW], grade: "B-", missCount: 8, noteCount: 3000 };
-  const exp = (p: LevelPlay) => playExp(p.tierOrder, p.grade, p.missCount, p.noteCount);
-  assert.equal(exp(six), exp(eight));
+  // Three on a 375 note map and six on a 1,500 note one both count as six,
+  // so they are worth the same. The cleaner real misscount leads.
+  const three: LevelPlay & { id: number } = {
+    id: 40, tierOrder: order("Emerald"), categories: [RAW], grade: "A-", missCount: 3, noteCount: 375,
+    accuracy: null,
+  };
+  const six: LevelPlay & { id: number } = {
+    id: 12, tierOrder: order("Emerald"), categories: [RAW], grade: "B", missCount: 6, noteCount: 1500,
+    accuracy: null,
+  };
+  const exp = (p: LevelPlay) => playExp(p.tierOrder, p.grade, p.missCount, p.noteCount, p.accuracy);
+  assert.equal(exp(three), exp(six));
 
-  const listed = [eight, six].map((p) => ({ ...p, exp: exp(p) })).sort(byWorth);
+  const listed = [six, three].map((p) => ({ ...p, exp: exp(p) })).sort(byWorth);
   assert.deepEqual(listed.map((p) => p.id), [40, 12]);
 
-  const places = countingPlaces([eight, six]);
+  const places = countingPlaces([six, three]);
   assert.deepEqual(places.get(40), [{ category: RAW, place: 1 }]);
   assert.deepEqual(places.get(12), [{ category: RAW, place: 2 }]);
 });
@@ -239,9 +244,9 @@ test("a play pushed out of one category still counts toward the total through an
 
 test("misses cost EXP by map size, while the pack's bar stays put", () => {
   // Amethyst, one miss: a 30 second map counts it about three times.
-  assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 150)), 674_195); // counts as 3
+  assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 150)), 664_423); // counts as 3.16
   assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 1500)), 833_927);
-  assert.equal(playExp(order("Amethyst"), "A", 2, 3000), 742_500); // forgives a fifth
+  assert.equal(Math.round(playExp(order("Amethyst"), "A", 2, 3000)), 775_232); // counts as 1.6
   // Full combos and 100% runs are never scaled.
   assert.equal(playExp(order("Amethyst"), "SS", 0, 150), 990_000);
   assert.equal(playExp(order("Amethyst"), "SSS", 0, 150), 1_188_000);
@@ -250,9 +255,32 @@ test("misses cost EXP by map size, while the pack's bar stays put", () => {
 
   const short: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 150 };
   const long: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 1500 };
-  // 2 misses on 150 notes count as 6, and six misses earn 53.2% of a pack.
-  assert.equal(Math.round(categoryLevels([short])[RAW].exp), 308_730);
+  // 2 misses on 150 notes count as 6.3, which earns 51.9% of a pack.
+  assert.equal(Math.round(categoryLevels([short])[RAW].exp), 301_141);
   assert.equal(categoryLevels([long])[RAW].exp, 435_000);
+});
+
+test("accuracy lifts a play, while the pack thresholds stay where they are", () => {
+  const emerald = order("Emerald");
+  assert.equal(playExp(emerald, "SS", 0, 1500), 580_000);
+  assert.equal(Math.round(playExp(emerald, "SS", 0, 1500, 97)), 633_209);
+  assert.equal(playExp(emerald, "SS", 0, 1500, 100), playExp(emerald, "SSS", 0));
+  assert.ok(playExp(emerald, "A", 2, 1500, 97) > playExp(emerald, "A", 2, 1500));
+  assert.equal(threshold(emerald), 4_350_000);
+
+  // The same play is counted the same way in a level as on its own.
+  const accurate: LevelPlay = { ...play("Emerald", "A"), noteCount: 1500, accuracy: 97 };
+  assert.equal(categoryLevels([accurate])[RAW].exp, playExp(emerald, "A", 2, 1500, 97));
+});
+
+test("ten full combos on the pack below never reach a pack, at any accuracy", () => {
+  for (const t of TIERS.slice(1)) {
+    const below = TIERS.find((x) => x.order === t.order - 1)!;
+    for (const accuracy of [95, 99, 99.99]) {
+      const fcsAt = Array.from({ length: 10 }, () => ({ ...play(below.name, "SS"), accuracy }));
+      assert.equal(levelFromExp(bestExp(fcsAt)).tierOrder, below.order);
+    }
+  }
 });
 
 /* ------------------------------------------ ordering a player's plays */
@@ -303,24 +331,25 @@ const graded = (
   grade: gradeFor({ missCount, isFc: false, isPerfect: false }),
   missCount,
   noteCount,
+  accuracy: null,
 });
 
-const expOf = (p: LevelPlay) => playExp(p.tierOrder, p.grade, p.missCount, p.noteCount);
+const expOf = (p: LevelPlay) => playExp(p.tierOrder, p.grade, p.missCount, p.noteCount, p.accuracy);
 const listed = (plays: Array<LevelPlay & { id: number }>) =>
   plays.map((p) => ({ ...p, exp: expOf(p) })).sort(byWorth);
 
 test("the screenshot case: tied EXP, and the cleaner run leads and is #1", () => {
-  // A tie is two plays whose misses count the same: six on a 1,500 note
-  // map, eight on a 3,000 note one. The eight is the older score.
-  const six = graded(40, "Emerald", 6, 1500);
-  const eight = graded(12, "Emerald", 8, 3000);
-  assert.equal(expOf(six), expOf(eight));
+  // A tie is two plays whose misses count the same: three on a 375 note
+  // map, six on a 1,500 note one. The six is the older score.
+  const three = graded(40, "Emerald", 3, 375);
+  const six = graded(12, "Emerald", 6, 1500);
+  assert.equal(expOf(three), expOf(six));
   // The grade letters differ, because a grade always reads the real misses.
+  assert.equal(three.grade, "A-");
   assert.equal(six.grade, "B");
-  assert.equal(eight.grade, "B-");
 
-  assert.deepEqual(listed([eight, six]).map((p) => p.id), [40, 12]);
-  const places = countingPlaces([eight, six]);
+  assert.deepEqual(listed([six, three]).map((p) => p.id), [40, 12]);
+  const places = countingPlaces([six, three]);
   assert.deepEqual(places.get(40), [{ category: RAW, place: 1 }]);
   assert.deepEqual(places.get(12), [{ category: RAW, place: 2 }]);
 });
@@ -361,23 +390,23 @@ test("however the plays fall, the list order and the printed places agree", () =
 });
 
 test("on a tie for the last counting place, the cleaner play takes it", () => {
-  // Eleven plays whose misses all count as six: five that really are six on
-  // a 1,500 note map, six that are eight on a 3,000 note one.
-  const six = [1, 2, 3, 4, 5].map((i) => graded(i, "Emerald", 6, 1500));
-  const eight = [6, 7, 8, 9, 10, 11].map((i) => graded(i, "Emerald", 8, 3000));
-  const all = [...six, ...eight];
+  // Eleven plays whose misses all count as six: five that really are three
+  // on a 375 note map, six that are six on a 1,500 note one.
+  const three = [1, 2, 3, 4, 5].map((i) => graded(i, "Emerald", 3, 375));
+  const six = [6, 7, 8, 9, 10, 11].map((i) => graded(i, "Emerald", 6, 1500));
+  const all = [...three, ...six];
   assert.equal(new Set(all.map(expOf)).size, 1, "they have to all be worth the same");
 
   const places = countingPlaces(all);
-  // The six miss runs take places 1 to 5, then the five oldest eight miss ones.
+  // The three miss runs take places 1 to 5, then the five oldest six miss ones.
   assert.deepEqual(
     all.filter((p) => places.has(p.id)).map((p) => p.id),
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
   );
-  assert.equal(places.has(11), false, "the newest eight miss run should be the one dropped");
+  assert.equal(places.has(11), false, "the newest six miss run should be the one dropped");
   assert.equal(
     Math.round(categoryLevels(all)[RAW].exp),
-    Math.round(BEST_PLAYS * expOf(six[0])),
+    Math.round(BEST_PLAYS * expOf(three[0])),
   );
 });
 
@@ -455,6 +484,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
     bestPlays: number;
     missShape: number[];
     missScaling: number[];
+    accuracy: number;
   };
   assert.equal(rules.grades.length, GRADE_RULES.length);
   for (const g of GRADE_RULES) {
@@ -467,6 +497,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
   // deploy that retunes one leaves everyone on the old figure.
   assert.deepEqual(rules.missShape, [MISS_KNEE, MISS_SLOPE, MISS_ACCEL, MISS_ACCEL_CAP, THRESHOLD_MISSES]);
   assert.deepEqual(rules.missScaling, [REFERENCE_NOTES, MISS_CURVE, MIN_MISS_FACTOR]);
+  assert.equal(rules.accuracy, ACC_EXPONENT);
 });
 
 test("sandbagging a pack is worth far less than playing the one you are on", () => {

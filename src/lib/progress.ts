@@ -89,6 +89,7 @@ export type PlayForProfile = {
   grade: string;
   missCount: number;
   noteCount: number | null;
+  accuracy: number | null;
   createdAt: Date;
   importedAt: Date;
 };
@@ -115,7 +116,7 @@ export function profileLists<T extends PlayForProfile>(
   const recent = plays.map((p) => ({
     ...p,
     id: p.scoreId,
-    exp: playExp(p.tierOrder, p.grade, p.missCount, p.noteCount),
+    exp: playExp(p.tierOrder, p.grade, p.missCount, p.noteCount, p.accuracy),
     places: places.get(p.scoreId) ?? [],
     fresh: freshness(p, seenAt),
   }));

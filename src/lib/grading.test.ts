@@ -8,8 +8,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_KNEE, MISS_SLOPE,
-  THRESHOLD_MISSES, THRESHOLD_SHARE, compareResults, expPercentFor, expShare, gradeFor,
-  missFactor, scaledMisses, shareForMisses,
+  THRESHOLD_MISSES, THRESHOLD_SHARE, accuracyCredit, compareResults, expPercentFor, expShare,
+  gradeFor, gradeRank, missFactor, scaledMisses, shareForMisses,
 } from "./grading";
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.01, a + " is not " + b);
@@ -44,14 +44,15 @@ test("a long map forgives a miss by a fifth at most, however long it runs", () =
   }
 });
 
-test("scaled misses round, and a miss never counts as none", () => {
+test("scaled misses keep their fraction, and a miss never counts as less than one", () => {
   assert.equal(scaledMisses(0, 150), 0);
-  assert.equal(scaledMisses(1, 150), 3);
-  assert.equal(scaledMisses(2, 150), 6);
+  near(scaledMisses(1, 150), 3.16);
+  near(scaledMisses(2, 150), 6.32);
+  assert.equal(scaledMisses(3, 375), 6);
   assert.equal(scaledMisses(2, 1500), 2);
   assert.equal(scaledMisses(1, 3000), 1);
-  assert.equal(scaledMisses(2, 3000), 2);
-  assert.equal(scaledMisses(3, 3000), 2);
+  near(scaledMisses(2, 3000), 1.6);
+  near(scaledMisses(3, 3000), 2.4);
   // A map long enough to hit the floor forgives a fifth, and no more.
   assert.equal(scaledMisses(30, 6000), 24);
   assert.equal(scaledMisses(30, 60_000), 24);
@@ -59,11 +60,11 @@ test("scaled misses round, and a miss never counts as none", () => {
 
 test("misses earn the share of what they count as", () => {
   const at = (m: number) => shareForMisses(m);
-  assert.equal(expShare("A+", 1, 150), at(3)); // counts as 3
-  assert.equal(expShare("A", 2, 150), at(6)); // counts as 6
-  assert.equal(expShare("A+", 1, 500), at(2)); // counts as 2
+  assert.equal(expShare("A+", 1, 150), at(Math.sqrt(10))); // counts as 3.16
+  assert.equal(expShare("A-", 3, 375), at(6)); // counts as 6
+  assert.equal(expShare("A+", 1, 500), at(Math.sqrt(3))); // counts as 1.73
   assert.equal(expShare("A+", 1, 1500), at(1)); // as it is
-  assert.equal(expShare("A", 2, 3000), at(2)); // a long map forgives a fifth
+  near(expShare("A", 2, 3000), at(1.6)); // a long map forgives a fifth
   assert.equal(expShare("A", 2, null), at(2)); // no count yet
   // Two misses on a 1,500 note map is the anchor every threshold reads.
   assert.equal(expShare("A", THRESHOLD_MISSES, 1500), THRESHOLD_SHARE);
@@ -255,7 +256,7 @@ test("the curve is anchored where the pack thresholds read it", () => {
   assert.ok(shareForMisses(150) < 0.01, "150 misses still earns " + shareForMisses(150) + "%");
 });
 
-test("the share beside a grade is the most that grade pays", () => {
+test("the share beside a grade is the most that grade pays before accuracy", () => {
   assert.equal(expPercentFor("SSS"), 120);
   assert.equal(expPercentFor("SS"), 100);
   assert.equal(expPercentFor("S"), 100);
@@ -268,6 +269,99 @@ test("the share beside a grade is the most that grade pays", () => {
   }
   // A label the team has dropped earns nothing rather than throwing.
   assert.equal(expPercentFor("Flow"), 0);
+});
+
+/* ------------------------------------------------ what accuracy wins back */
+
+test("accuracy wins back almost nothing below 90%, and most of a miss past 96%", () => {
+  assert.equal(accuracyCredit(null), 0);
+  assert.equal(accuracyCredit(Number.NaN), 0);
+  assert.equal(accuracyCredit(0), 0);
+  assert.equal(accuracyCredit(100), 1);
+  assert.equal(accuracyCredit(104), 1);
+  near(accuracyCredit(90), 0.08);
+  near(accuracyCredit(96), 0.375);
+  near(accuracyCredit(99), 0.786);
+
+  // Per point of accuracy, 96 to 100 is worth far more than 90 to 96, and
+  // that far more than anything below 90.
+  const rate = (from: number, to: number) => (accuracyCredit(to) - accuracyCredit(from)) / (to - from);
+  assert.ok(rate(96, 100) > 3 * rate(90, 96));
+  assert.ok(rate(90, 96) > 3 * rate(80, 90));
+
+  let last = -1;
+  for (let a = 0; a <= 100; a += 0.25) {
+    assert.ok(accuracyCredit(a) > last || accuracyCredit(a) === 0, "credit fell at " + a + "%");
+    last = accuracyCredit(a);
+  }
+});
+
+test("a full combo climbs to the 100% run's share, and only reaches it at 100%", () => {
+  assert.equal(expShare("SS", 0, 1500), 100);
+  assert.equal(expShare("SS", 0, 1500, null), 100);
+  near(expShare("SS", 0, 1500, 97), 109.17);
+  near(expShare("SS", 0, 1500, 100), 120);
+  assert.ok(expShare("SS", 0, 1500, 99.99) < 120);
+  // Map length never touches a full combo.
+  assert.equal(expShare("SS", 0, 150, 97), expShare("SS", 0, 3000, 97));
+  // A clean pass that dropped the combo has nothing to win back.
+  assert.equal(expShare("S", 0, 1500, 99.5), 100);
+});
+
+test("accuracy lifts a play with misses, by at most one counted miss", () => {
+  const plainAt = (m: number, notes: number | null, acc: number | null) =>
+    expShare(plain(m), m, notes, acc);
+  assert.ok(plainAt(2, 1500, 97) > plainAt(2, 1500, null));
+  near(plainAt(2, 1500, 97), shareForMisses(2 - accuracyCredit(97)));
+  // On a short map a miss counts as three, and accuracy still wins back only one.
+  near(plainAt(1, 150, 99), shareForMisses(Math.sqrt(10) - accuracyCredit(99)));
+  // On a long map it wins back at most the real miss, which counts for less.
+  near(plainAt(3, 3000, 99), shareForMisses(2.4 - 0.8 * accuracyCredit(99)));
+});
+
+/** The best accuracy a play with these misses can have: every other note a 300. */
+const bestAccuracy = (missCount: number, notes: number | null) =>
+  missCount === 0 ? 100 : (((notes ?? 1500) - missCount) / (notes ?? 1500)) * 100;
+
+test("one miss fewer always pays more, whatever the accuracy", () => {
+  for (const notes of [null, 60, 100, 150, 300, 375, 500, 700, 1000, 1500, 2000, 2344, 3000, 9000]) {
+    for (let m = 1; m <= 200 && m < (notes ?? 1500); m++) {
+      const best = expShare(plain(m), m, notes, bestAccuracy(m, notes));
+      const worst = expShare(plain(m - 1), m - 1, notes, 0);
+      assert.ok(
+        best < worst,
+        m + " misses at its best on " + notes + " notes pays " + best + ", one fewer at 0% " + worst,
+      );
+    }
+  }
+});
+
+test("a result the site ranks higher never pays less, so a best score never loses EXP", () => {
+  // Every result on one map, the way upsertScore and the boards compare them.
+  const notes = 1500;
+  const results: Array<{ gradeRank: number; missCount: number; accuracy: number; share: number }> = [];
+  const add = (grade: string, missCount: number, accuracy: number) =>
+    results.push({ gradeRank: gradeRank(grade), missCount, accuracy, share: expShare(grade, missCount, notes, accuracy) });
+  add("SSS", 0, 100);
+  for (const a of [80, 90, 95, 97, 99, 99.9]) {
+    add("SS", 0, a);
+    add("S", 0, a);
+  }
+  for (let m = 1; m <= 60; m++) {
+    for (const a of [70, 85, 92, 96, 98, 99.5]) {
+      if (a <= bestAccuracy(m, notes)) add(plain(m), m, a);
+    }
+  }
+  for (const better of results) {
+    for (const worse of results) {
+      if (compareResults(better, worse) < 0) {
+        assert.ok(
+          better.share >= worse.share,
+          JSON.stringify(better) + " is ranked above " + JSON.stringify(worse) + " but pays less",
+        );
+      }
+    }
+  }
 });
 
 /* ------------------------------------------- picking between two results */

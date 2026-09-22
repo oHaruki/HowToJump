@@ -1,15 +1,16 @@
 import { CATEGORIES, TIERS, normalizeCategory, tierByOrder } from "@/lib/tiers";
 import {
-  GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE,
+  ACC_EXPONENT, GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE,
   MISS_SLOPE, REFERENCE_NOTES, THRESHOLD_MISSES, expShare,
 } from "@/lib/grading";
 
 /**
  * Skill levels.
  *
- * Every play earns EXP: the pack's value times the share its grade earns. A
- * category's level adds up the player's best BEST_PLAYS plays in it. Pure —
- * the sync worker feeds it scores and stores what comes back.
+ * Every play earns EXP: the pack's value times the share its misses and
+ * accuracy earn. A category's level adds up the player's best BEST_PLAYS
+ * plays in it. Pure — the sync worker feeds it scores and stores what comes
+ * back.
  */
 
 /** How many plays in a category count toward its level. */
@@ -19,7 +20,7 @@ export const BEST_PLAYS = 10;
 export const MAIN_LEVEL = "main";
 
 /** Bump when the shape of the formula changes. Changed numbers are noticed without it. */
-export const LEVEL_RULES_VERSION = 4;
+export const LEVEL_RULES_VERSION = 5;
 
 /**
  * Everything a stored level depends on, as one string. Each deploy compares
@@ -36,6 +37,7 @@ export function levelRules(): string {
     grades: GRADE_RULES.map((g) => [g.grade, g.expPercent]),
     missScaling: [REFERENCE_NOTES, MISS_CURVE, MIN_MISS_FACTOR],
     missShape: [MISS_KNEE, MISS_SLOPE, MISS_ACCEL, MISS_ACCEL_CAP, THRESHOLD_MISSES],
+    accuracy: ACC_EXPONENT,
   });
 }
 
@@ -54,7 +56,8 @@ export type Level = {
 /**
  * A play as the level rule sees it. A map can sit in several categories, so
  * one play can count toward several levels. A null noteCount is a map osu!
- * has not told us about yet. The id only settles ties.
+ * has not told us about yet, and a null accuracy a score entered without
+ * one. The id only settles ties.
  */
 export type LevelPlay = {
   id?: number;
@@ -63,27 +66,29 @@ export type LevelPlay = {
   grade: string;
   missCount: number;
   noteCount: number | null;
+  accuracy: number | null;
 };
 
 /**
  * EXP for one play: the pack's value times the share the play earns. The
- * misscount sets the share; the grade only says whether this is a 100% run
- * or a full combo.
+ * misscount sets the share and accuracy lifts it; the grade only says
+ * whether this is a 100% run or a full combo.
  */
 export function playExp(
   tierOrder: number,
   grade: string,
   missCount: number,
   noteCount: number | null = null,
+  accuracy: number | null = null,
 ): number {
   const tier = tierByOrder(tierOrder);
-  return tier ? (tier.exp * expShare(grade, missCount, noteCount)) / 100 : 0;
+  return tier ? (tier.exp * expShare(grade, missCount, noteCount, accuracy)) / 100 : 0;
 }
 
 const expOf = (p: Omit<LevelPlay, "categories">) =>
-  playExp(p.tierOrder, p.grade, p.missCount, p.noteCount);
+  playExp(p.tierOrder, p.grade, p.missCount, p.noteCount, p.accuracy);
 
-/** EXP needed to reach a pack: BEST_PLAYS two-miss plays on it. */
+/** EXP needed to reach a pack: BEST_PLAYS two-miss plays on it, before accuracy. */
 export function threshold(tierOrder: number): number {
   return BEST_PLAYS * playExp(tierOrder, THRESHOLD_GRADE, THRESHOLD_MISSES, null);
 }

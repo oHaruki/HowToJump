@@ -10,7 +10,7 @@ export type GradeRule = {
   maxMiss: number | null;
   requiresFc: boolean;
   requiresPerfect: boolean;
-  /** The most this grade pays, as a percentage of the map's pack EXP. */
+  /** The most this grade pays before accuracy, as a percentage of the map's pack EXP. */
   expPercent: number;
 };
 
@@ -124,7 +124,7 @@ export function gradeRank(grade: string, rules: GradeRule[] = GRADE_RULES): numb
   return r ? r.sortOrder : 999;
 }
 
-/** The percentage of a map's pack EXP a grade earns; 0 for an unknown grade. */
+/** The percentage of a map's pack EXP a grade earns before accuracy; 0 for an unknown grade. */
 export function expPercentFor(grade: string, rules: GradeRule[] = GRADE_RULES): number {
   return rules.find((x) => x.grade === grade)?.expPercent ?? 0;
 }
@@ -166,23 +166,46 @@ export function missFactor(noteCount: number | null | undefined): number {
   return Math.max(MIN_MISS_FACTOR, Math.pow(REFERENCE_NOTES / noteCount, MISS_CURVE));
 }
 
-/** Misses as they count on a map this size: rounded, and never below one. */
+/** Misses as they count on a map this size, never below one. */
 export function scaledMisses(missCount: number, noteCount: number | null | undefined): number {
   if (missCount <= 0) return 0;
-  return Math.max(1, Math.round(missCount * missFactor(noteCount)));
+  return Math.max(1, missCount * missFactor(noteCount));
+}
+
+/* ------------------------------------------------ what accuracy wins back */
+
+/** Accuracy wins back (accuracy / 100) ^ ACC_EXPONENT of one miss. */
+export const ACC_EXPONENT = 24;
+
+/** The share of one miss a play's accuracy wins back, 0 to 1; 0 when unknown. */
+export function accuracyCredit(accuracy: number | null | undefined): number {
+  if (accuracy == null || !Number.isFinite(accuracy) || accuracy <= 0) return 0;
+  return Math.pow(Math.min(accuracy, 100) / 100, ACC_EXPONENT);
 }
 
 /**
- * The share of a map's pack EXP a play earns. SSS and SS keep their own
- * share; everything else is the curve read at the scaled misscount.
+ * The share of a map's pack EXP a play earns. A 100% run keeps its own
+ * share and a full combo climbs toward it with accuracy. Any other play
+ * reads the curve at its scaled misses, less the part of one miss its
+ * accuracy wins back, at most its last real miss.
  */
 export function expShare(
   grade: string,
   missCount: number,
   noteCount: number | null | undefined,
+  accuracy: number | null | undefined = null,
   rules: GradeRule[] = GRADE_RULES,
 ): number {
-  const own = rules.find((r) => r.grade === grade && (r.requiresFc || r.requiresPerfect));
-  if (own) return own.expPercent;
-  return shareForMisses(scaledMisses(missCount, noteCount));
+  const perfect = rules.find((r) => r.requiresPerfect);
+  if (perfect && grade === perfect.grade) return perfect.expPercent;
+  const credit = accuracyCredit(accuracy);
+  const fc = rules.find((r) => r.requiresFc);
+  if (fc && grade === fc.grade) {
+    const top = perfect?.expPercent ?? fc.expPercent;
+    return fc.expPercent * Math.pow(top / fc.expPercent, credit);
+  }
+  const counted = scaledMisses(missCount, noteCount);
+  if (counted === 0) return shareForMisses(0);
+  const room = Math.min(1, counted - scaledMisses(missCount - 1, noteCount));
+  return shareForMisses(counted - room * credit);
 }

@@ -20,6 +20,7 @@ export type RecordTaken =
       entryId: number;
       grade: string;
       missCount: number;
+      accuracy: number | null;
       /** Whoever held the place, or null when the map had no score. */
       previous: string | null;
     }
@@ -48,7 +49,7 @@ async function playerOf(userId: number): Promise<PlayerLike | null> {
 /** Posts imported scores to the feed channel, if one is set up. Never throws. */
 export async function announceScores(
   userId: number,
-  imported: Array<{ entryId: number; grade: string; missCount: number }>,
+  imported: Array<{ entryId: number; grade: string; missCount: number; accuracy: number | null }>,
 ): Promise<void> {
   const channel = process.env.DISCORD_SCORES_CHANNEL_ID;
   if (!channel || !imported.length) return;
@@ -73,7 +74,9 @@ export async function announceRecords(
     const [who, lines] = await Promise.all([
       playerOf(userId),
       describeScores(
-        maps.map((r) => ({ entryId: r.entryId, grade: r.grade, missCount: r.missCount })),
+        maps.map((r) => ({
+          entryId: r.entryId, grade: r.grade, missCount: r.missCount, accuracy: r.accuracy,
+        })),
       ),
     ]);
     if (!who) return;

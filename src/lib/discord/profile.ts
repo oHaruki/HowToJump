@@ -74,6 +74,7 @@ export async function profileReply(name: string): Promise<Message> {
         noteCount: best.noteCount,
         grade: best.grade,
         missCount: best.missCount,
+        accuracy: best.accuracy,
       }
     : null;
 

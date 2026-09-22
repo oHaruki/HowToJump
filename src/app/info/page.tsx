@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { GRADE_RULES, MIN_MISS_FACTOR, REFERENCE_NOTES, missFactor } from "@/lib/grading";
+import {
+  GRADE_RULES, MIN_MISS_FACTOR, REFERENCE_NOTES, accuracyCredit, missFactor,
+} from "@/lib/grading";
 import { BEST_PLAYS, THRESHOLD_GRADE, threshold } from "@/lib/levels";
 import { tierByName } from "@/lib/tiers";
 import { GradeLetter, SectionHead, gradeTone } from "@/components/ui";
@@ -12,6 +14,8 @@ const fmt = (n: number) => n.toLocaleString("en");
    small ones keep a second decimal rather than rounding away to nothing. */
 const share = (n: number) => (n < 1 ? +n.toFixed(2) : +n.toFixed(1));
 const standard = GRADE_RULES.find((g) => g.grade === THRESHOLD_GRADE);
+/** How much of one miss an accuracy wins back, in percent. */
+const wonBack = (accuracy: number) => Math.round(accuracyCredit(accuracy) * 100);
 const packLine = (name: string) => {
   const t = tierByName(name);
   return t ? fmt(threshold(t.order)) + " for " + t.name : "";
@@ -39,8 +43,15 @@ export default function InfoPage() {
                 EXP does not step from grade to grade. It falls with every miss on
                 one curve, and each miss costs a little more than the one before,
                 so a map survived is worth nothing like a map cleared. The
-                percentage beside a grade is the most that grade pays, on a normal{" "}
-                {fmt(REFERENCE_NOTES)} note map.
+                percentage beside a grade is the most that grade pays before
+                accuracy, on a normal {fmt(REFERENCE_NOTES)} note map.
+              </p>
+              <p className="lede">
+                Accuracy then wins back part of one miss: {wonBack(90)}% of it at
+                90%, {wonBack(96)}% at 96% and {wonBack(99)}% at 99%. Never a whole
+                one, so one miss fewer always pays more. A full combo climbs the same
+                way toward SSS, and a clean pass that dropped the combo stays where
+                it is.
               </p>
               <p className="lede">
                 Staying clean is easier on a short map, so there each miss costs
@@ -71,14 +82,15 @@ export default function InfoPage() {
             <div className="stack">
               <p>
                 Every play earns EXP: its pack&apos;s value times the percentage its
-                grade earns. Each category adds up your best {BEST_PLAYS} plays in it,
-                so grinding easy maps does not help, and a new map never lowers
-                anyone. A map can sit in more than one category, and then a play on
-                it counts toward each.
+                misses and accuracy earn. Each category adds up your best{" "}
+                {BEST_PLAYS} plays in it, so grinding easy maps does not help, and a
+                new map never lowers anyone. A map can sit in more than one category,
+                and then a play on it counts toward each.
               </p>
               <p className="small">
                 You reach a pack when your best {BEST_PLAYS} add up to {BEST_PLAYS}{" "}
-                plays at {standard?.grade} ({standard?.label}) on it: {packLine("Emerald")},{" "}
+                plays at {standard?.grade} ({standard?.label}) on it, before accuracy:{" "}
+                {packLine("Emerald")},{" "}
                 {packLine("Amethyst")}. Full combos on the pack below never get there on
                 their own, so reaching a pack means playing it. Your main level is the
                 average of the five categories.

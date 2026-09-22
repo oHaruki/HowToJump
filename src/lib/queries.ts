@@ -403,11 +403,12 @@ export type ScoreLine = {
   noteCount: number | null;
   grade: string;
   missCount: number;
+  accuracy: number | null;
 };
 
 /** The maps behind a sync's imports, in the order they were imported. */
 export async function describeScores(
-  imported: Array<{ entryId: number; grade: string; missCount: number }>,
+  imported: Array<{ entryId: number; grade: string; missCount: number; accuracy: number | null }>,
 ): Promise<ScoreLine[]> {
   if (!imported.length) return [];
   const rows = await db
@@ -431,7 +432,7 @@ export async function describeScores(
   const byId = new Map(rows.map((r) => [r.entryId, r]));
   return imported.flatMap((i) => {
     const r = byId.get(i.entryId);
-    return r ? [{ ...r, grade: i.grade, missCount: i.missCount }] : [];
+    return r ? [{ ...r, grade: i.grade, missCount: i.missCount, accuracy: i.accuracy }] : [];
   });
 }
 

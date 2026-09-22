@@ -93,7 +93,8 @@ export default async function BeatmapPage({
 
   const tier = tierByOrder(map.tierOrder);
   const colour = tier ? tier.color : "#777";
-  const expOf = (s: BoardScore) => playExp(map.tierOrder, s.grade, s.missCount, map.noteCount);
+  const expOf = (s: BoardScore) =>
+    playExp(map.tierOrder, s.grade, s.missCount, map.noteCount, s.accuracy);
 
   return (
     <div className="view">
@@ -260,6 +261,9 @@ function Header({
               <span>A full combo here is worth</span>
               <b>{fmt(playExp(map.tierOrder, "SS", 0))} EXP</b>
             </div>
+            <p className="bm-misses">
+              Accuracy lifts it to <b>{fmt(playExp(map.tierOrder, "SSS", 0))}</b> at 100%
+            </p>
             {map.noteCount ? <MissNote notes={map.noteCount} /> : null}
           </aside>
         </div>

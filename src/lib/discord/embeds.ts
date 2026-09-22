@@ -81,7 +81,8 @@ export function playerAuthor(p: PlayerLike, note?: string) {
 }
 
 /** What a play is worth, which is the number every list here ranks by. */
-const scoreExp = (s: ScoreLine) => playExp(s.tierOrder, s.grade, s.missCount, s.noteCount);
+const scoreExp = (s: ScoreLine) =>
+  playExp(s.tierOrder, s.grade, s.missCount, s.noteCount, s.accuracy);
 
 const categoryText = (categories: string[]) =>
   categories.map((c) => shortCategory(c)).join(" + ") || "Unjudged";

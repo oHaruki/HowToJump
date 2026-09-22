@@ -71,12 +71,12 @@ test("a score is new, improved, or old news, against when the player last looked
 // the tie falls through to the older id.
 test("counting places: each category's best ten by EXP, older id last on a tie", () => {
   const plays = [
-    { id: 1, tierOrder: 13, categories: [RAW], grade: "A", missCount: 2, noteCount: null },
-    { id: 2, tierOrder: 14, categories: [RAW], grade: "SS", missCount: 0, noteCount: null },
-    { id: 3, tierOrder: 13, categories: [RAW], grade: "A", missCount: 2, noteCount: null },
-    { id: 4, tierOrder: 13, categories: ["Raw Aim"], grade: "SS", missCount: 0, noteCount: null }, // old spelling, same category
-    { id: 5, tierOrder: 16, categories: ["Flow Aim"], grade: "SSS", missCount: 0, noteCount: null }, // dropped, counts nowhere
-    ...Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, tierOrder: 1, categories: [RAW], grade: "Pass", missCount: 101, noteCount: null })),
+    { id: 1, tierOrder: 13, categories: [RAW], grade: "A", missCount: 2, noteCount: null, accuracy: null },
+    { id: 2, tierOrder: 14, categories: [RAW], grade: "SS", missCount: 0, noteCount: null, accuracy: null },
+    { id: 3, tierOrder: 13, categories: [RAW], grade: "A", missCount: 2, noteCount: null, accuracy: null },
+    { id: 4, tierOrder: 13, categories: ["Raw Aim"], grade: "SS", missCount: 0, noteCount: null, accuracy: null }, // old spelling, same category
+    { id: 5, tierOrder: 16, categories: ["Flow Aim"], grade: "SSS", missCount: 0, noteCount: null, accuracy: null }, // dropped, counts nowhere
+    ...Array.from({ length: 10 }, (_, i) => ({ id: 100 + i, tierOrder: 1, categories: [RAW], grade: "Pass", missCount: 101, noteCount: null, accuracy: null })),
   ];
   const place = (id: number) => countingPlaces(plays).get(id)?.map((p) => p.place);
   assert.deepEqual(place(2), [1]);
@@ -92,7 +92,7 @@ test("counting places: among equals, the cleaner run is numbered first", () => {
   // Same pack, same 1,500 note map, both B: only the misscount tells them
   // apart, and it has to beat the newer score's higher id.
   const play = (id: number, missCount: number) =>
-    ({ id, tierOrder: 13, categories: [RAW], grade: "B", missCount, noteCount: 1500 });
+    ({ id, tierOrder: 13, categories: [RAW], grade: "B", missCount, noteCount: 1500, accuracy: null });
   const places = countingPlaces([play(1, 7), play(2, 6)]);
   assert.deepEqual(places.get(2), [{ category: RAW, place: 1 }]);
   assert.deepEqual(places.get(1), [{ category: RAW, place: 2 }]);
@@ -101,8 +101,8 @@ test("counting places: among equals, the cleaner run is numbered first", () => {
 test("a play on a map in two categories holds a place in each, best first", () => {
   const CONSISTENCY = "Aim - consistency";
   const places = countingPlaces([
-    { id: 1, tierOrder: 14, categories: [RAW], grade: "SS", missCount: 0, noteCount: null },
-    { id: 2, tierOrder: 13, categories: [RAW, CONSISTENCY], grade: "SS", missCount: 0, noteCount: null },
+    { id: 1, tierOrder: 14, categories: [RAW], grade: "SS", missCount: 0, noteCount: null, accuracy: null },
+    { id: 2, tierOrder: 13, categories: [RAW, CONSISTENCY], grade: "SS", missCount: 0, noteCount: null, accuracy: null },
   ]);
   assert.deepEqual(places.get(2), [
     { category: CONSISTENCY, place: 1 },
@@ -133,6 +133,7 @@ const play = (
   grade: gradeFor({ missCount, isFc: false, isPerfect: false }),
   missCount,
   noteCount: opts.noteCount === undefined ? 1500 : opts.noteCount,
+  accuracy: null,
   playedAt: new Date(opts.at ?? "2026-09-20T12:00:00Z"),
   createdAt: new Date(opts.at ?? "2026-09-20T12:00:00Z"),
   importedAt: new Date(opts.at ?? "2026-09-20T12:00:00Z"),
@@ -155,19 +156,18 @@ test("the history keeps the order it was given, whatever the plays are worth", (
 });
 
 test("the screenshot case: the cleaner of two tied plays leads and is #1", () => {
-  // Misses count by map length, so six on a 1,500 note map and eight on a
-  // 3,000 note one are worth the same. The eight was set first, which used
-  // to win it #1 while being drawn underneath.
+  // Misses count by map length, so three on a 375 note map and six on a
+  // 1,500 note one are worth the same. The six was set first.
   const plays = newestFirst([
-    play(12, 8, { at: "2026-09-01T00:00:00Z", noteCount: 3000 }),
-    play(40, 6, { at: "2026-09-20T00:00:00Z" }),
+    play(12, 6, { at: "2026-09-01T00:00:00Z" }),
+    play(40, 3, { at: "2026-09-20T00:00:00Z", noteCount: 375 }),
   ]);
   const { recent, top } = profileLists(plays, null);
   assert.equal(recent[0].exp, recent[1].exp, "the two have to be worth the same");
 
   assert.deepEqual(top.map((p) => p.scoreId), [40, 12]);
   assert.deepEqual(top.map((p) => p.places[0].place), [1, 2]);
-  assert.equal(top[0].missCount, 6);
+  assert.equal(top[0].missCount, 3);
 });
 
 test("nothing in the top plays is ever drawn above something numbered better", () => {

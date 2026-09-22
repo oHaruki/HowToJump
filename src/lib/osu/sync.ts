@@ -20,6 +20,7 @@ export type ImportedScore = {
   entryId: number;
   grade: string;
   missCount: number;
+  accuracy: number | null;
 };
 
 export type SyncResult = {
@@ -174,6 +175,7 @@ export async function refreshProgress(userId: number): Promise<void> {
       grade: scores.grade,
       missCount: scores.missCount,
       noteCount: beatmaps.noteCount,
+      accuracy: scores.accuracy,
     })
     .from(scores)
     .innerJoin(entries, eq(scores.entryId, entries.id))
@@ -305,7 +307,9 @@ export async function syncUser(
       const grade = await upsertScore(userId, entry, play);
       if (!grade) continue;
       result.scoresImported += 1;
-      result.imported.push({ entryId: entry.id, grade, missCount: play.missCount });
+      result.imported.push({
+        entryId: entry.id, grade, missCount: play.missCount, accuracy: play.accuracy,
+      });
 
       if (held?.userId !== userId && (await getEntryLeader(entry.id))?.userId === userId) {
         result.records.push({
@@ -313,6 +317,7 @@ export async function syncUser(
           entryId: entry.id,
           grade,
           missCount: play.missCount,
+          accuracy: play.accuracy,
           previous: held?.username ?? null,
         });
       }
