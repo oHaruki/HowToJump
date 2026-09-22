@@ -6,7 +6,7 @@ import { AuthButton } from "@/components/AuthButton";
 import { NavLinks } from "@/components/NavLinks";
 
 export const metadata: Metadata = {
-  title: "Project Aim",
+  title: { default: "Project Aim", template: "%s · Project Aim" },
   description:
     "Ranked osu! aim. Sixteen packs of aim maps from Stone to GOAT, graded on misscount and tracked automatically from your osu! account.",
 };

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/lib/auth";
@@ -6,6 +7,22 @@ import { users } from "@/lib/schema";
 import { ProfileView } from "@/components/ProfileView";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ osuUserId: string }>;
+}): Promise<Metadata> {
+  const { osuUserId } = await params;
+  const id = Number(osuUserId);
+  if (!Number.isSafeInteger(id) || id <= 0) return {};
+
+  const [player] = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(and(eq(users.osuUserId, id), isNull(users.bannedAt)));
+  return player ? { title: player.username } : {};
+}
 
 /**
  * Anyone's profile, by their osu! user ID, which is what leaderboards and map

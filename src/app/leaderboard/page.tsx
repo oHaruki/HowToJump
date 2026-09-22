@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { MAIN_LEVEL, progressText } from "@/lib/levels";
@@ -11,6 +12,8 @@ import { BankPager } from "@/components/BankPager";
 import { LiveRefresh } from "@/components/LiveRefresh";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Leaderboard" };
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 

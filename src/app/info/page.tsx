@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { GRADE_RULES, MIN_MISS_FACTOR, REFERENCE_NOTES, missFactor } from "@/lib/grading";
 import { BEST_PLAYS, THRESHOLD_GRADE, threshold } from "@/lib/levels";
 import { tierByName } from "@/lib/tiers";
 import { GradeLetter, SectionHead, gradeTone } from "@/components/ui";
 import { ModLegend, PackLadder, SkillSlots, SyncFlow } from "@/components/InfoViz";
+
+export const metadata: Metadata = { title: "Info" };
 
 const fmt = (n: number) => n.toLocaleString("en");
 /* The curve gives shares from 120 down to hundredths of a percent, so the

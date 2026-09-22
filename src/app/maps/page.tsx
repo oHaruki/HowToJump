@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { getBankPage, getFacets, getTierCounts, type BankPage } from "@/lib/queries";
 import {
   bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
@@ -11,6 +12,8 @@ import { BankPager } from "@/components/BankPager";
 import { BankCount } from "@/components/BankCount";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Map bank" };
 
 export default async function MapsPage({
   searchParams,

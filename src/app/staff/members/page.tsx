@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { desc, inArray, sql as raw } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
@@ -5,6 +6,8 @@ import { SectionHead } from "@/components/ui";
 import { MembersTable } from "@/components/MembersTable";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Members" };
 
 export default async function MembersPage() {
   // Staff only. Every signed in player has a row here, so listing them all

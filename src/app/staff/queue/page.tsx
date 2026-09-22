@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { getPendingSuggestions } from "@/lib/queries";
 import { SectionHead } from "@/components/ui";
 import { QueueTable } from "@/components/QueueTable";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Review queue" };
 
 export default async function QueuePage() {
   const [session, rows] = await Promise.all([auth(), getPendingSuggestions()]);

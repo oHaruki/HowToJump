@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -17,6 +18,26 @@ import { timeAgo } from "@/lib/time";
 export const dynamic = "force-dynamic";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ beatmapId: string }>;
+  searchParams: Promise<{ mod?: string }>;
+}): Promise<Metadata> {
+  const [{ beatmapId }, sp] = await Promise.all([params, searchParams]);
+  const id = Number(beatmapId);
+  if (!Number.isSafeInteger(id) || id <= 0) return {};
+
+  const banked = await getBeatmapPage(id);
+  if (!banked.length) return {};
+  const choices = banked.slice().sort((a, b) => Number(b.mod === "NM") - Number(a.mod === "NM"));
+  const wanted = sp.mod ? normalizeMod(sp.mod) : null;
+  const map = choices.find((e) => e.mod === wanted) ?? choices[0];
+
+  return { title: map.version ? `${map.title} [${map.version}]` : map.title };
+}
 
 /*
  * osu!'s own star rating colours, from blue at the easy end through green,

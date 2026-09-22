@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { ProfileView } from "@/components/ProfileView";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "My profile" };
 
 /** The signed in player's own profile, with the parts only they get. */
 export default async function MePage() {

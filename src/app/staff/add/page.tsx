@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { Importer } from "@/components/Importer";
 import { SectionHead } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Add maps" };
 
 export default function AddMapsPage() {
   return (

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -8,6 +9,8 @@ import { BEST_PLAYS } from "@/lib/levels";
 import { NONE, StatCard } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Staff" };
 
 /*
  * Below this many maps of a category in a pack, reaching that pack through
