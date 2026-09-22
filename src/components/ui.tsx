@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { TIERS, tierByName, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
 import { modLabel } from "@/lib/mods";
@@ -31,20 +32,8 @@ export function ModChip({ mod }: { mod: string }) {
 }
 
 /**
- * Length and speed, one chip each.
- *
- * Both are graded words rather than numbers, so a single "Long - Medium" cell
- * left no way to tell which of them was the time and which the tempo. Each
- * now carries its own chip, and the key sits in a recessed cell of its own:
- * styling them alike and trusting the words to carry the difference did not
- * work, since a dim label and a bright value still read as one phrase.
- *
- * The pair also takes a line of its own, rather than wrapping wherever the
- * mod and category happen to run out of room. A long title or a long category
- * used to decide whether a card showed one row of chips or two, which left
- * the list ragged; now every card reads the same way.
- *
- * The two keys are the only wording here, so renaming them is a one line job.
+ * Length and speed, one keyed chip each, on a line of their own. Both are
+ * graded words, so each carries its key in a recessed cell.
  */
 export function PacingChips({
   length,
@@ -71,10 +60,7 @@ function KeyedChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * A map's categories, one chip each. Written as stored, so a label the
- * grading team has since renamed or dropped still shows for what it is.
- */
+/** A map's categories, one chip each, written as stored. */
 export function CategoryChips({ categories }: { categories: readonly string[] }) {
   return (
     <>
@@ -86,16 +72,9 @@ export function CategoryChips({ categories }: { categories: readonly string[] })
 }
 
 /**
- * A dropdown whose first line is a label, not a choice.
- *
- * Pack, category, length and speed all have to end up with a real value, so
- * "Pick a category" is there to say the field is still empty rather than to
- * be selected; picking it would only undo the field. Disabling it leaves it
- * visible while nothing is set and takes it out of the list once something is.
- *
- * A value the scale does not know, such as a label the sheet used before it
- * was renamed, stays in the list so opening the dropdown cannot silently
- * rewrite it.
+ * A dropdown whose first line is a disabled label saying the field is empty.
+ * A value the scale does not know stays in the list, so opening the dropdown
+ * never rewrites it.
  */
 export function PickSelect({
   value,
@@ -135,10 +114,7 @@ export function PickSelect({
   );
 }
 
-/**
- * A country flag, drawn with the same artwork osu! uses. Emoji flags would be
- * simpler, but Windows shows them as two bare letters.
- */
+/** A country flag, drawn with the same artwork osu! uses. */
 export function Flag({ code }: { code: string | null | undefined }) {
   if (!code || !/^[A-Za-z]{2}$/.test(code)) return null;
   const points = code
@@ -158,22 +134,17 @@ export function Flag({ code }: { code: string | null | undefined }) {
   );
 }
 
-/* osu!'s grade colours by family: gold at the top, then green, blue, purple, red. */
-function gradeTone(grade: string): string {
+/** Which family a grade belongs to, as the stylesheet names them. */
+export function gradeTone(grade: string): string {
   if (grade === "SSS" || grade === "SS" || grade === "S") return grade.toLowerCase();
   const letter = grade.charAt(0);
   return "ABCD".includes(letter) ? letter.toLowerCase() : "f";
 }
 
 /**
- * A grade drawn the way osu! draws one on a scoreboard: a slanted letter in
- * its family's colours, no box around it. This is the only way a grade is
- * written on the site, so the colour alone says how good a play was before
- * the letter is read at all.
- *
- * Sized rather than restyled, because the same mark has to carry a hero score
- * and a row in a long list: "big" heads a scoreboard, "sm" is for the places
- * they arrive by the dozen, where a full glow on every line would smear.
+ * A grade the way osu! draws one: a slanted letter in its family's colours,
+ * no box. "big" heads a scoreboard, "sm" is for long lists, where a full
+ * glow on every line would smear.
  */
 export function GradeLetter({
   grade,
@@ -198,7 +169,8 @@ export function StatCard({ label, value }: { label: string; value: string | numb
   );
 }
 
-export function Stat({ label, value }: { label: string; value: string | number }) {
+/** One figure in a strip of them. The value is a node, so it can animate. */
+export function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="stat">
       <b>{value}</b>
@@ -223,9 +195,8 @@ export function beatmapUrl(m: MapLike) {
 }
 
 /**
- * A map's page on this site: /beatmap/ and the same number as on osu!, so it
- * can be typed from memory. Anything banked under a mod carries it, since
- * one beatmap can be banked more than once.
+ * A map's page on this site: /beatmap/ and the same number as on osu!.
+ * Carries the mod, since one beatmap can be banked more than once.
  */
 export function mapHref(osuBeatmapId: number, mod?: string | null) {
   return "/beatmap/" + osuBeatmapId + (mod && mod !== "NM" ? "?mod=" + mod : "");
@@ -311,16 +282,9 @@ export function Empty({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * What sits where a slow list will be.
- *
- * The site's own art rather than a generic spinner, cropped to the figure and
- * served at a fourteenth of the hero's weight, since an icon that says the
- * page is still working should not itself be the download. She is mid leap
- * already, so the loop bobs her instead of rotating: a jump reads as motion
- * where a spinning character would only read as a spinning character.
- *
- * role="status" so the wait is announced rather than being a silent gap, and
- * the bob is an animation, which the reduced motion rule already turns off.
+ * What sits where a slow list will be: the site's own art, bobbing. The
+ * role="status" announces the wait, and the bob is an animation, so the
+ * reduced motion rule turns it off.
  */
 export function Loading({ label = "Loading" }: { label?: string }) {
   return (
@@ -346,7 +310,14 @@ export function LadderGrid({
       {TIERS.map((t) => {
         const n = counts.get(t.order) ?? 0;
         return (
-          <Link key={t.slug} className="gem" href={hrefFor ? hrefFor(t) : "/maps?pack=" + t.slug}>
+          <Link
+            key={t.slug}
+            className="gem"
+            href={hrefFor ? hrefFor(t) : "/maps?pack=" + t.slug}
+            // The flat colour. The swatch keeps the fill, since GOAT's
+            // is a gradient and a gradient cannot go in a color-mix.
+            style={{ "--tier": t.color } as CSSProperties}
+          >
             <span className="gem-swatch" style={{ background: tierFill(t) }} />
             <span>
               <span className="gem-name">{t.name}</span>

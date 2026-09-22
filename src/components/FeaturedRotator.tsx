@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Cover } from "@/components/Cover";
 import { CategoryChips, ModChip, NONE, TierChip } from "@/components/ui";
 import type { BankRow } from "@/lib/queries";
+import { tierByOrder } from "@/lib/tiers";
 
 /**
- * Cycles the hero card through the newest entries.
- *
- * Pauses while the pointer or keyboard focus is on it, so it cannot swap the
- * card out from under someone reading it or about to click the link.
+ * Cycles the hero card through the newest entries. Pauses while the pointer
+ * or keyboard focus is on it.
  */
 export function FeaturedRotator({
   entries,
@@ -43,6 +42,7 @@ export function FeaturedRotator({
   }
 
   const m = entries[Math.min(index, entries.length - 1)];
+  const tier = tierByOrder(m.tierOrder);
   const url = m.osuBeatmapsetId
     ? "https://osu.ppy.sh/beatmapsets/" + m.osuBeatmapsetId + "#osu/" + m.osuBeatmapId
     : "https://osu.ppy.sh/b/" + m.osuBeatmapId;
@@ -50,11 +50,24 @@ export function FeaturedRotator({
   return (
     <div
       className="box feat rotator"
+      style={{ "--tier": tier ? tier.color : "var(--accent)" } as CSSProperties}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
+      {/* How long this card has left, on the same interval as the swap. */}
+      {entries.length > 1 ? (
+        <span
+          className="rotator-bar"
+          key={"bar-" + m.entryId}
+          style={{
+            animationDuration: intervalMs + "ms",
+            animationPlayState: paused ? "paused" : "running",
+          }}
+        />
+      ) : null}
+
       {/* Keyed on the entry so each swap replays the fade. */}
       <div className="rotator-slide" key={m.entryId}>
         <Cover

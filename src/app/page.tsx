@@ -1,10 +1,13 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { getBankStats, getRecentEntries, getTierCounts } from "@/lib/queries";
 import {
   CategoryChips, LadderGrid, ModChip, NONE, Stat, TierChip, beatmapUrl,
 } from "@/components/ui";
 import { Cover } from "@/components/Cover";
+import { CountUp } from "@/components/CountUp";
 import { FeaturedRotator } from "@/components/FeaturedRotator";
+import { tierByOrder } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +21,8 @@ export default async function OverviewPage() {
   const recent = newest.slice(0, 4);
 
   return (
-    <div className="view">
+    // rise-in lands each band of the page a step after the one above it.
+    <div className="view rise-in">
       <div className="hero">
         <div className="hero-copy">
           {/* Decorative only, so it is hidden from assistive tech. */}
@@ -52,12 +56,12 @@ export default async function OverviewPage() {
       </div>
 
       <div className="stat-strip">
-        <Stat label="packs" value={16} />
-        <Stat label="grades" value={18} />
-        <Stat label="entries in the bank" value={stats.total} />
+        <Stat label="packs" value={<CountUp value={16} />} />
+        <Stat label="grades" value={<CountUp value={18} />} />
+        <Stat label="entries in the bank" value={<CountUp value={stats.total} />} />
         <Stat
           label="hardest star rating"
-          value={stats.hardest ? stats.hardest.toFixed(2) : "0.00"}
+          value={<CountUp value={stats.hardest ?? 0} decimals={2} />}
         />
       </div>
 
@@ -81,7 +85,16 @@ export default async function OverviewPage() {
           </div>
           <div className="grid-auto">
             {recent.map((m) => (
-              <div className="box feat" key={m.entryId}>
+              <div
+                className="box feat"
+                key={m.entryId}
+                // Caps the card in its pack's colour.
+                style={
+                  {
+                    "--tier": tierByOrder(m.tierOrder)?.color ?? "var(--accent)",
+                  } as CSSProperties
+                }
+              >
                 <Cover
                   setId={m.osuBeatmapsetId}
                   kind="card"
