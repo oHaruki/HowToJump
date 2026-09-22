@@ -62,7 +62,7 @@ export function UserMenu({
           // eslint-disable-next-line @next/next/no-img-element
           <img className="av" src={user.image} alt="" />
         ) : null}
-        <span>{user.name}</span>
+        <span className="userbtn-name">{user.name}</span>
       </button>
 
       {open ? (

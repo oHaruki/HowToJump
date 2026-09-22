@@ -21,7 +21,9 @@ export function AuthButton({
         }}
       >
         <button className="tool" type="submit">
-          Sign in with osu!
+          <span>
+            Sign in<span className="signin-more"> with osu!</span>
+          </span>
         </button>
       </form>
     );
