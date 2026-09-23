@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { BackfillForm } from "@/components/BackfillForm";
 
 const ROLE_LABEL: Record<string, string> = {
   user: "Player",
@@ -19,7 +20,7 @@ export type MenuUser = {
 /**
  * The avatar opens a menu; signing out is a choice inside it. Sign out is a
  * form posting to a server action, so
- * it still works without JavaScript.
+ * it still works without JavaScript. Adding an older score opens a dialog.
  */
 export function UserMenu({
   user,
@@ -32,6 +33,15 @@ export function UserMenu({
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const [adding, setAdding] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const pressedBackdrop = useRef(false);
+
+  useEffect(() => {
+    if (!adding) return;
+    dialog.current?.showModal();
+    dialog.current?.querySelector("input")?.focus();
+  }, [adding]);
 
   useEffect(() => {
     if (!open) return;
@@ -76,6 +86,17 @@ export function UserMenu({
           <Link className="menu-item" href="/me" role="menuitem" onClick={() => setOpen(false)}>
             My progress
           </Link>
+          <button
+            className="menu-item"
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              setAdding(true);
+            }}
+          >
+            Add an older score
+          </button>
           {isStaff ? (
             <Link
               className="menu-item"
@@ -105,6 +126,42 @@ export function UserMenu({
           </form>
         </div>
       ) : null}
+
+      {/* Closes on a click that both starts and ends on the backdrop. */}
+      <dialog
+        ref={dialog}
+        className="dialog"
+        aria-labelledby="backfill-title"
+        onClose={() => setAdding(false)}
+        onMouseDown={(e) => {
+          pressedBackdrop.current = e.target === e.currentTarget;
+        }}
+        onClick={(e) => {
+          if (pressedBackdrop.current && e.target === e.currentTarget) e.currentTarget.close();
+        }}
+      >
+        {adding ? (
+          <div className="dialog-in">
+            <div className="dialog-head">
+              <h2 id="backfill-title">Add an older score</h2>
+              <button
+                className="tool"
+                type="button"
+                aria-label="Close"
+                onClick={() => dialog.current?.close()}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="small">
+              Plays are picked up from when you connect. For one from before that, or one the
+              site missed, paste the score&apos;s osu! link. It has to be your own pass on a bank
+              map, with the mods the map is banked under.
+            </p>
+            <BackfillForm />
+          </div>
+        ) : null}
+      </dialog>
     </div>
   );
 }

@@ -16,7 +16,6 @@ import { PlayList } from "@/components/PlayList";
 import type { PlayView } from "@/components/PlayRow";
 import { timeAgo } from "@/lib/time";
 import { SyncButton } from "@/components/SyncButton";
-import { BackfillForm } from "@/components/BackfillForm";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 
@@ -275,21 +274,6 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
           />
         </section>
       </div>
-
-      {owner ? (
-        <section className="stack">
-          <div className="section-head">
-            <span className="lbl">Backfill</span>
-            <h2>Add an older score</h2>
-            <p className="small">
-              Plays are picked up from when you connect. For one from before that, or
-              one the site missed, paste the score&apos;s osu! link. It has to be your
-              own pass on a bank map, with the mods the map is banked under.
-            </p>
-          </div>
-          <BackfillForm />
-        </section>
-      ) : null}
 
       <section className="stack-lg">
         <div className="section-head">

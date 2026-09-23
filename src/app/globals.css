@@ -843,6 +843,19 @@ footer {
 .menu-item.danger { color: var(--danger); }
 .menu-item.danger:hover { background: color-mix(in srgb, var(--danger) 12%, var(--bg-c)); }
 
+/* A modal opened from the menu, drawn above everything by the browser. */
+.dialog {
+  width: min(560px, calc(100% - 32px)); padding: 0;
+  color: var(--text); background: var(--bg-b);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--surface-radius); corner-shape: var(--corner-shape);
+  box-shadow: 0 30px 80px #000000aa;
+}
+.dialog::backdrop { background: color-mix(in srgb, #000 62%, transparent); backdrop-filter: blur(6px); }
+.dialog-in { display: flex; flex-direction: column; gap: 12px; padding: 22px 24px 24px; }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dialog-head h2 { font-size: var(--h3-size); line-height: 1.2; }
+
 /* The vertical list every card surface sits in. */
 .review-list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -1553,6 +1566,7 @@ a.pager-page:hover, a.pager-step:hover {
 .backfill { display: flex; flex-direction: column; gap: 8px; max-width: 680px; }
 .backfill-row { display: flex; gap: 8px; }
 .backfill-row input { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: var(--font-size-mono); }
+.backfill-row .btn { flex: none; }
 .backfill-msg { font-size: var(--font-size-small); color: var(--danger); }
 .backfill-msg[data-ok="true"] { color: var(--success); }
 @media (max-width: 560px) { .backfill-row { flex-direction: column; } }
