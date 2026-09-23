@@ -5,7 +5,7 @@ import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
-  auditLog, beatmaps, entries, suggestionBatches, suggestions, users,
+  auditLog, beatmaps, entries, suggestionBatches, suggestions, users, type Suggestion,
 } from "@/lib/schema";
 import { auth, requireAdmin, requireStaff } from "@/lib/auth";
 import {
@@ -254,48 +254,64 @@ export async function importRows(
 
 /* ---------------------------------------------------------------- reviews */
 
-/** Makes sure the beatmap row exists, pulling fresh metadata when it does not. */
-async function ensureBeatmap(osuBeatmapId: number): Promise<number> {
-  const found = await db.query.beatmaps.findFirst({
-    where: eq(beatmaps.osuBeatmapId, osuBeatmapId),
-  });
-  if (found) return found.id;
+/**
+ * Makes sure every beatmap has a row, looking the new ones up on osu! 50 to
+ * a request. Returns each osu! beatmap ID's row ID.
+ */
+async function ensureBeatmaps(osuBeatmapIds: number[]): Promise<Map<number, number>> {
+  const ids = Array.from(new Set(osuBeatmapIds));
+  const rowIds = async () => {
+    const rows = await db
+      .select({ id: beatmaps.id, osuBeatmapId: beatmaps.osuBeatmapId })
+      .from(beatmaps)
+      .where(inArray(beatmaps.osuBeatmapId, ids));
+    return new Map(rows.map((r) => [r.osuBeatmapId, r.id]));
+  };
 
-  let facts: BeatmapFacts | undefined;
+  const found = await rowIds();
+  const missing = ids.filter((id) => !found.has(id));
+  if (!missing.length) return found;
+
+  let facts = new Map<number, BeatmapFacts>();
   try {
-    facts = (await fetchBeatmaps([osuBeatmapId])).get(osuBeatmapId);
+    facts = await fetchBeatmaps(missing);
   } catch {
-    facts = undefined;
+    // Every missing map goes in as Unknown.
   }
 
-  const [created] = await db
+  await db
     .insert(beatmaps)
-    .values({
-      osuBeatmapId,
-      osuBeatmapsetId: facts?.osuBeatmapsetId ?? null,
-      artist: facts?.artist ?? null,
-      title: facts?.title ?? "Unknown",
-      version: facts?.version ?? null,
-      mapper: facts?.mapper ?? null,
-      mapperUserId: facts?.mapperUserId ?? null,
-      stars: facts?.stars ?? null,
-      bpm: facts?.bpm ?? null,
-      drainSeconds: facts?.drainSeconds ?? null,
-      totalSeconds: facts?.totalSeconds ?? null,
-      cs: facts?.cs ?? null,
-      ar: facts?.ar ?? null,
-      od: facts?.od ?? null,
-      hp: facts?.hp ?? null,
-      maxCombo: facts?.maxCombo ?? null,
-      noteCount: facts?.noteCount ?? null,
-      status: facts?.status ?? null,
-      coverUrl: facts?.coverUrl ?? null,
-      cardUrl: facts?.cardUrl ?? null,
-      listUrl: facts?.listUrl ?? null,
-      lastSyncedAt: facts ? new Date() : null,
-    })
-    .returning({ id: beatmaps.id });
-  return created.id;
+    .values(
+      missing.map((osuBeatmapId) => {
+        const f = facts.get(osuBeatmapId);
+        return {
+          osuBeatmapId,
+          osuBeatmapsetId: f?.osuBeatmapsetId ?? null,
+          artist: f?.artist ?? null,
+          title: f?.title ?? "Unknown",
+          version: f?.version ?? null,
+          mapper: f?.mapper ?? null,
+          mapperUserId: f?.mapperUserId ?? null,
+          stars: f?.stars ?? null,
+          bpm: f?.bpm ?? null,
+          drainSeconds: f?.drainSeconds ?? null,
+          totalSeconds: f?.totalSeconds ?? null,
+          cs: f?.cs ?? null,
+          ar: f?.ar ?? null,
+          od: f?.od ?? null,
+          hp: f?.hp ?? null,
+          maxCombo: f?.maxCombo ?? null,
+          noteCount: f?.noteCount ?? null,
+          status: f?.status ?? null,
+          coverUrl: f?.coverUrl ?? null,
+          cardUrl: f?.cardUrl ?? null,
+          listUrl: f?.listUrl ?? null,
+          lastSyncedAt: f ? new Date() : null,
+        };
+      }),
+    )
+    .onConflictDoNothing();
+  return rowIds();
 }
 
 /**
@@ -306,48 +322,58 @@ export async function approveSuggestions(ids: number[]) {
   const admin = await requireAdmin();
   if (!ids.length) return { approved: 0 };
 
-  const rows = await db.select().from(suggestions).where(inArray(suggestions.id, ids));
-  let approved = 0;
-  const added: number[] = [];
+  // A pack is required before anything reaches the ladder.
+  const rows = (
+    await db.select().from(suggestions).where(inArray(suggestions.id, ids))
+  ).filter(
+    (s): s is Suggestion & { proposedTierOrder: number } =>
+      s.status === "pending" && s.proposedTierOrder != null,
+  );
+  if (!rows.length) return { approved: 0 };
 
-  for (const s of rows) {
-    if (s.status !== "pending") continue;
-    // A pack is required before anything reaches the ladder.
-    if (!s.proposedTierOrder) continue;
+  const beatmapRowIds = await ensureBeatmaps(rows.map((s) => s.osuBeatmapId));
 
-    const beatmapRowId = await ensureBeatmap(s.osuBeatmapId);
-    const [created] = await db
+  const { added, approved } = await db.transaction(async (tx) => {
+    const created = await tx
       .insert(entries)
-      .values({
-        beatmapId: beatmapRowId,
-        mod: normalizeMod(s.mod),
-        tierOrder: s.proposedTierOrder,
-        // The importer will not send a row without one, so this only stands in
-        // for a suggestion that somehow arrived with the field empty.
-        categories: s.proposedCategories.length
-          ? normalizeCategories(s.proposedCategories)
-          : [CATEGORIES[0]],
-        lengthBucket: s.proposedLength,
-        speedBucket: s.proposedSpeed,
-        stars: s.stars,
-        bpm: s.bpm,
-        drainSeconds: s.drainSeconds,
-        cs: s.cs,
-        ar: s.ar,
-        od: s.od,
-        judgedById: admin.id,
-        judgedByName: admin.name ?? null,
-      })
+      .values(
+        rows.map((s) => ({
+          beatmapId: beatmapRowIds.get(s.osuBeatmapId)!,
+          mod: normalizeMod(s.mod),
+          tierOrder: s.proposedTierOrder,
+          // The importer will not send a row without one, so this only stands in
+          // for a suggestion that somehow arrived with the field empty.
+          categories: s.proposedCategories.length
+            ? normalizeCategories(s.proposedCategories)
+            : [CATEGORIES[0]],
+          lengthBucket: s.proposedLength,
+          speedBucket: s.proposedSpeed,
+          stars: s.stars,
+          bpm: s.bpm,
+          drainSeconds: s.drainSeconds,
+          cs: s.cs,
+          ar: s.ar,
+          od: s.od,
+          judgedById: admin.id,
+          judgedByName: admin.name ?? null,
+        })),
+      )
       .onConflictDoNothing()
       .returning({ id: entries.id });
-    if (created) added.push(created.id);
 
-    await db
+    const marked = await tx
       .update(suggestions)
       .set({ status: "approved", reviewerId: admin.id, reviewedAt: new Date() })
-      .where(eq(suggestions.id, s.id));
-    approved += 1;
-  }
+      .where(
+        and(
+          inArray(suggestions.id, rows.map((s) => s.id)),
+          eq(suggestions.status, "pending"),
+        ),
+      )
+      .returning({ id: suggestions.id });
+
+    return { added: created.map((e) => e.id), approved: marked.length };
+  });
 
   await record(admin.id, admin.name ?? undefined, "suggestions.approve", "suggestion", null, {
     ids,
