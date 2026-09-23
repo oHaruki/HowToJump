@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { levelValue, progressText } from "@/lib/levels";
-import { tierByOrder, tierFill, type Tier } from "@/lib/tiers";
+import { explainShare, type ShareSteps } from "@/lib/grading";
+import { levelValue, progressText, type Place } from "@/lib/levels";
+import { normalizeCategory, shortCategory, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
 import { ladderPosition } from "@/components/LevelView";
+import { GradeLetter } from "@/components/ui";
+import { CountUp } from "@/components/CountUp";
 
 /**
  * The level up popup, shown when a player returns to their profile having
@@ -14,6 +17,24 @@ import { ladderPosition } from "@/components/LevelView";
 
 type Level = { exp: number; tierOrder: number | null; progress: number | null };
 type Snapshot = Record<string, Level>;
+
+/** A score since the last look, with what it takes to explain its EXP. */
+export type EarnedPlay = {
+  scoreId: number;
+  title: string;
+  version: string | null;
+  mod: string;
+  tierOrder: number;
+  categories: string[];
+  grade: string;
+  missCount: number;
+  accuracy: number | null;
+  noteCount: number | null;
+  osuBeatmapsetId: number | null;
+  exp: number;
+  places: Place[];
+  fresh: "new" | "improved";
+};
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 const UNRANKED: Level = { exp: 0, tierOrder: null, progress: 0 };
@@ -61,6 +82,7 @@ export function LevelUp({
   scopes,
   newScores,
   improved,
+  earned,
   firstLook,
   renderedAt,
 }: {
@@ -71,6 +93,8 @@ export function LevelUp({
   scopes: Array<{ scope: string; label: string }>;
   newScores: number;
   improved: number;
+  /** The new and improved scores, most EXP first. */
+  earned: EarnedPlay[];
   firstLook: boolean;
   renderedAt: string;
 }) {
@@ -96,7 +120,12 @@ export function LevelUp({
   const [open, setOpen] = useState(false);
   // Frozen when the player presses play, so a refresh mid-animation cannot
   // change what is being shown.
-  const [playing, setPlaying] = useState<{ changes: Change[]; after: Snapshot; renderedAt: string } | null>(null);
+  const [playing, setPlaying] = useState<{
+    changes: Change[];
+    after: Snapshot;
+    renderedAt: string;
+    earned: EarnedPlay[];
+  } | null>(null);
 
   // Open once the player is actually looking: tab showing, window focused.
   useEffect(() => {
@@ -177,14 +206,14 @@ export function LevelUp({
         style={{ "--tier": mainTier ? mainTier.color : "#777" } as CSSProperties}
       >
         {playing ? (
-          <Celebration changes={playing.changes} onClose={close} />
+          <Celebration changes={playing.changes} earned={playing.earned} onClose={close} />
         ) : (
           <Summary
             changes={changes}
             firstLook={firstLook}
             newScores={newScores}
             improved={improved}
-            onPlay={() => setPlaying({ changes, after, renderedAt })}
+            onPlay={() => setPlaying({ changes, after, renderedAt, earned })}
             onSkip={close}
           />
         )}
@@ -384,14 +413,33 @@ function Burst({ small }: { small?: boolean }) {
   );
 }
 
-/** The played part: the main level first, then each category that moved. */
-function Celebration({ changes, onClose }: { changes: Change[]; onClose: () => void }) {
+/**
+ * The played part: the main level first, then each category that moved,
+ * then each new score in turn.
+ */
+function Celebration({
+  changes,
+  earned,
+  onClose,
+}: {
+  changes: Change[];
+  earned: EarnedPlay[];
+  onClose: () => void;
+}) {
   const [main, ...cats] = changes;
   const moved = cats.filter((c) => c.gain > 0 || c.rankedUp);
   const [skip, setSkip] = useState(false);
   const [mainDone, setMainDone] = useState(false);
   const [catsDone, setCatsDone] = useState(0);
+  // Which score is showing, or -1 while the levels are.
+  const [page, setPage] = useState(-1);
   const done = mainDone && catsDone >= moved.length;
+
+  if (page >= 0) {
+    return (
+      <ScorePage plays={earned} index={page} onNext={() => setPage(page + 1)} onClose={onClose} />
+    );
+  }
 
   return (
     <>
@@ -412,8 +460,13 @@ function Celebration({ changes, onClose }: { changes: Change[]; onClose: () => v
       ) : null}
       <div className="lu-actions">
         {done ? (
-          <button className="btn lu-go" type="button" autoFocus onClick={onClose}>
-            Nice
+          <button
+            className="btn lu-go"
+            type="button"
+            autoFocus
+            onClick={earned.length ? () => setPage(0) : onClose}
+          >
+            {earned.length ? "Next" : "Nice"}
           </button>
         ) : (
           <button className="btn btn-ghost" type="button" onClick={() => setSkip(true)}>
@@ -564,4 +617,155 @@ function CategoryFill({
       <span className="lu-cat-exp">+{fmt(exp - change.from.exp)}</span>
     </div>
   );
+}
+
+/** Up to two decimals, with no trailing zeros. */
+const num = (n: number) => String(Math.round(n * 100) / 100);
+const pct = (n: number) => num(n) + "%";
+
+/** One new score and what earned its EXP, with a button on to the next. */
+function ScorePage({
+  plays,
+  index,
+  onNext,
+  onClose,
+}: {
+  plays: EarnedPlay[];
+  index: number;
+  onNext: () => void;
+  onClose: () => void;
+}) {
+  const last = index >= plays.length - 1;
+  return (
+    <>
+      <span className="lu-kicker">
+        Where the EXP came from
+        {plays.length > 1 ? " · " + (index + 1) + " of " + plays.length : ""}
+      </span>
+      <EarnedCard key={plays[index].scoreId} play={plays[index]} />
+      {plays.length > 1 ? (
+        <div className="lu-dots" aria-hidden>
+          {plays.map((p, i) => (
+            <i key={p.scoreId} data-on={i === index || undefined} />
+          ))}
+        </div>
+      ) : null}
+      <div className="lu-actions">
+        <button className="btn lu-go" type="button" autoFocus onClick={last ? onClose : onNext}>
+          {last ? "Nice" : "Next"}
+        </button>
+        {last ? null : (
+          <button className="btn btn-ghost" type="button" onClick={onClose}>
+            Skip
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+function EarnedCard({ play: p }: { play: EarnedPlay }) {
+  const tier = tierByOrder(p.tierOrder);
+  const steps = explainShare(p.grade, p.missCount, p.noteCount, p.accuracy);
+  const tiles = stepTiles(steps, p);
+  const places = new Map(p.places.map((x) => [x.category, x.place]));
+  const skills = Array.from(new Set(p.categories.map((c) => normalizeCategory(c))));
+
+  return (
+    <div
+      className="lu-earn"
+      style={{ "--tint": tier?.color ?? "#777", "--fill": tierFill(tier) } as CSSProperties}
+    >
+      <div className="lu-earn-art">
+        {p.osuBeatmapsetId ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={"https://assets.ppy.sh/beatmaps/" + p.osuBeatmapsetId + "/covers/card.jpg"}
+            alt=""
+            decoding="async"
+          />
+        ) : null}
+      </div>
+      <div className="lu-earn-head">
+        <GradeLetter grade={p.grade} />
+        <div className="lu-earn-map">
+          <b>
+            {p.title}
+            {p.version ? <span> [{p.version}]</span> : null}
+            {p.mod !== "NM" ? " +" + p.mod : null}
+          </b>
+          <span>
+            {p.fresh === "new" ? "New score" : "Improved"} · {tier?.name}
+          </span>
+        </div>
+        <span className="lu-earn-exp">
+          +<CountUp value={Math.round(p.exp)} format={fmt} durationMs={1000} />
+          <small>EXP</small>
+        </span>
+      </div>
+      <div className="lu-earn-bar">
+        <i style={{ width: Math.min(100, steps.share) + "%" }} />
+      </div>
+      <span className="lu-earn-of">
+        {pct(steps.share)} of {tier?.name}&apos;s {fmt(tier?.exp ?? 0)}
+      </span>
+      <ol className="lu-earn-steps" style={{ "--n": tiles.length } as CSSProperties}>
+        {tiles.map((t) => (
+          <li key={t.label}>
+            <span>{t.label}</span>
+            <b data-kind={t.kind}>{t.value}</b>
+            <small>{t.note}</small>
+          </li>
+        ))}
+      </ol>
+      <div className="lu-earn-skills">
+        {skills.map((c) =>
+          places.has(c) ? (
+            <span key={c} data-counts>
+              {shortCategory(c)} #{places.get(c)}
+            </span>
+          ) : (
+            <span key={c}>{shortCategory(c)} · outside top 10</span>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+type Tile = { label: string; value: string; note: string; kind?: "gain" | "share" };
+
+/** Each step from the result to the share of the pack it earns, with the running count. */
+function stepTiles(s: ShareSteps, p: EarnedPlay): Tile[] {
+  const acc = p.accuracy != null ? p.accuracy.toFixed(2) + "%" : "not recorded";
+  if (s.kind === "perfect") {
+    return [
+      { label: "Result", value: "100%", note: "every note perfect" },
+      { label: "Share", value: pct(s.share), note: "the most a map pays", kind: "share" },
+    ];
+  }
+  if (s.kind === "fc") {
+    return [
+      { label: "Result", value: "FC", note: "full combo" },
+      { label: "Accuracy", value: "+" + pct(s.share - 100), note: acc, kind: "gain" },
+      { label: "Share", value: pct(s.share), note: "of the pack", kind: "share" },
+    ];
+  }
+  if (s.counted === 0) {
+    return [
+      { label: "Misses", value: "0", note: "combo broke" },
+      { label: "Share", value: pct(s.share), note: "of the pack", kind: "share" },
+    ];
+  }
+  const left = s.counted - s.wonBack;
+  return [
+    { label: "Misses", value: String(s.misses), note: "as played" },
+    {
+      label: "Length",
+      value: "×" + num(s.factor),
+      note: (p.noteCount ? fmt(p.noteCount) + " notes" : "not known yet") + " → " + num(s.counted),
+    },
+    { label: "Accuracy", value: "−" + num(s.wonBack), note: acc + " → " + num(left), kind: "gain" },
+    { label: "Share", value: pct(s.share), note: "of the pack", kind: "share" },
+  ];
 }

@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import {
   GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_KNEE, MISS_SLOPE,
   THRESHOLD_MISSES, THRESHOLD_SHARE, accuracyCredit, compareResults, expPercentFor, expShare,
-  gradeFor, gradeRank, missFactor, scaledMisses, shareForMisses,
+  explainShare, gradeFor, gradeRank, missFactor, scaledMisses, shareForMisses,
 } from "./grading";
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.01, a + " is not " + b);
@@ -431,4 +431,45 @@ test("a personal best is only taken by something actually better", () => {
   assert.ok(beats(result(12, 20, 10)), "fewer misses is an improvement");
   assert.ok(beats(result(11, 21, 97.15)), "a better grade is an improvement");
   assert.ok(beats(result(12, 21, 97.16)), "accuracy still splits an equal misscount");
+});
+
+test("the steps behind a share are the ones the share is worked from", () => {
+  // Two misses on a 375 note map count as four; 99% wins back most of one.
+  const short = explainShare("A", 2, 375, 99);
+  assert.equal(short.kind, "misses");
+  if (short.kind !== "misses") return;
+  assert.equal(short.factor, 2);
+  assert.equal(short.counted, 4);
+  near(short.wonBack, accuracyCredit(99));
+  near(short.share, shareForMisses(4 - accuracyCredit(99)));
+
+  // One miss on a long map is floored at one, and still wins back its accuracy.
+  const long = explainShare("A+", 1, 6000, 98);
+  assert.ok(long.kind === "misses" && long.counted === 1 && long.factor === MIN_MISS_FACTOR);
+
+  // No accuracy wins nothing back, and no misses has nothing to win back.
+  const unknown = explainShare("A", 2, 1500, null);
+  assert.ok(unknown.kind === "misses" && unknown.wonBack === 0);
+  const clean = explainShare("S", 0, 1500, 97);
+  assert.ok(clean.kind === "misses" && clean.counted === 0 && clean.wonBack === 0);
+  assert.equal(clean.share, 100);
+
+  assert.deepEqual(explainShare("SSS", 0, 800, 100), { kind: "perfect", share: 120 });
+  const fc = explainShare("SS", 0, 800, 99);
+  assert.ok(fc.kind === "fc" && fc.credit === accuracyCredit(99));
+});
+
+test("every explained share is the share the levels are paid", () => {
+  for (const grade of ["SSS", "SS", "S", "A+", "A", "B", "C-", "Pass"]) {
+    for (const misses of [0, 1, 2, 5, 24, 150]) {
+      for (const notes of [null, 190, 719, 1500, 6000]) {
+        for (const acc of [null, 88.5, 96.7, 99.9, 100]) {
+          assert.equal(
+            explainShare(grade, misses, notes, acc).share,
+            expShare(grade, misses, notes, acc),
+          );
+        }
+      }
+    }
+  }
 });

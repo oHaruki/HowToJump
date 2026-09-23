@@ -10,7 +10,7 @@ import { PROFILE_SCOPES, profileLists, readSnapshot, snapshotOf } from "@/lib/pr
 import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, packHref } from "@/components/ui";
 import { LevelBar, SkillRadar } from "@/components/LevelView";
-import { LevelUp } from "@/components/LevelUp";
+import { LevelUp, type EarnedPlay } from "@/components/LevelUp";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { PlayList } from "@/components/PlayList";
 import type { PlayView } from "@/components/PlayRow";
@@ -54,8 +54,13 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
 
   // Newest first for the history, by what they are worth for the top plays,
   // the second under the same order their places are numbered in.
-  const { recent: views, top }: { recent: PlayView[]; top: PlayView[] } =
-    profileLists(plays, seenAt);
+  const lists = profileLists(plays, seenAt);
+  const { recent: views, top }: { recent: PlayView[]; top: PlayView[] } = lists;
+
+  // What the level up popup explains: every score since the last look.
+  const earned: EarnedPlay[] = lists.recent
+    .flatMap((p) => (p.fresh ? [{ ...p, fresh: p.fresh }] : []))
+    .sort((a, b) => b.exp - a.exp);
 
   const clears = packRows.reduce((n, p) => n + p.entriesCleared, 0);
   const packsTouched = packRows.filter((p) => p.entriesCleared > 0).length;
@@ -79,6 +84,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
             }))}
             newScores={views.filter((v) => v.fresh === "new").length}
             improved={views.filter((v) => v.fresh === "improved").length}
+            earned={earned}
             firstLook={!previous}
             renderedAt={renderedAt.toISOString()}
           />

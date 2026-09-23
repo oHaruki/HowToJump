@@ -16,11 +16,14 @@ export function CountUp({
   value,
   decimals = 0,
   durationMs = 1100,
+  format,
 }: {
   value: number;
   /** A star rating carries two of these; a count carries none. */
   decimals?: number;
   durationMs?: number;
+  /** How each figure is written, in place of toFixed(decimals). */
+  format?: (n: number) => string;
 }) {
   const [shown, setShown] = useState(value);
   const frame = useRef(0);
@@ -47,5 +50,5 @@ export function CountUp({
     return () => cancelAnimationFrame(frame.current);
   }, [value, durationMs]);
 
-  return <>{shown.toFixed(decimals)}</>;
+  return <>{format ? format(shown) : shown.toFixed(decimals)}</>;
 }

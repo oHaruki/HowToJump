@@ -183,12 +183,61 @@ export function accuracyCredit(accuracy: number | null | undefined): number {
   return Math.pow(Math.min(accuracy, 100) / 100, ACC_EXPONENT);
 }
 
+/** Every step expShare takes, so a player can be shown where their EXP came from. */
+export type ShareSteps =
+  | { kind: "perfect"; share: number }
+  | {
+      kind: "fc";
+      /** The share of one miss the accuracy won back, 0 to 1. */
+      credit: number;
+      share: number;
+    }
+  | {
+      kind: "misses";
+      misses: number;
+      /** How many misses one counts as on this map. */
+      factor: number;
+      /** The misses once scaled, 0 for none. */
+      counted: number;
+      /** The part of a miss the accuracy won back. */
+      wonBack: number;
+      share: number;
+    };
+
 /**
- * The share of a map's pack EXP a play earns. A 100% run keeps its own
- * share and a full combo climbs toward it with accuracy. Any other play
- * reads the curve at its scaled misses, less the part of one miss its
- * accuracy wins back, at most its last real miss.
+ * The share of a map's pack EXP a play earns, with the steps to it. A 100%
+ * run keeps its own share and a full combo climbs toward it with accuracy.
+ * Any other play reads the curve at its scaled misses, less the part of one
+ * miss its accuracy wins back, at most its last real miss.
  */
+export function explainShare(
+  grade: string,
+  missCount: number,
+  noteCount: number | null | undefined,
+  accuracy: number | null | undefined = null,
+  rules: GradeRule[] = GRADE_RULES,
+): ShareSteps {
+  const perfect = rules.find((r) => r.requiresPerfect);
+  if (perfect && grade === perfect.grade) return { kind: "perfect", share: perfect.expPercent };
+  const credit = accuracyCredit(accuracy);
+  const fc = rules.find((r) => r.requiresFc);
+  if (fc && grade === fc.grade) {
+    const top = perfect?.expPercent ?? fc.expPercent;
+    return { kind: "fc", credit, share: fc.expPercent * Math.pow(top / fc.expPercent, credit) };
+  }
+  const counted = scaledMisses(missCount, noteCount);
+  const room = counted === 0 ? 0 : Math.min(1, counted - scaledMisses(missCount - 1, noteCount));
+  return {
+    kind: "misses",
+    misses: missCount,
+    factor: missFactor(noteCount),
+    counted,
+    wonBack: room * credit,
+    share: counted === 0 ? shareForMisses(0) : shareForMisses(counted - room * credit),
+  };
+}
+
+/** The share of a map's pack EXP a play earns, as a percentage. */
 export function expShare(
   grade: string,
   missCount: number,
@@ -196,16 +245,5 @@ export function expShare(
   accuracy: number | null | undefined = null,
   rules: GradeRule[] = GRADE_RULES,
 ): number {
-  const perfect = rules.find((r) => r.requiresPerfect);
-  if (perfect && grade === perfect.grade) return perfect.expPercent;
-  const credit = accuracyCredit(accuracy);
-  const fc = rules.find((r) => r.requiresFc);
-  if (fc && grade === fc.grade) {
-    const top = perfect?.expPercent ?? fc.expPercent;
-    return fc.expPercent * Math.pow(top / fc.expPercent, credit);
-  }
-  const counted = scaledMisses(missCount, noteCount);
-  if (counted === 0) return shareForMisses(0);
-  const room = Math.min(1, counted - scaledMisses(missCount - 1, noteCount));
-  return shareForMisses(counted - room * credit);
+  return explainShare(grade, missCount, noteCount, accuracy, rules).share;
 }
