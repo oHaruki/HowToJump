@@ -136,7 +136,7 @@ function bankWhere(filters: BankFilters) {
    a paged list keeps a stable order across queries. */
 const bankOrder = [desc(entries.tierOrder), desc(entries.stars), desc(entries.id)];
 
-/** The whole filtered bank. Staff screens only; public pages take a page. */
+/** The whole filtered bank, for staff screens and one pack's page. The bank itself takes a page. */
 export async function getBank(filters: BankFilters = {}): Promise<BankRow[]> {
   const rows = await db
     .select(bankSelection)

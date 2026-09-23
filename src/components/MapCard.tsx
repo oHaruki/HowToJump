@@ -28,7 +28,7 @@ export function MapCard({
   status,
   tone,
   packEditable,
-  extraStats,
+  score,
   linkTitle = true,
   href,
 }: {
@@ -53,8 +53,8 @@ export function MapCard({
   tone?: "error" | "attention" | "muted";
   /** Widens the pack slot when it holds a control rather than a tile. */
   packEditable?: boolean;
-  /** Appended to the figures, for surfaces with their own, like a score. */
-  extraStats?: ReactNode;
+  /** A player's result on the map, right of the map and its figures. */
+  score?: ReactNode;
   linkTitle?: boolean;
   /** The map's page on this site; the title links to osu! when there is none. */
   href?: string;
@@ -70,7 +70,7 @@ export function MapCard({
     <article className="mapcard" data-tone={tone ?? ""}>
       <CardArt setId={osuBeatmapsetId} tierOrder={tierOrder} />
 
-      <div className="mapcard-inner">
+      <div className={"mapcard-inner" + (score ? " scored" : "")}>
         {leading ? <div className="mapcard-lead">{leading}</div> : null}
 
         <div className="mapcard-left">
@@ -119,9 +119,9 @@ export function MapCard({
           <span><i>CS</i><b>{cs ?? NONE}</b></span>
           <span><i>AR</i><b>{ar ?? NONE}</b></span>
           <span><i>OD</i><b>{od ?? NONE}</b></span>
-          {extraStats}
         </div>
 
+        {score ? <div className="mapcard-score">{score}</div> : null}
         {status ? <div className="mapcard-status">{status}</div> : null}
         {actions ? <div className="mapcard-actions">{actions}</div> : null}
       </div>

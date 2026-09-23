@@ -202,6 +202,11 @@ export function mapHref(osuBeatmapId: number, mod?: string | null) {
   return "/beatmap/" + osuBeatmapId + (mod && mod !== "NM" ? "?mod=" + mod : "");
 }
 
+/** A player's maps and scores in one pack. */
+export function packHref(osuUserId: number | undefined, slug: string) {
+  return "/u/" + osuUserId + "/packs/" + slug;
+}
+
 /** Cover art. The 404 fallback lives in Cover, which needs the client. */
 export function Thumb({ map }: { map: MapLike }) {
   return (

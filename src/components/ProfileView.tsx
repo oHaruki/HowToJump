@@ -3,12 +3,12 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userLevels, userTierProgress, users } from "@/lib/schema";
-import { RANKING_PAGE_SIZE, getProfilePlays, getRankOf } from "@/lib/queries";
+import { RANKING_PAGE_SIZE, getProfilePlays, getRankOf, getTierCounts } from "@/lib/queries";
 import { GRADE_RULES } from "@/lib/grading";
 import { BEST_PLAYS, MAIN_LEVEL, levelValue } from "@/lib/levels";
 import { PROFILE_SCOPES, profileLists, readSnapshot, snapshotOf } from "@/lib/progress";
 import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
-import { Flag, GradeLetter } from "@/components/ui";
+import { Flag, GradeLetter, packHref } from "@/components/ui";
 import { LevelBar, SkillRadar } from "@/components/LevelView";
 import { LevelUp } from "@/components/LevelUp";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -37,12 +37,13 @@ const GRADE_TALLY = [
 export async function ProfileView({ userId, owner }: { userId: number; owner: boolean }) {
   const renderedAt = new Date();
   // One round trip: nothing in the batch needs the player's own row.
-  const [[me], packRows, plays, levelRows, standing] = await Promise.all([
+  const [[me], packRows, plays, levelRows, standing, packSizes] = await Promise.all([
     db.select().from(users).where(eq(users.id, userId)),
     db.select().from(userTierProgress).where(eq(userTierProgress.userId, userId)),
     getProfilePlays(userId),
     db.select().from(userLevels).where(eq(userLevels.userId, userId)),
     getRankOf(userId, MAIN_LEVEL),
+    getTierCounts(),
   ]);
 
   // Where the player is, and, for the owner, where they were when they last looked.
@@ -294,17 +295,19 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
         <div className="section-head">
           <span className="lbl">Packs</span>
           <h2>Through the packs</h2>
+          <p className="small">Open a pack to see every map in it and the score on each.</p>
         </div>
         <div className="pf-packs">
           {TIERS.map((t) => {
             const p = byPack.get(t.order);
-            const total = p?.entriesTotal ?? 0;
+            const total = packSizes.get(t.order) ?? 0;
             const done = p?.entriesCleared ?? 0;
             const best = GRADE_RULES.find((g) => g.sortOrder === p?.bestGradeRank);
             return (
-              <div
+              <Link
                 className="pk"
                 key={t.slug}
+                href={packHref(me?.osuUserId, t.slug)}
                 data-idle={done ? undefined : true}
                 style={{ "--pack": t.color, "--fill": tierFill(t) } as CSSProperties}
               >
@@ -319,7 +322,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
                 <span className="pk-count">
                   {total ? done + " / " + total + " cleared" : "No maps yet"}
                 </span>
-              </div>
+              </Link>
             );
           })}
         </div>

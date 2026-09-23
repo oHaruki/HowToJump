@@ -1030,6 +1030,48 @@ footer {
   }
 }
 
+/*
+ * A card with a player's score: the map on the first row, its figures on
+ * the second, and the score to the right of both.
+ */
+.mapcard-inner.scored {
+  display: grid; align-items: center; gap: 14px 26px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "left score" "stats score";
+}
+.scored > .mapcard-left { grid-area: left; }
+.scored > .mapcard-stats { grid-area: stats; flex-wrap: wrap; row-gap: 8px; }
+.scored > .mapcard-stats > span { text-align: left; }
+.mapcard-score { grid-area: score; justify-self: end; display: flex; align-items: center; gap: 16px; }
+.mapcard-score .gl { min-width: 64px; text-align: center; font-size: 36px; }
+.mapcard-score-acc {
+  font-family: var(--font-mono); font-size: var(--font-size-small);
+  color: var(--text); text-align: right; line-height: 1.35; white-space: nowrap;
+}
+.mapcard-score-exp { display: flex; flex-direction: column; align-items: flex-end; min-width: 92px; }
+.mapcard-score-exp b {
+  font-family: var(--font-mono); font-weight: 400; font-size: 21px;
+  font-variant-numeric: tabular-nums; color: var(--text-focus);
+}
+.mapcard-score-exp span {
+  font-family: var(--font-mono); font-size: 11.5px; white-space: nowrap;
+  text-transform: uppercase; letter-spacing: var(--letter-label); color: var(--text-dark);
+}
+.mapcard-score-exp span[data-counts] { color: color-mix(in srgb, var(--pack) 55%, var(--text-focus)); }
+.mapcard-score-none { font-size: var(--font-size-small); color: var(--text-dark); }
+/* A map the player has not cleared, grayed out. */
+.mapcard[data-tone="muted"]:has(.mapcard-score-none) { filter: grayscale(1); }
+@media (max-width: 1280px) {
+  .mapcard-inner.scored { grid-template-areas: "left left" "stats score"; }
+}
+@media (max-width: 720px) {
+  .mapcard-inner.scored {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "left" "stats" "score";
+  }
+  .mapcard-score { justify-self: start; }
+}
+
 /* ------------------------------------------------------------ pack picker */
 
 .packpick-btn {
@@ -1631,6 +1673,32 @@ a.pager-page:hover, a.pager-step:hover {
 .pk-bar { height: 5px; background: var(--bg-d); border-radius: 99px; overflow: hidden; }
 .pk-bar i { display: block; height: 100%; border-radius: 99px; background: var(--fill); }
 .pk-count { font-family: var(--font-mono); font-size: var(--font-size-small); color: var(--text); }
+a.pk { color: inherit; text-decoration: none; transition: border-color var(--dur-fast); }
+a.pk:hover { border-color: color-mix(in srgb, var(--pack) 55%, var(--border)); }
+
+/* A pack's own page: the profile's tile, larger, under a gem for every pack. */
+.pk-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
+.pk-strip { display: flex; flex-wrap: wrap; gap: 6px; }
+.pk-strip > * {
+  width: 24px; height: 24px;
+  border-radius: 7px; corner-shape: var(--corner-shape);
+  outline: var(--border-width) solid var(--scrim);
+  transition: opacity var(--dur-fast);
+}
+.pk-strip > span { opacity: 0.15; }
+.pk-strip > [data-idle] { opacity: 0.4; }
+.pk-strip > a:hover { opacity: 1; }
+.pk-strip > a:focus-visible { outline: 1px solid var(--text-focus); outline-offset: 2px; }
+.pk-strip > [aria-current="page"] {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--main-bg), 0 0 0 4px var(--text-focus);
+}
+.pk-lg { gap: 14px; padding: 22px 24px; }
+.pk-lg .pk-top { gap: 16px; }
+.pk-lg .pk-gem { width: 46px; height: 46px; border-radius: 13px; }
+.pk-who { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pk-lg .pk-top .gl { font-size: 48px; min-width: 80px; }
+.pk-lg .pk-bar { height: 8px; }
 
 /* -------------------------------------------------------------- level up */
 

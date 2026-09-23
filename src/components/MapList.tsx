@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { CategoryChips, ModChip, PacingChips, mapHref } from "@/components/ui";
 import type { BankRow } from "@/lib/queries";
@@ -11,31 +12,47 @@ export function MapList({ rows }: { rows: BankRow[] }) {
   return (
     <div className="review-list">
       {rows.map((m) => (
-        <MapCard
-          key={m.entryId}
-          osuBeatmapId={m.osuBeatmapId}
-          osuBeatmapsetId={m.osuBeatmapsetId}
-          title={m.title}
-          version={m.version}
-          mapper={m.mapper}
-          tierOrder={m.tierOrder}
-          stars={m.stars}
-          bpm={m.bpm}
-          drain={m.drain}
-          cs={m.cs}
-          ar={m.ar}
-          od={m.od}
-          href={mapHref(m.osuBeatmapId, m.mod)}
-          pack={<PackTile tierOrder={m.tierOrder} />}
-          tags={
-            <>
-              <ModChip mod={m.mod} />
-              <CategoryChips categories={m.categories} />
-              <PacingChips length={m.lengthBucket} speed={m.speedBucket} />
-            </>
-          }
-        />
+        <BankCard key={m.entryId} map={m} />
       ))}
     </div>
+  );
+}
+
+/** One bank entry as its card, with a player's score where a page has one. */
+export function BankCard({
+  map: m,
+  score,
+  tone,
+}: {
+  map: BankRow;
+  score?: ReactNode;
+  tone?: "muted";
+}) {
+  return (
+    <MapCard
+      osuBeatmapId={m.osuBeatmapId}
+      osuBeatmapsetId={m.osuBeatmapsetId}
+      title={m.title}
+      version={m.version}
+      mapper={m.mapper}
+      tierOrder={m.tierOrder}
+      stars={m.stars}
+      bpm={m.bpm}
+      drain={m.drain}
+      cs={m.cs}
+      ar={m.ar}
+      od={m.od}
+      href={mapHref(m.osuBeatmapId, m.mod)}
+      pack={<PackTile tierOrder={m.tierOrder} />}
+      tags={
+        <>
+          <ModChip mod={m.mod} />
+          <CategoryChips categories={m.categories} />
+          <PacingChips length={m.lengthBucket} speed={m.speedBucket} />
+        </>
+      }
+      score={score}
+      tone={tone}
+    />
   );
 }
