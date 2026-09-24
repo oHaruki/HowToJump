@@ -6,8 +6,9 @@
  *   2. The grade table, refreshed from the code.
  *   3. The sheet's maps, into an empty bank only.
  *   4. Missing note counts, and entries folded by mod.
- *   5. Zero miss plays, read again once under a new full combo rule.
- *   6. Levels, where the rules or the players above changed.
+ *   5. Scores played under other mods than their entry's, moved or deleted.
+ *   6. Zero miss plays, read again once under a new full combo rule.
+ *   7. Levels, where the rules or the players above changed.
  */
 import "./env";
 import { createHash } from "node:crypto";
@@ -16,8 +17,8 @@ import { fileURLToPath } from "node:url";
 import { and, eq, inArray, isNotNull, sql as raw } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { db, sql } from "@/lib/db";
-import { entries, scores, siteConfig } from "@/lib/schema";
-import { rebuildLevelsIfRulesChanged, refreshProgress } from "@/lib/osu/sync";
+import { auditLog, entries, scores, siteConfig } from "@/lib/schema";
+import { clearOffModScores, rebuildLevelsIfRulesChanged, refreshProgress } from "@/lib/osu/sync";
 import { fetchScore, toPlay, type OsuScore } from "@/lib/osu/client";
 import { gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
 import {
@@ -133,6 +134,19 @@ async function main() {
   if (filled.length) console.log("Note counts filled for " + filled.length + " maps");
 
   const remoded = await mergeLooseModEntries();
+
+  const cleared = await clearOffModScores();
+  if (cleared.length) {
+    await db.insert(auditLog).values({
+      actorName: "deploy",
+      action: "scores.clear",
+      entityType: "score",
+      entityId: null,
+      detail: cleared,
+    });
+    console.log("Took " + cleared.length + " scores off entries under other mods");
+  }
+
   const regraded = await recheckFullCombos();
 
   // The previous build's app keeps running until this finishes, so a player
@@ -145,8 +159,9 @@ async function main() {
       : "Level rules unchanged",
   );
 
-  // A count, a merge or a regrade changes what those plays are worth.
-  const moved = [...remoded, ...regraded];
+  // A count, a merge, a cleared score or a regrade changes what those plays
+  // are worth.
+  const moved = [...remoded, ...cleared.map((s) => s.userId), ...regraded];
   if (!levels.rebuilt && (filled.length || moved.length)) {
     const onFilled = filled.length
       ? await db

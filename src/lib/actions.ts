@@ -11,7 +11,9 @@ import { auth, requireAdmin, requireStaff } from "@/lib/auth";
 import {
   fetchBeatmaps, fetchStarRating, fetchUser, type BeatmapFacts,
 } from "@/lib/osu/client";
-import { backfillScore, cooldownLeft, refreshEntryPlayers, syncUser } from "@/lib/osu/sync";
+import {
+  backfillScore, clearOffModScores, cooldownLeft, refreshEntryPlayers, refreshProgress, syncUser,
+} from "@/lib/osu/sync";
 import { parseScoreLink } from "@/lib/osu/backfill";
 import { modAcronyms, normalizeMod } from "@/lib/mods";
 import {
@@ -422,9 +424,9 @@ export async function setSuggestionTier(id: number, tierName: string) {
 
 /**
  * Edits everything staff assign on a banked entry. Changing the mod
- * recalculates the figures from the beatmap's nomod values and re-fetches
- * the star rating; beatmap and mod are unique, so a collision is checked
- * before anything is written.
+ * recalculates the figures from the beatmap's nomod values, re-fetches the
+ * star rating and takes off the scores set under the old mod; beatmap and
+ * mod are unique, so a collision is checked before anything is written.
  */
 export async function updateEntry(
   entryId: number,
@@ -509,9 +511,15 @@ export async function updateEntry(
   }
 
   await db.update(entries).set(set).where(eq(entries.id, entryId));
-  await record(staff.id, staff.name ?? undefined, "entry.update", "entry", entryId, patch);
+  // The scores set under the old mod come off with it.
+  const cleared = set.mod ? await clearOffModScores(entryId) : [];
+  await record(
+    staff.id, staff.name ?? undefined, "entry.update", "entry", entryId,
+    cleared.length ? { ...patch, cleared } : patch,
+  );
   // A new pack or category changes what every play on the map is worth.
   if (patch.tier || patch.categories) await refreshEntryPlayers(entryId);
+  for (const userId of new Set(cleared.map((s) => s.userId))) await refreshProgress(userId);
 
   revalidatePath("/staff/bank");
   revalidatePath("/maps");

@@ -7,7 +7,7 @@ import {
   LENGTHS, SPEEDS, LENGTH_SCALE, SPEED_SCALE, scaleHint,
   tierByName, tierByOrder, tierBySlug,
 } from "@/lib/tiers";
-import { MODS } from "@/lib/mods";
+import { MODS, modsText } from "@/lib/mods";
 import { CategoryChips, ModChip, PacingChips, PickSelect } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
@@ -156,7 +156,10 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                       onChange={(v) => setDraft({ ...draft, speed: v })}
                     />
                     {draft.mod !== r.mod ? (
-                      <span className="small">Mod change recalculates the figures</span>
+                      <span className="small">
+                        Mod change recalculates the figures and removes the{" "}
+                        {modsText([r.mod])} scores
+                      </span>
                     ) : null}
                   </>
                 ) : (

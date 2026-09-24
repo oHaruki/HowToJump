@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lt, notInArray, or, sql as raw } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, ne, notInArray, or, sql as raw } from "drizzle-orm";
 import { db, sql } from "@/lib/db";
 import {
   beatmaps, entries, scores, siteConfig, syncRuns, userLevels, userTierProgress, users,
@@ -274,6 +274,70 @@ export async function refreshEntryPlayers(entryId: number): Promise<number> {
     .where(eq(scores.entryId, entryId));
   for (const p of players) await refreshProgress(p.userId);
   return players.length;
+}
+
+/** A score taken off an entry under other mods, and the entry it moved to, if any. */
+export type ClearedScore = {
+  userId: number;
+  osuScoreId: number | null;
+  mods: string;
+  movedTo: number | null;
+};
+
+/**
+ * Takes every score played under other mods than its entry's off that
+ * entry. It moves to the same map's entry under its own mods, the player
+ * keeping their better result there, or is deleted when there is none.
+ * Only the given entry's scores, or every entry's when none is given. The
+ * players in the result still need their levels recomputed.
+ */
+export async function clearOffModScores(entryId?: number): Promise<ClearedScore[]> {
+  const rows = await db
+    .select({
+      id: scores.id,
+      userId: scores.userId,
+      osuScoreId: scores.osuScoreId,
+      mods: scores.mods,
+      gradeRank: scores.gradeRank,
+      missCount: scores.missCount,
+      accuracy: scores.accuracy,
+      beatmapId: entries.beatmapId,
+      entryMod: entries.mod,
+    })
+    .from(scores)
+    .innerJoin(entries, eq(scores.entryId, entries.id))
+    .where(and(
+      ne(scores.mods, entries.mod),
+      entryId == null ? undefined : eq(scores.entryId, entryId),
+    ));
+
+  const cleared: ClearedScore[] = [];
+  for (const score of rows) {
+    // Normalized on both sides, so a score kept as HDHR still counts as HR.
+    const mods = normalizeMod(score.mods);
+    if (mods === normalizeMod(score.entryMod)) continue;
+
+    const [home] = await db
+      .select({ id: entries.id })
+      .from(entries)
+      .where(and(eq(entries.beatmapId, score.beatmapId), eq(entries.mod, mods)));
+    const [held] = home
+      ? await db
+          .select()
+          .from(scores)
+          .where(and(eq(scores.userId, score.userId), eq(scores.entryId, home.id)))
+      : [];
+    // The same comparison the sync makes: grade, then misses, then accuracy.
+    const movedTo = home && !(held && compareResults(score, held) >= 0) ? home.id : null;
+    if (movedTo == null) {
+      await db.delete(scores).where(eq(scores.id, score.id));
+    } else {
+      if (held) await db.delete(scores).where(eq(scores.id, held.id));
+      await db.update(scores).set({ entryId: movedTo }).where(eq(scores.id, score.id));
+    }
+    cleared.push({ userId: score.userId, osuScoreId: score.osuScoreId, mods, movedTo });
+  }
+  return cleared;
 }
 
 /** Where the rules the stored levels were computed under are kept. */
