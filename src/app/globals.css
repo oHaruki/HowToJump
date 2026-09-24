@@ -1529,7 +1529,8 @@ a.pager-page:hover, a.pager-step:hover {
 }
 .pf-hardest { display: flex; align-items: center; gap: 12px; }
 .pf-hardest .dot { width: 14px; height: 14px; }
-.pf-grades { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: -14px; }
+.pf-grades { display: flex; flex-wrap: wrap; gap: 10px 44px; margin-top: -14px; }
+.pf-grade-family { display: flex; flex-wrap: wrap; gap: 10px 26px; }
 .pf-grade { display: inline-flex; align-items: center; gap: 10px; }
 .pf-grade b { font-size: 20px; font-weight: 400; }
 

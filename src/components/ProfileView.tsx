@@ -19,12 +19,11 @@ import { SyncButton } from "@/components/SyncButton";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 
-/** The grades a profile counts, osu! style: the top three, then the A band. */
+/** The grades a profile counts, SSS down to B-, one family to a group. */
 const GRADE_TALLY = [
-  { label: "SSS", grades: ["SSS"] },
-  { label: "SS", grades: ["SS"] },
-  { label: "S", grades: ["S"] },
-  { label: "A", grades: ["A+", "A", "A-"] },
+  ["SSS", "SS", "S"],
+  ["A+", "A", "A-"],
+  ["B+", "B", "B-"],
 ];
 
 /**
@@ -216,11 +215,15 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
       </div>
 
       <div className="pf-grades">
-        {GRADE_TALLY.map((g) => (
-          <span className="pf-grade" key={g.label}>
-            <GradeLetter grade={g.label} />
-            <b className="num">{plays.filter((p) => g.grades.includes(p.grade)).length}</b>
-          </span>
+        {GRADE_TALLY.map((family) => (
+          <div className="pf-grade-family" key={family[0]}>
+            {family.map((grade) => (
+              <span className="pf-grade" key={grade}>
+                <GradeLetter grade={grade} />
+                <b className="num">{plays.filter((p) => p.grade === grade).length}</b>
+              </span>
+            ))}
+          </div>
         ))}
       </div>
 
