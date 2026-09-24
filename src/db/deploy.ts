@@ -6,17 +6,20 @@
  *   2. The grade table, refreshed from the code.
  *   3. The sheet's maps, into an empty bank only.
  *   4. Missing note counts, and entries folded by mod.
- *   5. Levels, where the rules or the players above changed.
+ *   5. Zero miss plays, read again once under a new full combo rule.
+ *   6. Levels, where the rules or the players above changed.
  */
 import "./env";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { eq, inArray, sql as raw } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql as raw } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { db, sql } from "@/lib/db";
-import { entries, scores } from "@/lib/schema";
+import { entries, scores, siteConfig } from "@/lib/schema";
 import { rebuildLevelsIfRulesChanged, refreshProgress } from "@/lib/osu/sync";
+import { fetchScore, toPlay, type OsuScore } from "@/lib/osu/client";
+import { gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
 import {
   backfillNoteCounts, mergeLooseModEntries, seedGradeRules, seedSheet, seedSiteConfig,
 } from "./seeding";
@@ -61,6 +64,55 @@ async function adoptPushedDatabase(): Promise<boolean> {
   return true;
 }
 
+/** Where the full combo rule the stored plays were read under is kept. */
+const FC_RULE_KEY = "fc_rule";
+const FC_RULE = "dropped slider ends count";
+
+/**
+ * Asks osu! again about every stored zero miss play that isn't a full
+ * combo, once per FC_RULE, and regrades the ones that now are. Returns the
+ * players whose grades moved.
+ */
+async function recheckFullCombos(): Promise<number[]> {
+  const [stored] = await db
+    .select({ value: siteConfig.value })
+    .from(siteConfig)
+    .where(eq(siteConfig.key, FC_RULE_KEY));
+  if (stored?.value === FC_RULE) return [];
+
+  const rows = await db
+    .select({ id: scores.id, userId: scores.userId, osuScoreId: scores.osuScoreId })
+    .from(scores)
+    .where(and(eq(scores.missCount, 0), eq(scores.isFc, false), isNotNull(scores.osuScoreId)));
+
+  const moved = new Set<number>();
+  for (const r of rows) {
+    let score: OsuScore | null;
+    try {
+      score = await fetchScore({ id: r.osuScoreId!, ruleset: null });
+    } catch (e) {
+      console.warn("Full combos not all rechecked, trying again next deploy: " + (e instanceof Error ? e.message : e));
+      return [...moved];
+    }
+    if (!score) continue;
+    const play = toPlay(score);
+    if (!play.isFc) continue;
+    const grade = gradeFor(play, GRADE_RULES);
+    await db
+      .update(scores)
+      .set({ isFc: true, isPerfect: play.isPerfect, grade, gradeRank: gradeRank(grade, GRADE_RULES) })
+      .where(eq(scores.id, r.id));
+    moved.add(r.userId);
+  }
+
+  await db
+    .insert(siteConfig)
+    .values({ key: FC_RULE_KEY, value: FC_RULE })
+    .onConflictDoUpdate({ target: siteConfig.key, set: { value: FC_RULE, updatedAt: new Date() } });
+  console.log("Rechecked " + rows.length + " zero miss plays, " + moved.size + " players gained a full combo");
+  return [...moved];
+}
+
 async function main() {
   if (await adoptPushedDatabase()) {
     console.log("Built with db:push before migrations were tracked; took it from there");
@@ -81,6 +133,7 @@ async function main() {
   if (filled.length) console.log("Note counts filled for " + filled.length + " maps");
 
   const remoded = await mergeLooseModEntries();
+  const regraded = await recheckFullCombos();
 
   // The previous build's app keeps running until this finishes, so a player
   // it syncs in the meantime is recomputed under the old rules. Their next
@@ -92,8 +145,9 @@ async function main() {
       : "Level rules unchanged",
   );
 
-  // A count or a merge that arrives later changes what those plays are worth.
-  if (!levels.rebuilt && (filled.length || remoded.length)) {
+  // A count, a merge or a regrade changes what those plays are worth.
+  const moved = [...remoded, ...regraded];
+  if (!levels.rebuilt && (filled.length || moved.length)) {
     const onFilled = filled.length
       ? await db
           .selectDistinct({ userId: scores.userId })
@@ -101,7 +155,7 @@ async function main() {
           .innerJoin(entries, eq(scores.entryId, entries.id))
           .where(inArray(entries.beatmapId, filled))
       : [];
-    const players = new Set([...onFilled.map((p) => p.userId), ...remoded]);
+    const players = new Set([...onFilled.map((p) => p.userId), ...moved]);
     for (const userId of players) await refreshProgress(userId);
     console.log("Recomputed " + players.size + " players on those maps");
   }

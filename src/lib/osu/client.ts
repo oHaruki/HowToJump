@@ -251,6 +251,9 @@ type OsuScoreStatistics = {
   great?: number;
   ok?: number;
   meh?: number;
+  large_tick_hit?: number;
+  slider_tail_hit?: number;
+  legacy_combo_increase?: number;
 };
 
 export type OsuScore = {
@@ -299,12 +302,35 @@ export type PlayFacts = {
   passed: boolean;
 };
 
+/**
+ * Whether every combo a play is short of the map's could be a dropped slider
+ * end, which costs one combo without breaking it. A lazer score counts its
+ * ends; a stable one shows each as a 100.
+ */
+function onlyDroppedEnds(s: OsuScore): boolean {
+  const most = s.maximum_statistics;
+  if (!most) return false;
+  const mapCombo =
+    (most.great ?? 0) + (most.large_tick_hit ?? 0) + (most.slider_tail_hit ?? 0) +
+    (most.legacy_combo_increase ?? 0);
+  if (!mapCombo) return false;
+  const stats = s.statistics ?? {};
+  const dropped =
+    most.slider_tail_hit != null
+      ? most.slider_tail_hit - (stats.slider_tail_hit ?? 0)
+      : (stats.ok ?? 0);
+  return mapCombo - (s.max_combo ?? 0) <= dropped;
+}
+
 export function toPlay(s: OsuScore): PlayFacts {
   const stats = s.statistics ?? {};
   const missCount = stats.count_miss ?? stats.miss ?? 0;
-  // A full combo means no misses and no dropped combo. osu! reports this as
-  // "perfect" on legacy scores and "is_perfect_combo" on newer ones.
-  const isFc = Boolean(s.perfect ?? s.legacy_perfect ?? s.is_perfect_combo) && missCount === 0;
+  // A full combo means no misses and no break in the combo. osu! flags only
+  // a combo that matches the map's, as "perfect" on legacy scores and
+  // "is_perfect_combo" on newer ones, so dropped slider ends are read too.
+  const isFc =
+    missCount === 0 &&
+    (Boolean(s.perfect ?? s.legacy_perfect ?? s.is_perfect_combo) || onlyDroppedEnds(s));
   // SSS is reserved for a run that also dropped nothing to 100 or 50.
   const rank = String(s.rank ?? "");
   const isPerfect = isFc && (rank === "X" || rank === "XH" || rank === "SS" || rank === "SSH");
