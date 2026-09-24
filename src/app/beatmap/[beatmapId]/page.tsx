@@ -13,6 +13,7 @@ import {
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, ModChip, PacingChips, mapHref } from "@/components/ui";
+import { ScoreDelete } from "@/components/ScoreDelete";
 import { timeAgo } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +118,12 @@ export default async function BeatmapPage({
             {mine && mine.rank !== 1 ? (
               <ScoreCard s={mine} exp={expOf(mine)} setId={map.osuBeatmapsetId} kind="mine" />
             ) : null}
-            <Scoreboard scores={board} expOf={expOf} me={session?.userId ?? null} />
+            <Scoreboard
+              scores={board}
+              expOf={expOf}
+              me={session?.userId ?? null}
+              admin={session?.role === "admin"}
+            />
           </>
         ) : (
           <div className="sb-empty">
@@ -373,15 +379,20 @@ function ScoreCard({
   );
 }
 
-/** Every score, a row each, the way osu!'s beatmap scoreboard lists them. */
+/**
+ * Every score, a row each, the way osu!'s beatmap scoreboard lists them. An
+ * admin gets a delete on each row.
+ */
 function Scoreboard({
   scores,
   expOf,
   me,
+  admin,
 }: {
   scores: BoardScore[];
   expOf: (s: BoardScore) => number;
   me: number | null;
+  admin: boolean;
 }) {
   return (
     <div className="sb-list" role="table" aria-label="Scoreboard">
@@ -413,6 +424,7 @@ function Scoreboard({
           </span>
           <span role="cell" className="sb-who">
             <Player s={s} avatar />
+            {admin ? <ScoreDelete scoreId={s.scoreId} /> : null}
           </span>
           <span role="cell" className="c sb-num sb-opt" data-fc={s.isFc || undefined}>
             {s.maxCombo != null ? fmt(s.maxCombo) + "x" : "·"}

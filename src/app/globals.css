@@ -2314,14 +2314,19 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
 .sb-num[data-zero] { color: var(--text-dark); }
 .sb-exp { font-size: 17px; }
 /* A flex box, so the name sits on the row's centre line with the figures
-   rather than riding up on its own line box. */
-.sb-who { min-width: 0; display: flex; align-items: center; }
+   rather than riding up on its own line box. An admin's delete sits beside
+   the name, or under it where the column is too narrow for both. */
+.sb-who { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; row-gap: 6px; }
 .sb-player {
-  display: inline-flex; align-items: center; gap: 10px; max-width: 100%;
+  display: inline-flex; align-items: center; gap: 10px; max-width: 100%; min-width: 0;
   color: var(--text-focus); font-weight: 600; text-decoration: none;
 }
 .sb-player span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-player:hover span { text-decoration: underline; }
+.sb-delete {
+  display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px;
+  margin-left: auto; padding-left: 10px;
+}
 .sb-row .chip-mod { padding: 1px 8px; font-size: 12px; }
 .sb-empty {
   display: flex; align-items: center; gap: 20px; padding: 24px 28px;

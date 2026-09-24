@@ -5,7 +5,7 @@ import { completionOf, fetchLatestScore, toPlay, type OsuScore, type PlayFacts }
 import { compareResults, gradeFor, gradeRank } from "@/lib/grading";
 import { playExp } from "@/lib/levels";
 import { modsAsPlayed, modsText, normalizeMod } from "@/lib/mods";
-import { gradeText } from "@/lib/queries";
+import { gradeText, isDeletedScore } from "@/lib/queries";
 import { md, type Message } from "@/lib/discord/api";
 import { recentEmbed, type RecentPlay } from "@/lib/discord/embeds";
 import { findPlayer, unknownPlayer } from "@/lib/discord/profile";
@@ -112,6 +112,7 @@ async function standing(
     return "In the bank as " + listed + ", not " + modsText([play.mods]) + ", so it doesn't count.";
   }
   if (!play.passed) return "A fail, so it doesn't count.";
+  if (await isDeletedScore(play.osuScoreId)) return "Deleted by an admin, so it doesn't count.";
 
   const best = await db.query.scores.findFirst({
     where: and(eq(scores.userId, userId), eq(scores.entryId, entry.id)),

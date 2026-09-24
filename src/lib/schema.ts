@@ -218,6 +218,13 @@ export const scores = pgTable(
   ],
 );
 
+/** osu! scores an admin deleted, so neither the sync nor a link brings one back. */
+export const deletedScores = pgTable("deleted_scores", {
+  osuScoreId: bigint("osu_score_id", { mode: "number" }).primaryKey(),
+  deletedById: integer("deleted_by_id").references(() => users.id),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Rollup refreshed on score import so pages never aggregate per request. */
 export const userTierProgress = pgTable(
   "user_tier_progress",

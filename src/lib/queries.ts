@@ -3,7 +3,9 @@ import {
   sql as raw,
 } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { beatmaps, entries, scores, suggestions, userLevels, users } from "@/lib/schema";
+import {
+  beatmaps, deletedScores, entries, scores, suggestions, userLevels, users,
+} from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
 import { CATEGORIES, LENGTHS, SPEEDS, orderByScale } from "@/lib/tiers";
 
@@ -552,6 +554,16 @@ export async function getEntryLeader(entryId: number): Promise<BoardScore | null
     .orderBy(boardOrder)
     .limit(1);
   return row ? { ...row, rank: 1 } : null;
+}
+
+/** Whether an admin deleted this osu! score, which keeps it off the site. */
+export async function isDeletedScore(osuScoreId: number | null): Promise<boolean> {
+  if (osuScoreId == null) return false;
+  const [row] = await db
+    .select({ osuScoreId: deletedScores.osuScoreId })
+    .from(deletedScores)
+    .where(eq(deletedScores.osuScoreId, osuScoreId));
+  return row != null;
 }
 
 /**

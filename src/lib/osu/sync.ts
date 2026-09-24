@@ -10,7 +10,7 @@ import {
 import { compareResults, gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
 import { modsText, normalizeMod } from "@/lib/mods";
 import { announceRecords, announceScores, type RecordTaken } from "@/lib/discord";
-import { getEntryLeader, getTopRanked } from "@/lib/queries";
+import { getEntryLeader, getTopRanked, isDeletedScore } from "@/lib/queries";
 import { planPass, type SyncReason } from "@/lib/osu/plan";
 import { backfillProblem, type ScoreRef } from "@/lib/osu/backfill";
 
@@ -74,14 +74,16 @@ async function entryIndex(): Promise<Map<string, EntryRow>> {
 }
 
 /**
- * Writes one play if it beats what the player already has on that entry.
- * Returns the grade when something was actually written.
+ * Writes one play if it beats what the player already has on that entry,
+ * and never one an admin deleted. Returns the grade when something was
+ * actually written.
  */
 async function upsertScore(
   userId: number,
   entry: EntryRow,
   play: PlayFacts,
 ): Promise<string | null> {
+  if (await isDeletedScore(play.osuScoreId)) return null;
   const grade = gradeFor(
     { missCount: play.missCount, isFc: play.isFc, isPerfect: play.isPerfect },
     GRADE_RULES,
@@ -486,6 +488,9 @@ export async function backfillScore(
   if (problem) return { ok: false, error: problem };
 
   const play = toPlay(score);
+  if (await isDeletedScore(play.osuScoreId)) {
+    return { ok: false, error: "An admin deleted that score, so it can't be added back." };
+  }
   const banked = await db
     .select({
       id: entries.id,

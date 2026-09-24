@@ -5,7 +5,8 @@ import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
-  auditLog, beatmaps, entries, suggestionBatches, suggestions, users, type Suggestion,
+  auditLog, beatmaps, deletedScores, entries, scores, suggestionBatches, suggestions, users,
+  type Suggestion,
 } from "@/lib/schema";
 import { auth, requireAdmin, requireStaff } from "@/lib/auth";
 import {
@@ -613,6 +614,37 @@ export async function addStaffMember(
   });
   revalidatePath("/staff/members");
   return { username: profile.username, created: true };
+}
+
+/* ----------------------------------------------------------------- scores */
+
+/**
+ * Deletes a score from its map, the player's profile and their levels. Its
+ * osu! score ID is kept, so neither the sync nor a link brings it back.
+ */
+export async function deleteScore(scoreId: number) {
+  const admin = await requireAdmin();
+  const gone = await db.transaction(async (tx) => {
+    const [row] = await tx.delete(scores).where(eq(scores.id, scoreId)).returning();
+    if (row?.osuScoreId != null) {
+      await tx
+        .insert(deletedScores)
+        .values({ osuScoreId: row.osuScoreId, deletedById: admin.id })
+        .onConflictDoNothing();
+    }
+    return row;
+  });
+  if (!gone) throw new Error("That score is already gone");
+
+  await record(admin.id, admin.name ?? undefined, "score.delete", "score", scoreId, {
+    userId: gone.userId,
+    entryId: gone.entryId,
+    osuScoreId: gone.osuScoreId,
+    grade: gone.grade,
+    missCount: gone.missCount,
+    accuracy: gone.accuracy,
+  });
+  await refreshProgress(gone.userId);
 }
 
 /* ------------------------------------------------------------------- sync */
