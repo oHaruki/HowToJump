@@ -28,6 +28,8 @@ export const users = pgTable(
     progressSeen: jsonb("progress_seen").$type<Record<string, unknown>>(),
     progressSeenAt: timestamp("progress_seen_at", { withTimezone: true }),
     bannedAt: timestamp("banned_at", { withTimezone: true }),
+    /** The links a staff member shows on the team page, beside their osu! profile. */
+    socialLinks: text("social_links").array().notNull().default(sql`'{}'`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

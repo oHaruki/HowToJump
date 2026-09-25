@@ -2344,6 +2344,34 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
   .sb-row .sb-end { text-align: right; }
 }
 
+/* ------------------------------------------------------------------ team */
+
+.team-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+}
+.team-card { display: flex; flex-direction: column; gap: 14px; }
+.team-who { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.team-av {
+  width: 64px; height: 64px; flex: none; object-fit: cover;
+  background: var(--bg-d);
+  border-radius: 16px; corner-shape: var(--corner-shape);
+  outline: var(--border-width) solid var(--border);
+}
+.team-name { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.team-name a {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  color: var(--text-focus); font-size: 20px; font-weight: 600; text-decoration: none;
+}
+.team-name a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-name a:hover span { text-decoration: underline; }
+.link-chip { color: var(--text-focus); text-decoration: none; transition: border-color var(--dur-fast); }
+.link-chip:hover { border-color: var(--text-dark); }
+.link-icon { width: 14px; height: 14px; flex: none; }
+.team-form { display: flex; flex-direction: column; gap: 8px; }
+.team-msg { color: var(--danger); font-size: var(--font-size-small); }
+.team-edit { align-self: flex-start; }
+
 /* ------------------------------------------------------------- entrances */
 
 /*

@@ -17,6 +17,7 @@ import {
 } from "@/lib/osu/sync";
 import { parseScoreLink } from "@/lib/osu/backfill";
 import { modAcronyms, normalizeMod } from "@/lib/mods";
+import { MAX_LINKS, normalizeLink } from "@/lib/links";
 import {
   CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
 } from "@/lib/tiers";
@@ -645,6 +646,31 @@ export async function deleteScore(scoreId: number) {
     accuracy: gone.accuracy,
   });
   await refreshProgress(gone.userId);
+}
+
+/* ------------------------------------------------------------------- team */
+
+/**
+ * Saves the signed in staff member's own links for the team page. Blank
+ * boxes are dropped; anything that isn't a web address is refused.
+ */
+export async function setMyLinks(given: string[]): Promise<{ error?: string }> {
+  const staff = await requireStaff();
+  const filled = given.map((l) => String(l ?? "").trim()).filter(Boolean);
+  if (filled.length > MAX_LINKS) return { error: "Two links at most." };
+
+  const links: string[] = [];
+  for (const text of filled) {
+    const link = normalizeLink(text);
+    if (!link) return { error: text.slice(0, 60) + " isn't a web address." };
+    if (!links.includes(link)) links.push(link);
+  }
+  await db
+    .update(users)
+    .set({ socialLinks: links, updatedAt: new Date() })
+    .where(eq(users.id, staff.id));
+  revalidatePath("/team");
+  return {};
 }
 
 /* ------------------------------------------------------------------- sync */
