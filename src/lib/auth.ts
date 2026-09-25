@@ -6,14 +6,13 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { fetchMe, type OsuMe } from "@/lib/osu/client";
-import { getRole } from "@/lib/queries";
-import { PLAYER, can, type Permission } from "@/lib/roles";
+import { getRoles } from "@/lib/queries";
+import { can, isAdmin, type Permission, type RoleView } from "@/lib/roles";
 
 declare module "next-auth/jwt" {
   interface JWT {
     userId: number;
     osuUserId: number;
-    role: string;
     osuAccessToken?: string;
     osuRefreshToken?: string;
     osuExpiresAt?: number;
@@ -26,9 +25,10 @@ declare module "next-auth" {
   interface Session {
     userId: number;
     osuUserId: number;
-    /** "user", "helper", "admin", or a custom role's key. */
-    role: string;
-    roleName: string;
+    /** Every role held, highest first: "admin", "helper" or a custom role's key. */
+    roles: string[];
+    roleNames: string[];
+    /** What the roles grant between them. */
     permissions: Permission[];
     osuAccessToken?: string;
   }
@@ -66,7 +66,7 @@ const bootstrapAdmins = new Set(
 );
 
 /** Creates the local row on first sign in, refreshes the cached profile after. */
-async function upsertUser(me: OsuMe): Promise<{ id: number; role: string }> {
+async function upsertUser(me: OsuMe): Promise<{ id: number }> {
   const existing = await db.query.users.findFirst({
     where: eq(users.osuUserId, me.id),
   });
@@ -81,15 +81,15 @@ async function upsertUser(me: OsuMe): Promise<{ id: number; role: string }> {
 
   if (existing) {
     await db.update(users).set(patch).where(eq(users.id, existing.id));
-    return { id: existing.id, role: existing.role };
+    return { id: existing.id };
   }
 
-  const role = bootstrapAdmins.has(String(me.id)) ? "admin" : "user";
+  const roles = bootstrapAdmins.has(String(me.id)) ? ["admin"] : [];
   const [created] = await db
     .insert(users)
-    .values({ osuUserId: me.id, role, ...patch })
+    .values({ osuUserId: me.id, roles, ...patch })
     .returning({ id: users.id });
-  return { id: created.id, role };
+  return { id: created.id };
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -104,7 +104,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const local = await upsertUser(me);
         token.osuUserId = me.id;
         token.userId = local.id;
-        token.role = local.role;
         token.osuAccessToken = account.access_token;
         token.osuRefreshToken = account.refresh_token;
         token.osuExpiresAt = account.expires_at;
@@ -115,13 +114,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       // Read from the database, not the token, so a role change applies at once.
-      let role = PLAYER;
+      let held: RoleView[] = [];
       if (token.userId) {
         const row = await db.query.users.findFirst({
           where: eq(users.id, token.userId),
-          columns: { role: true, bannedAt: true },
+          columns: { roles: true, bannedAt: true },
         });
-        if (row && !row.bannedAt) role = await getRole(row.role);
+        if (row && !row.bannedAt && row.roles.length) {
+          held = (await getRoles()).filter((r) => row.roles.includes(r.key));
+        }
       }
 
       // Returned as a new object rather than mutated: the callback's session
@@ -131,9 +132,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         ...session,
         userId: token.userId,
         osuUserId: token.osuUserId,
-        role: role.key,
-        roleName: role.name,
-        permissions: [...role.permissions],
+        roles: held.map((r) => r.key),
+        roleNames: held.map((r) => r.name),
+        permissions: [...new Set(held.flatMap((r) => r.permissions))],
         osuAccessToken: token.osuAccessToken,
       };
     },
@@ -145,7 +146,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 export type CurrentUser = {
   id: number;
   osuUserId: number;
-  role: string;
+  roles: string[];
   permissions: Permission[];
   name: string | null;
   image: string | null;
@@ -157,7 +158,7 @@ export async function currentUser(): Promise<CurrentUser | null> {
   return {
     id: session.userId,
     osuUserId: session.osuUserId,
-    role: session.role,
+    roles: session.roles,
     permissions: session.permissions,
     name: session.user?.name ?? null,
     image: session.user?.image ?? null,
@@ -174,12 +175,12 @@ export async function requirePermission(permission: Permission) {
 /** Throws unless the signed in user holds a staff role, a custom one included. */
 export async function requireTeamMember() {
   const user = await currentUser();
-  if (!user || user.role === PLAYER.key) throw new Error("Staff access required");
+  if (!user || !user.roles.length) throw new Error("Staff access required");
   return user;
 }
 
 export async function requireAdmin() {
   const user = await currentUser();
-  if (!user || user.role !== "admin") throw new Error("Admin access required");
+  if (!user || !isAdmin(user)) throw new Error("Admin access required");
   return user;
 }

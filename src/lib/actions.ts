@@ -5,8 +5,8 @@ import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
-  auditLog, beatmaps, deletedScores, entries, roles, scores, suggestionBatches, suggestions,
-  users, type Suggestion,
+  auditLog, beatmaps, deletedScores, entries, roles, scores, siteConfig, suggestionBatches,
+  suggestions, users, type Suggestion,
 } from "@/lib/schema";
 import { auth, requireAdmin, requirePermission, requireTeamMember } from "@/lib/auth";
 import {
@@ -19,7 +19,7 @@ import { parseScoreLink } from "@/lib/osu/backfill";
 import { modAcronyms, normalizeMod } from "@/lib/mods";
 import { MAX_LINKS, normalizeLink } from "@/lib/links";
 import {
-  PERMISSIONS, PLAYER, customRoleKey, roleNameProblem, type Permission,
+  PERMISSIONS, PLAYER, customRoleId, customRoleKey, roleNameProblem, type Permission,
 } from "@/lib/roles";
 import {
   CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
@@ -29,7 +29,7 @@ import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
 } from "@/lib/import/parse";
 import {
-  describeScores, entryName, getExistingEntryKeys, getRole, getRoles, gradeText,
+  ROLE_ORDER_KEY, describeScores, entryName, getExistingEntryKeys, getRole, getRoles, gradeText,
 } from "@/lib/queries";
 import { announceEntries } from "@/lib/discord";
 
@@ -558,40 +558,67 @@ export async function restoreEntry(entryId: number) {
   revalidatePath("/ladder");
 }
 
-/** Throws unless a key names a staff role, or a player where one is allowed. */
-async function assertRole(role: string, allowPlayer: boolean) {
-  if (role === PLAYER.key && allowPlayer) return;
+/** Throws unless a key names a staff role. */
+async function assertRole(role: string) {
   if (role === PLAYER.key || (await getRole(role)).key !== role) {
     throw new Error("That role doesn't exist");
   }
 }
 
 /** Stops the last admin locking themselves out of the staff area. */
-async function assertAdminStays(adminId: number, userId: number, role: string) {
-  if (userId !== adminId || role === "admin") return;
+async function assertAdminStays(adminId: number, userId: number) {
+  if (userId !== adminId) return;
   const [{ n }] = await db
     .select({ n: rawSql<number>`count(*)::int` })
     .from(users)
-    .where(eq(users.role, "admin"));
-  if (n <= 1) throw new Error("You are the only admin, promote someone else first");
+    .where(rawSql`'admin' = any(${users.roles})`);
+  if (n <= 1) throw new Error("You are the only admin, make someone else one first");
 }
 
-export async function setUserRole(userId: number, role: string) {
+/** A user's roles with this one added, once. */
+const withRole = (role: string) =>
+  rawSql`array_append(array_remove(${users.roles}, ${role}::text), ${role}::text)`;
+
+/** Gives someone a role on top of any they already hold. */
+export async function grantRole(userId: number, role: string) {
   const admin = await requireAdmin();
-  await assertRole(role, true);
-  await assertAdminStays(admin.id, userId, role);
-  await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, userId));
-  await record(admin.id, admin.name ?? undefined, "user.role", "user", userId, { role });
+  await assertRole(role);
+  await db
+    .update(users)
+    .set({ roles: withRole(role), updatedAt: new Date() })
+    .where(eq(users.id, userId));
+  await record(admin.id, admin.name ?? undefined, "user.role.grant", "user", userId, { role });
   revalidatePath("/staff/members");
 }
 
-/** Grants a role by osu! ID or username, creating the local row if needed. */
+/** Takes one role off someone, leaving any others. */
+export async function revokeRole(userId: number, role: string) {
+  const admin = await requireAdmin();
+  if (role === "admin") await assertAdminStays(admin.id, userId);
+  await db
+    .update(users)
+    .set({ roles: rawSql`array_remove(${users.roles}, ${role}::text)`, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+  await record(admin.id, admin.name ?? undefined, "user.role.revoke", "user", userId, { role });
+  revalidatePath("/staff/members");
+}
+
+/** Takes every role off someone, which makes them an ordinary player again. */
+export async function removeFromStaff(userId: number) {
+  const admin = await requireAdmin();
+  await assertAdminStays(admin.id, userId);
+  await db.update(users).set({ roles: [], updatedAt: new Date() }).where(eq(users.id, userId));
+  await record(admin.id, admin.name ?? undefined, "user.role.clear", "user", userId);
+  revalidatePath("/staff/members");
+}
+
+/** Gives a role by osu! ID or username, creating the local row if needed. */
 export async function addStaffMember(
   identifier: string,
   role: string,
 ): Promise<{ username: string; created: boolean }> {
   const admin = await requireAdmin();
-  await assertRole(role, false);
+  await assertRole(role);
   const trimmed = identifier.trim();
   if (!trimmed) throw new Error("Enter an osu! user ID or username");
 
@@ -603,12 +630,11 @@ export async function addStaffMember(
   });
 
   if (existing) {
-    await assertAdminStays(admin.id, existing.id, role);
     await db
       .update(users)
-      .set({ role, username: profile.username, updatedAt: new Date() })
+      .set({ roles: withRole(role), username: profile.username, updatedAt: new Date() })
       .where(eq(users.id, existing.id));
-    await record(admin.id, admin.name ?? undefined, "user.role", "user", existing.id, { role });
+    await record(admin.id, admin.name ?? undefined, "user.role.grant", "user", existing.id, { role });
     revalidatePath("/staff/members");
     return { username: profile.username, created: false };
   }
@@ -621,7 +647,7 @@ export async function addStaffMember(
       avatarUrl: profile.avatar_url,
       countryCode: profile.country_code,
       globalRank: profile.statistics?.global_rank ?? null,
-      role,
+      roles: [role],
     })
     .returning({ id: users.id });
 
@@ -689,20 +715,45 @@ export async function updateRole(
   return {};
 }
 
-/** Deletes a custom role. Everyone who held it goes back to being a player. */
+/** Deletes a custom role, taking it off everyone who held it. */
 export async function deleteRole(id: number) {
   const admin = await requireAdmin();
   const key = customRoleKey(id);
-  const players = await db.transaction(async (tx) => {
-    const moved = await tx
+  const holders = await db.transaction(async (tx) => {
+    const held = await tx
       .update(users)
-      .set({ role: PLAYER.key, updatedAt: new Date() })
-      .where(eq(users.role, key))
+      .set({ roles: rawSql`array_remove(${users.roles}, ${key}::text)`, updatedAt: new Date() })
+      .where(rawSql`${key}::text = any(${users.roles})`)
       .returning({ id: users.id });
     await tx.delete(roles).where(eq(roles.id, id));
-    return moved.length;
+    return held.length;
   });
-  await record(admin.id, admin.name ?? undefined, "role.delete", "role", id, { players });
+  await record(admin.id, admin.name ?? undefined, "role.delete", "role", id, { holders });
+  revalidatePath("/staff/roles");
+}
+
+/**
+ * Moves a role one place up or down the ranking. Admin stays on top, and
+ * the team page shows everyone under the highest role they hold.
+ */
+export async function moveRole(key: string, direction: -1 | 1) {
+  const admin = await requireAdmin();
+  if (direction !== -1 && direction !== 1) return;
+  const keys = (await getRoles()).map((r) => r.key).filter((k) => k !== "admin");
+  const from = keys.indexOf(key);
+  const to = from + direction;
+  if (from === -1 || to < 0 || to >= keys.length) return;
+  [keys[from], keys[to]] = [keys[to], keys[from]];
+
+  const value = keys.join(",");
+  await db
+    .insert(siteConfig)
+    .values({ key: ROLE_ORDER_KEY, value })
+    .onConflictDoUpdate({ target: siteConfig.key, set: { value, updatedAt: new Date() } });
+  await record(admin.id, admin.name ?? undefined, "role.move", "role", customRoleId(key), {
+    key,
+    direction,
+  });
   revalidatePath("/staff/roles");
 }
 

@@ -15,8 +15,10 @@ export const users = pgTable(
     avatarUrl: text("avatar_url"),
     countryCode: varchar("country_code", { length: 4 }),
     globalRank: integer("global_rank"),
-    /** user | helper | admin */
+    /** Unused: a user's roles are in roles. */
     role: varchar("role", { length: 16 }).notNull().default("user"),
+    /** Every role a user holds: "helper", "admin" or a custom role's key. None for a player. */
+    roles: text("roles").array().notNull().default(sql`'{}'`),
     syncEnabled: boolean("sync_enabled").notNull().default(true),
     /** Newest play seen, fails included. Tells a sync whether a play arrived. */
     lastPlayedAt: timestamp("last_played_at", { withTimezone: true }),
@@ -42,7 +44,7 @@ export const users = pgTable(
 
 /**
  * Roles an admin made, beside the built in Admin and Helper. A member's
- * users.role holds "custom:" and the role's id.
+ * users.roles holds "custom:" and the role's id.
  */
 export const roles = pgTable(
   "roles",

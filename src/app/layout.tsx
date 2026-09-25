@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { auth } from "@/lib/auth";
-import { canUseStaffArea } from "@/lib/roles";
+import { PLAYER, canUseStaffArea } from "@/lib/roles";
 import { AuthButton } from "@/components/AuthButton";
 import { NavLinks } from "@/components/NavLinks";
 
@@ -47,7 +47,7 @@ export default async function RootLayout({
                     ? {
                         name: session.user?.name ?? "",
                         image: session.user?.image ?? null,
-                        roleName: session.roleName,
+                        roleName: session.roleNames.join(" · ") || PLAYER.name,
                         osuUserId: session.osuUserId,
                       }
                     : null

@@ -4,11 +4,11 @@ import {
 } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  beatmaps, deletedScores, entries, roles, scores, suggestions, userLevels, users,
+  beatmaps, deletedScores, entries, roles, scores, siteConfig, suggestions, userLevels, users,
 } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
 import {
-  BUILT_IN_ROLES, PLAYER, customRoleId, customRoleKey, isPermission, type RoleView,
+  BUILT_IN_ROLES, PLAYER, customRoleId, customRoleKey, isPermission, orderRoles, type RoleView,
 } from "@/lib/roles";
 import { CATEGORIES, LENGTHS, SPEEDS, orderByScale } from "@/lib/tiers";
 
@@ -361,10 +361,19 @@ const roleView = (r: typeof roles.$inferSelect): RoleView => ({
   builtIn: false,
 });
 
-/** Every staff role: the built in ones, then the ones admins made, oldest first. */
+/** Where the order the roles rank in is kept, as role keys from highest down. */
+export const ROLE_ORDER_KEY = "role_order";
+
+/** Every staff role from highest to lowest, as the roles board ranks them. */
 export async function getRoles(): Promise<RoleView[]> {
-  const custom = await db.select().from(roles).orderBy(asc(roles.id));
-  return [...BUILT_IN_ROLES, ...custom.map(roleView)];
+  const [custom, [order]] = await Promise.all([
+    db.select().from(roles).orderBy(asc(roles.id)),
+    db
+      .select({ value: siteConfig.value })
+      .from(siteConfig)
+      .where(eq(siteConfig.key, ROLE_ORDER_KEY)),
+  ]);
+  return orderRoles([...BUILT_IN_ROLES, ...custom.map(roleView)], order ? order.value.split(",") : []);
 }
 
 /** The role a user row's key names; a key that names none reads as a player. */

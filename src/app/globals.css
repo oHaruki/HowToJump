@@ -2374,7 +2374,11 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
 
 /* ----------------------------------------------------------------- roles */
 
-table.roles-board { min-width: 900px; }
+table.roles-board { min-width: 820px; }
+.roles-board th, .roles-board td { padding-inline: 12px; }
+.roles-board thead th.c { white-space: normal; max-width: 110px; }
+.roles-move { display: inline-flex; gap: 4px; }
+.roles-move .btn { padding-inline: 9px; }
 .roles-board th.c, .roles-board td.c { text-align: center; }
 .roles-board input[type="checkbox"]:disabled { opacity: 0.55; }
 .roles-name { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
@@ -2391,6 +2395,12 @@ table.roles-board { min-width: 900px; }
 .roles-perm input { margin-top: 3px; flex: none; }
 .roles-perm > span { display: flex; flex-direction: column; gap: 2px; }
 .roles-perm b { color: var(--text-focus); font-weight: 600; }
+.chip-x {
+  margin-left: 2px; padding: 0 2px; border: 0; background: none;
+  font: inherit; font-size: 14px; line-height: 1; color: var(--text-dark); cursor: pointer;
+}
+.chip-x:hover { color: var(--danger); }
+.chip-x:disabled { cursor: default; opacity: 0.5; }
 
 /* ------------------------------------------------------------- entrances */
 

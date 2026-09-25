@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addStaffMember, setUserRole } from "@/lib/actions";
+import { addStaffMember, grantRole, removeFromStaff, revokeRole } from "@/lib/actions";
 import { NONE } from "@/components/ui";
 
 export type MemberRow = {
@@ -10,7 +10,8 @@ export type MemberRow = {
   username: string;
   avatarUrl: string | null;
   osuUserId: number;
-  role: string;
+  /** Every role held, highest first. */
+  roles: string[];
   globalRank: number | null;
   /** Already in words, so the server and the browser show the same thing. */
   lastSynced: string;
@@ -59,7 +60,7 @@ export function MembersTable({
       setNotice(
         res.created
           ? res.username + " added as " + roleName(newRole) + ", before their first sign in"
-          : res.username + " is now " + roleName(newRole),
+          : res.username + " now has " + roleName(newRole),
       );
     });
 
@@ -125,7 +126,7 @@ export function MembersTable({
               <th>Staff member</th>
               <th>osu! rank</th>
               <th>Last sync</th>
-              <th>Role</th>
+              <th>Roles</th>
               <th style={{ textAlign: "right" }}>Remove</th>
             </tr>
           </thead>
@@ -153,26 +154,52 @@ export function MembersTable({
                 </td>
                 <td className="small">{u.lastSynced}</td>
                 <td>
-                  <select
-                    className="mini"
-                    defaultValue={u.role}
-                    disabled={pending}
-                    onChange={(e) => run(() => setUserRole(u.id, e.target.value))}
-                  >
-                    {roles.map((r) => (
-                      <option key={r.key} value={r.key}>
-                        {r.name}
-                      </option>
+                  <div className="row-tight member-roles">
+                    {u.roles.map((key) => (
+                      <span className="chip" key={key}>
+                        {roleName(key)}
+                        <button
+                          className="chip-x"
+                          type="button"
+                          disabled={pending}
+                          aria-label={"Take " + roleName(key) + " off " + u.username}
+                          title={"Take " + roleName(key) + " off"}
+                          onClick={() => run(() => revokeRole(u.id, key))}
+                        >
+                          ×
+                        </button>
+                      </span>
                     ))}
-                  </select>
+                    {roles.some((r) => !u.roles.includes(r.key)) ? (
+                      <select
+                        className="mini"
+                        value=""
+                        disabled={pending}
+                        aria-label={"Give " + u.username + " a role"}
+                        onChange={(e) => {
+                          const key = e.target.value;
+                          if (key) run(() => grantRole(u.id, key));
+                        }}
+                      >
+                        <option value="">Add role</option>
+                        {roles
+                          .filter((r) => !u.roles.includes(r.key))
+                          .map((r) => (
+                            <option key={r.key} value={r.key}>
+                              {r.name}
+                            </option>
+                          ))}
+                      </select>
+                    ) : null}
+                  </div>
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <button
                     className="btn btn-sm btn-no"
                     type="button"
                     disabled={pending}
-                    title="Drops them back to an ordinary player"
-                    onClick={() => run(() => setUserRole(u.id, "user"))}
+                    title="Takes every role off them, back to an ordinary player"
+                    onClick={() => run(() => removeFromStaff(u.id))}
                   >
                     Remove
                   </button>

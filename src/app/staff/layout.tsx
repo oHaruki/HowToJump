@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { can, canSeeQueue, canUseStaffArea } from "@/lib/roles";
+import { can, canSeeQueue, canUseStaffArea, isAdmin } from "@/lib/roles";
 import { StaffNav } from "@/components/StaffNav";
 import { getStaffStats } from "@/lib/queries";
 
@@ -25,7 +25,7 @@ export default async function StaffLayout({
           add: can(session, "maps.add"),
           queue: canSeeQueue(session),
           bank: can(session, "bank.edit"),
-          admin: session.role === "admin",
+          admin: isAdmin(session),
         }}
       />
       <div className="stack-lg" style={{ minWidth: 0 }}>

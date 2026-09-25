@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createRole, deleteRole, updateRole } from "@/lib/actions";
+import { createRole, deleteRole, moveRole, updateRole } from "@/lib/actions";
 import { PERMISSIONS, customRoleId, type Permission } from "@/lib/roles";
 
 export type BoardRole = {
@@ -17,9 +17,10 @@ const toggled = (list: Permission[], p: Permission) =>
   list.includes(p) ? list.filter((x) => x !== p) : [...list, p];
 
 /**
- * Every role against every permission. The built in rows are fixed. A
- * custom role saves as its boxes are ticked, and is renamed or deleted
- * from its own row. New roles are made below the board.
+ * Every role against every permission, highest first. The built in rows
+ * are fixed. Every row but Admin's moves up or down the ranking, and a
+ * custom role saves as its boxes are ticked and is renamed or deleted from
+ * its own row. New roles are made below the board.
  */
 export function RolesBoard({ roles }: { roles: BoardRole[] }) {
   const router = useRouter();
@@ -61,6 +62,7 @@ export function RolesBoard({ roles }: { roles: BoardRole[] }) {
         <table className="roles-board">
           <thead>
             <tr>
+              <th>Rank</th>
               <th>Role</th>
               {PERMISSIONS.map((p) => (
                 <th key={p.key} className="c" title={p.hint}>
@@ -72,10 +74,36 @@ export function RolesBoard({ roles }: { roles: BoardRole[] }) {
             </tr>
           </thead>
           <tbody>
-            {roles.map((r) => {
+            {roles.map((r, i) => {
               const id = customRoleId(r.key);
               return (
                 <tr key={r.key}>
+                  <td>
+                    {r.key !== "admin" ? (
+                      <span className="roles-move">
+                        <button
+                          className="btn btn-sm"
+                          type="button"
+                          disabled={pending || i <= 1}
+                          aria-label={"Move " + r.name + " up"}
+                          title="Up the ranking"
+                          onClick={() => run(() => moveRole(r.key, -1))}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          type="button"
+                          disabled={pending || i === roles.length - 1}
+                          aria-label={"Move " + r.name + " down"}
+                          title="Down the ranking"
+                          onClick={() => run(() => moveRole(r.key, 1))}
+                        >
+                          ↓
+                        </button>
+                      </span>
+                    ) : null}
+                  </td>
                   <td>
                     {renaming === r.key && id != null ? (
                       <form
@@ -129,55 +157,57 @@ export function RolesBoard({ roles }: { roles: BoardRole[] }) {
                   ))}
                   <td className="c num">{r.members}</td>
                   <td>
-                    {id == null ? null : confirming === r.key ? (
-                      <span className="row-tight roles-actions">
-                        {r.members ? (
-                          <span className="small">
-                            {r.members === 1 ? "1 member becomes a player" : r.members + " members become players"}
-                          </span>
-                        ) : null}
-                        <button
-                          className="btn btn-sm btn-no"
-                          type="button"
-                          disabled={pending}
-                          onClick={() => {
-                            setConfirming(null);
-                            run(() => deleteRole(id));
-                          }}
-                        >
-                          Confirm
-                        </button>
-                        <button className="btn btn-sm" type="button" onClick={() => setConfirming(null)}>
-                          Cancel
-                        </button>
-                      </span>
-                    ) : (
-                      <span className="row-tight roles-actions">
-                        <button
-                          className="btn btn-sm"
-                          type="button"
-                          disabled={pending}
-                          onClick={() => {
-                            setConfirming(null);
-                            setDraftName(r.name);
-                            setRenaming(r.key);
-                          }}
-                        >
-                          Rename
-                        </button>
-                        <button
-                          className="btn btn-sm btn-no"
-                          type="button"
-                          disabled={pending}
-                          onClick={() => {
-                            setRenaming(null);
-                            setConfirming(r.key);
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </span>
-                    )}
+                    <span className="row-tight roles-actions">
+                      {id == null ? null : confirming === r.key ? (
+                        <>
+                          {r.members ? (
+                            <span className="small">
+                              {r.members === 1 ? "1 member holds it" : r.members + " members hold it"}
+                            </span>
+                          ) : null}
+                          <button
+                            className="btn btn-sm btn-no"
+                            type="button"
+                            disabled={pending}
+                            onClick={() => {
+                              setConfirming(null);
+                              run(() => deleteRole(id));
+                            }}
+                          >
+                            Confirm
+                          </button>
+                          <button className="btn btn-sm" type="button" onClick={() => setConfirming(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            type="button"
+                            disabled={pending}
+                            onClick={() => {
+                              setConfirming(null);
+                              setDraftName(r.name);
+                              setRenaming(r.key);
+                            }}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            className="btn btn-sm btn-no"
+                            type="button"
+                            disabled={pending}
+                            onClick={() => {
+                              setRenaming(null);
+                              setConfirming(r.key);
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </span>
                   </td>
                 </tr>
               );

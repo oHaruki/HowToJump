@@ -1,8 +1,9 @@
 /**
  * Who can do what. Admin and Helper are built in and never change; admins
- * make any other role, each granting some of the permissions below.
- * Managing staff and roles is not one of them: that stays with admins.
- * Pure, so it runs without the database.
+ * make any other role, each granting some of the permissions below, and
+ * someone holding several roles may do what any of them grants. Managing
+ * staff and roles is not one of them: that stays with admins. Pure, so it
+ * runs without the database.
  */
 
 export const PERMISSIONS = [
@@ -36,7 +37,7 @@ export const BUILT_IN_ROLES: RoleView[] = [
   },
 ];
 
-/** Everyone without a staff role, and anyone whose role no longer exists. */
+/** What someone holding no staff role is called. */
 export const PLAYER: RoleView = { key: "user", name: "Player", permissions: [], builtIn: true };
 
 const MAX_NAME = 24;
@@ -56,26 +57,39 @@ export function isPermission(key: string): key is Permission {
   return PERMISSIONS.some((p) => p.key === key);
 }
 
+/** Someone signed in, as far as what they may do goes. */
+type Holder = { roles: readonly string[]; permissions: readonly string[] } | null | undefined;
+
+export function isAdmin(user: { roles: readonly string[] } | null | undefined): boolean {
+  return !!user && user.roles.includes("admin");
+}
+
 /** Whether someone may do something. Admins may do everything. */
-export function can(
-  user: { role: string; permissions: readonly string[] } | null | undefined,
-  permission: Permission,
-): boolean {
-  return !!user && (user.role === "admin" || user.permissions.includes(permission));
+export function can(user: Holder, permission: Permission): boolean {
+  return !!user && (isAdmin(user) || user.permissions.includes(permission));
 }
 
 /** Whether someone sees the staff area: an admin, or a role granting anything. */
-export function canUseStaffArea(
-  user: { role: string; permissions: readonly string[] } | null | undefined,
-): boolean {
-  return !!user && (user.role === "admin" || user.permissions.length > 0);
+export function canUseStaffArea(user: Holder): boolean {
+  return !!user && (isAdmin(user) || user.permissions.length > 0);
 }
 
 /** The queue is for whoever fills it, sorts it or empties it. */
-export function canSeeQueue(
-  user: { role: string; permissions: readonly string[] } | null | undefined,
-): boolean {
+export function canSeeQueue(user: Holder): boolean {
   return can(user, "maps.add") || can(user, "queue.review") || can(user, "queue.approve");
+}
+
+/**
+ * Roles from highest to lowest: Admin always first, then the keys in
+ * `order`, then any role `order` doesn't name, in the order given.
+ */
+export function orderRoles(roles: readonly RoleView[], order: readonly string[]): RoleView[] {
+  const rank = (r: RoleView) => {
+    if (r.key === "admin") return -1;
+    const i = order.indexOf(r.key);
+    return i === -1 ? order.length + roles.indexOf(r) : i;
+  };
+  return roles.slice().sort((a, b) => rank(a) - rank(b));
 }
 
 /**

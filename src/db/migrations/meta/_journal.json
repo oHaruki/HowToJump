@@ -92,6 +92,13 @@
       "when": 1790298591318,
       "tag": "0012_custom_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790301206142,
+      "tag": "0013_multiple_roles",
+      "breakpoints": true
     }
   ]
 }
