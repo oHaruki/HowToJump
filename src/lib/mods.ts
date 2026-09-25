@@ -14,6 +14,25 @@ export const MOD_NAMES: Record<string, string> = {
   HRDT: "Hard Rock + Double Time",
 };
 
+/** Mods whose plays never count: they keep a run alive or play part of it. */
+const REFUSED: Record<string, string> = {
+  NF: "No Fail",
+  RX: "Relax",
+  AP: "Autopilot",
+  DA: "Difficulty Adjust",
+  AT: "Auto",
+  CP: "Cinema",
+};
+
+/** The first mod a score was played with that keeps it from counting, by name, or null. */
+export function refusedMod(mods: Array<{ acronym: string }> | string[] | null | undefined): string | null {
+  for (const m of (mods ?? []) as Array<{ acronym: string } | string>) {
+    const name = REFUSED[String(typeof m === "string" ? m : m.acronym).toUpperCase()];
+    if (name) return name;
+  }
+  return null;
+}
+
 /** Canonical ordering, so HRDT and DTHR resolve to the same entry. */
 const ORDER = ["EZ", "HT", "HR", "DT", "FL"];
 

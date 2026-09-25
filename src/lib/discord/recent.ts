@@ -112,6 +112,7 @@ async function standing(
     return "In the bank as " + listed + ", not " + modsText([play.mods]) + ", so it doesn't count.";
   }
   if (!play.passed) return "A fail, so it doesn't count.";
+  if (play.refused) return "Played with " + play.refused + ", so it doesn't count.";
   if (await isDeletedScore(play.osuScoreId)) return "Deleted by an admin, so it doesn't count.";
 
   const best = await db.query.scores.findFirst({

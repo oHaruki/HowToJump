@@ -1,4 +1,5 @@
 import type { OsuScore } from "@/lib/osu/client";
+import { refusedMod } from "@/lib/mods";
 
 /**
  * Reading a pasted score link, and whether the score it names can go on a
@@ -28,5 +29,7 @@ export function backfillProblem(score: OsuScore, osuUserId: number): string | nu
   const ruleset = score.ruleset_id ?? score.mode_int;
   if (ruleset != null && ruleset !== 0) return "Only osu!standard scores count.";
   if (score.passed === false) return "That play was a fail, so it can't count.";
+  const refused = refusedMod(score.mods);
+  if (refused) return "That play used " + refused + ", so it can't count.";
   return null;
 }

@@ -7,8 +7,9 @@
  *   3. The sheet's maps, into an empty bank only.
  *   4. Missing note counts, and entries folded by mod.
  *   5. Scores played under other mods than their entry's, moved or deleted.
- *   6. Zero miss plays, read again once under a new full combo rule.
- *   7. Levels, where the rules or the players above changed.
+ *   6. Scores played with a refused mod such as No Fail, deleted once.
+ *   7. Zero miss plays, read again once under a new full combo rule.
+ *   8. Levels, where the rules or the players above changed.
  */
 import "./env";
 import { createHash } from "node:crypto";
@@ -21,6 +22,7 @@ import { auditLog, entries, scores, siteConfig } from "@/lib/schema";
 import { clearOffModScores, rebuildLevelsIfRulesChanged, refreshProgress } from "@/lib/osu/sync";
 import { fetchScore, toPlay, type OsuScore } from "@/lib/osu/client";
 import { gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
+import { refusedMod } from "@/lib/mods";
 import {
   backfillNoteCounts, mergeLooseModEntries, seedGradeRules, seedSheet, seedSiteConfig,
 } from "./seeding";
@@ -114,6 +116,63 @@ async function recheckFullCombos(): Promise<number[]> {
   return [...moved];
 }
 
+/** Where the refused mods the stored plays were checked against are kept. */
+const MOD_RULE_KEY = "mod_rule";
+const MOD_RULE = "NF RX AP DA AT CP refused";
+
+/**
+ * Asks osu! again about every stored play, once per MOD_RULE, and deletes
+ * the ones played with a mod that doesn't count. Returns the players whose
+ * scores went.
+ */
+async function clearRefusedScores(): Promise<number[]> {
+  const [stored] = await db
+    .select({ value: siteConfig.value })
+    .from(siteConfig)
+    .where(eq(siteConfig.key, MOD_RULE_KEY));
+  if (stored?.value === MOD_RULE) return [];
+
+  const rows = await db
+    .select({ id: scores.id, userId: scores.userId, osuScoreId: scores.osuScoreId })
+    .from(scores)
+    .where(isNotNull(scores.osuScoreId));
+
+  const gone: Array<{ userId: number; osuScoreId: number | null; mod: string }> = [];
+  let checked = 0;
+  for (const r of rows) {
+    let score: OsuScore | null;
+    try {
+      score = await fetchScore({ id: r.osuScoreId!, ruleset: null });
+    } catch (e) {
+      console.warn("Refused mods not all checked, trying again next deploy: " + (e instanceof Error ? e.message : e));
+      break;
+    }
+    checked += 1;
+    const mod = score ? refusedMod(score.mods) : null;
+    if (!mod) continue;
+    await db.delete(scores).where(eq(scores.id, r.id));
+    gone.push({ userId: r.userId, osuScoreId: r.osuScoreId, mod });
+  }
+
+  if (gone.length) {
+    await db.insert(auditLog).values({
+      actorName: "deploy",
+      action: "scores.refused",
+      entityType: "score",
+      entityId: null,
+      detail: gone,
+    });
+  }
+  if (checked === rows.length) {
+    await db
+      .insert(siteConfig)
+      .values({ key: MOD_RULE_KEY, value: MOD_RULE })
+      .onConflictDoUpdate({ target: siteConfig.key, set: { value: MOD_RULE, updatedAt: new Date() } });
+    console.log("Checked " + rows.length + " plays for refused mods, deleted " + gone.length);
+  }
+  return [...new Set(gone.map((g) => g.userId))];
+}
+
 async function main() {
   if (await adoptPushedDatabase()) {
     console.log("Built with db:push before migrations were tracked; took it from there");
@@ -147,6 +206,7 @@ async function main() {
     console.log("Took " + cleared.length + " scores off entries under other mods");
   }
 
+  const refused = await clearRefusedScores();
   const regraded = await recheckFullCombos();
 
   // The previous build's app keeps running until this finishes, so a player
@@ -161,7 +221,7 @@ async function main() {
 
   // A count, a merge, a cleared score or a regrade changes what those plays
   // are worth.
-  const moved = [...remoded, ...cleared.map((s) => s.userId), ...regraded];
+  const moved = [...remoded, ...cleared.map((s) => s.userId), ...refused, ...regraded];
   if (!levels.rebuilt && (filled.length || moved.length)) {
     const onFilled = filled.length
       ? await db

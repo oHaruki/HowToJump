@@ -61,6 +61,8 @@ test("only the player's own osu!standard passes can be added", () => {
   assert.match(backfillProblem(score({ user_id: 43 }), 42) ?? "", /someone else/);
   assert.match(backfillProblem(score({ ruleset_id: 3 }), 42) ?? "", /osu!standard/);
   assert.match(backfillProblem(score({ passed: false }), 42) ?? "", /fail/);
+  assert.match(backfillProblem(score({ mods: [{ acronym: "NF" }] }), 42) ?? "", /No Fail/);
+  assert.equal(backfillProblem(score({ mods: [{ acronym: "HD" }] }), 42), null);
   // Older replies name the player and mode differently.
   assert.equal(backfillProblem(score({ user_id: undefined, user: { id: 42 } }), 42), null);
   assert.match(

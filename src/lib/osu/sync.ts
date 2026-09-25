@@ -75,15 +75,15 @@ async function entryIndex(): Promise<Map<string, EntryRow>> {
 
 /**
  * Writes one play if it beats what the player already has on that entry,
- * and never one an admin deleted. Returns the grade when something was
- * actually written.
+ * and never one an admin deleted or one played with a refused mod. Returns
+ * the grade when something was actually written.
  */
 async function upsertScore(
   userId: number,
   entry: EntryRow,
   play: PlayFacts,
 ): Promise<string | null> {
-  if (await isDeletedScore(play.osuScoreId)) return null;
+  if (play.refused || (await isDeletedScore(play.osuScoreId))) return null;
   const grade = gradeFor(
     { missCount: play.missCount, isFc: play.isFc, isPerfect: play.isPerfect },
     GRADE_RULES,

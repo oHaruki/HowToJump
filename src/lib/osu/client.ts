@@ -1,4 +1,4 @@
-import { modsFromApi } from "@/lib/mods";
+import { modsFromApi, refusedMod } from "@/lib/mods";
 
 /**
  * osu! API v2 client. Two credentials paths share one rate limiter:
@@ -300,6 +300,8 @@ export type PlayFacts = {
   isPerfect: boolean;
   playedAt: Date | null;
   passed: boolean;
+  /** The mod that keeps the play from counting, by name, such as No Fail. */
+  refused: string | null;
 };
 
 /**
@@ -346,6 +348,7 @@ export function toPlay(s: OsuScore): PlayFacts {
     isPerfect,
     playedAt: when ? new Date(when) : null,
     passed: s.passed !== false,
+    refused: refusedMod(s.mods),
   };
 }
 

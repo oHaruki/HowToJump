@@ -136,7 +136,9 @@ export default function InfoPage() {
               its own leaderboard, and a score only counts when the mods match.
               Hidden is the exception: it moves no notes, so it never splits an entry
               and a Hidden run counts on the entry without it. Nightcore counts as
-              Double Time, and so do No Fail and the rest that change nothing.
+              Double Time, and the other mods that change nothing count too. No Fail,
+              Relax, Autopilot and Difficulty Adjust never count: every score has to
+              be a real pass.
             </p>
             <ModLegend />
           </div>
