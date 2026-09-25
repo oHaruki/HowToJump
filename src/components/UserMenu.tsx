@@ -4,16 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { BackfillForm } from "@/components/BackfillForm";
 
-const ROLE_LABEL: Record<string, string> = {
-  user: "Player",
-  helper: "Helper",
-  admin: "Admin",
-};
-
 export type MenuUser = {
   name: string;
   image: string | null;
-  role: string;
+  roleName: string;
   osuUserId: number;
 };
 
@@ -79,7 +73,7 @@ export function UserMenu({
         <div className="menu" role="menu">
           <div className="menu-head">
             <span style={{ color: "var(--text-focus)" }}>{user.name}</span>
-            <span className="small">{ROLE_LABEL[user.role] ?? user.role}</span>
+            <span className="small">{user.roleName}</span>
           </div>
           <hr className="sep" />
 

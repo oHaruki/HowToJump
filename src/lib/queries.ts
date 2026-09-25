@@ -4,9 +4,12 @@ import {
 } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  beatmaps, deletedScores, entries, scores, suggestions, userLevels, users,
+  beatmaps, deletedScores, entries, roles, scores, suggestions, userLevels, users,
 } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
+import {
+  BUILT_IN_ROLES, PLAYER, customRoleId, customRoleKey, isPermission, type RoleView,
+} from "@/lib/roles";
 import { CATEGORIES, LENGTHS, SPEEDS, orderByScale } from "@/lib/tiers";
 
 /** One row of the map bank, flattened for display. */
@@ -347,6 +350,31 @@ export async function getStaffStats() {
     bank: bank?.n ?? 0,
     players: players?.n ?? 0,
   };
+}
+
+/* ----------------------------------------------------------------- roles */
+
+const roleView = (r: typeof roles.$inferSelect): RoleView => ({
+  key: customRoleKey(r.id),
+  name: r.name,
+  permissions: r.permissions.filter(isPermission),
+  builtIn: false,
+});
+
+/** Every staff role: the built in ones, then the ones admins made, oldest first. */
+export async function getRoles(): Promise<RoleView[]> {
+  const custom = await db.select().from(roles).orderBy(asc(roles.id));
+  return [...BUILT_IN_ROLES, ...custom.map(roleView)];
+}
+
+/** The role a user row's key names; a key that names none reads as a player. */
+export async function getRole(key: string): Promise<RoleView> {
+  const builtIn = BUILT_IN_ROLES.find((r) => r.key === key);
+  if (builtIn) return builtIn;
+  const id = customRoleId(key);
+  if (id == null) return PLAYER;
+  const [row] = await db.select().from(roles).where(eq(roles.id, id));
+  return row ? roleView(row) : PLAYER;
 }
 
 /* --------------------------------------------------------------- profile */

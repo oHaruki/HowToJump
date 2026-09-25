@@ -12,7 +12,8 @@ export type MemberRow = {
   osuUserId: number;
   role: string;
   globalRank: number | null;
-  lastSyncedAt: string | null;
+  /** Already in words, so the server and the browser show the same thing. */
+  lastSynced: string;
 };
 
 /**
@@ -21,9 +22,12 @@ export type MemberRow = {
  * handful of people this page is actually about.
  */
 export function MembersTable({
+  roles,
   rows,
   playerCount,
 }: {
+  /** Every staff role, built in first, as the selects offer them. */
+  roles: Array<{ key: string; name: string }>;
   rows: MemberRow[];
   playerCount: number;
 }) {
@@ -32,7 +36,8 @@ export function MembersTable({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState("");
-  const [newRole, setNewRole] = useState<"helper" | "admin">("helper");
+  const [newRole, setNewRole] = useState("helper");
+  const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
 
   const run = (fn: () => Promise<unknown>) => {
     setError(null);
@@ -53,8 +58,8 @@ export function MembersTable({
       setIdentifier("");
       setNotice(
         res.created
-          ? res.username + " added as " + newRole + ", before their first sign in"
-          : res.username + " is now " + newRole,
+          ? res.username + " added as " + roleName(newRole) + ", before their first sign in"
+          : res.username + " is now " + roleName(newRole),
       );
     });
 
@@ -90,12 +95,12 @@ export function MembersTable({
           </label>
           <label className="field" style={{ flex: "1 1 140px" }}>
             <span className="lbl">Role</span>
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value as "helper" | "admin")}
-            >
-              <option value="helper">helper</option>
-              <option value="admin">admin</option>
+            <select value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+              {roles.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.name}
+                </option>
+              ))}
             </select>
           </label>
           <button
@@ -144,24 +149,21 @@ export function MembersTable({
                   </div>
                 </td>
                 <td className="num">
-                  {u.globalRank ? "#" + u.globalRank.toLocaleString() : NONE}
+                  {u.globalRank ? "#" + u.globalRank.toLocaleString("en") : NONE}
                 </td>
-                <td className="small">
-                  {u.lastSyncedAt ? new Date(u.lastSyncedAt).toLocaleString() : "never"}
-                </td>
+                <td className="small">{u.lastSynced}</td>
                 <td>
                   <select
                     className="mini"
                     defaultValue={u.role}
                     disabled={pending}
-                    onChange={(e) =>
-                      run(() =>
-                        setUserRole(u.id, e.target.value as "user" | "helper" | "admin"),
-                      )
-                    }
+                    onChange={(e) => run(() => setUserRole(u.id, e.target.value))}
                   >
-                    <option value="helper">helper</option>
-                    <option value="admin">admin</option>
+                    {roles.map((r) => (
+                      <option key={r.key} value={r.key}>
+                        {r.name}
+                      </option>
+                    ))}
                   </select>
                 </td>
                 <td style={{ textAlign: "right" }}>
@@ -189,7 +191,7 @@ export function MembersTable({
       </div>
 
       <p className="small">
-        {rows.length} staff {NONE} {playerCount.toLocaleString()} registered{" "}
+        {rows.length} staff {NONE} {playerCount.toLocaleString("en")} registered{" "}
         {playerCount === 1 ? "player" : "players"} in total
       </p>
     </>

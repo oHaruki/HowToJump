@@ -5,10 +5,10 @@ import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
-  auditLog, beatmaps, deletedScores, entries, scores, suggestionBatches, suggestions, users,
-  type Suggestion,
+  auditLog, beatmaps, deletedScores, entries, roles, scores, suggestionBatches, suggestions,
+  users, type Suggestion,
 } from "@/lib/schema";
-import { auth, requireAdmin, requireStaff } from "@/lib/auth";
+import { auth, requireAdmin, requirePermission, requireTeamMember } from "@/lib/auth";
 import {
   fetchBeatmaps, fetchStarRating, fetchUser, type BeatmapFacts,
 } from "@/lib/osu/client";
@@ -19,13 +19,18 @@ import { parseScoreLink } from "@/lib/osu/backfill";
 import { modAcronyms, normalizeMod } from "@/lib/mods";
 import { MAX_LINKS, normalizeLink } from "@/lib/links";
 import {
+  PERMISSIONS, PLAYER, customRoleKey, roleNameProblem, type Permission,
+} from "@/lib/roles";
+import {
   CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
 } from "@/lib/tiers";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
 } from "@/lib/import/parse";
-import { describeScores, entryName, getExistingEntryKeys, gradeText } from "@/lib/queries";
+import {
+  describeScores, entryName, getExistingEntryKeys, getRole, getRoles, gradeText,
+} from "@/lib/queries";
 import { announceEntries } from "@/lib/discord";
 
 async function record(
@@ -77,7 +82,7 @@ export async function previewPaste(
   defaults?: { tier?: string; categories?: string[]; mod?: string },
   asLinks?: boolean,
 ): Promise<{ mode: string | null; rows: PreviewRow[] }> {
-  await requireStaff();
+  await requirePermission("maps.add");
 
   const parsed = asLinks
     ? {
@@ -176,7 +181,7 @@ export async function starRatingFor(
   osuBeatmapId: number,
   mod: string,
 ): Promise<number | null> {
-  await requireStaff();
+  await requirePermission("maps.add");
   const acronyms = modAcronyms(mod);
   if (!acronyms.length) return null;
   try {
@@ -212,7 +217,7 @@ export async function importRows(
   rowsInput: unknown,
   source: "paste" | "upload" | "link" = "paste",
 ) {
-  const staff = await requireStaff();
+  const staff = await requirePermission("maps.add");
   const rows = z.array(ImportRow).parse(rowsInput);
   if (!rows.length) return { created: 0, batchId: null as number | null };
 
@@ -318,12 +323,9 @@ async function ensureBeatmaps(osuBeatmapIds: number[]): Promise<Map<number, numb
   return rowIds();
 }
 
-/**
- * Admin only. The single place anything is written into entries: helpers
- * fill the queue, admins decide what the ladder holds.
- */
+/** The single place anything is written into entries. */
 export async function approveSuggestions(ids: number[]) {
-  const admin = await requireAdmin();
+  const reviewer = await requirePermission("queue.approve");
   if (!ids.length) return { approved: 0 };
 
   // A pack is required before anything reaches the ladder.
@@ -358,8 +360,8 @@ export async function approveSuggestions(ids: number[]) {
           cs: s.cs,
           ar: s.ar,
           od: s.od,
-          judgedById: admin.id,
-          judgedByName: admin.name ?? null,
+          judgedById: reviewer.id,
+          judgedByName: reviewer.name ?? null,
         })),
       )
       .onConflictDoNothing()
@@ -367,7 +369,7 @@ export async function approveSuggestions(ids: number[]) {
 
     const marked = await tx
       .update(suggestions)
-      .set({ status: "approved", reviewerId: admin.id, reviewedAt: new Date() })
+      .set({ status: "approved", reviewerId: reviewer.id, reviewedAt: new Date() })
       .where(
         and(
           inArray(suggestions.id, rows.map((s) => s.id)),
@@ -379,7 +381,7 @@ export async function approveSuggestions(ids: number[]) {
     return { added: created.map((e) => e.id), approved: marked.length };
   });
 
-  await record(admin.id, admin.name ?? undefined, "suggestions.approve", "suggestion", null, {
+  await record(reviewer.id, reviewer.name ?? undefined, "suggestions.approve", "suggestion", null, {
     ids,
     approved,
   });
@@ -393,7 +395,7 @@ export async function approveSuggestions(ids: number[]) {
 }
 
 export async function rejectSuggestions(ids: number[], note?: string) {
-  const staff = await requireStaff();
+  const staff = await requirePermission("queue.review");
   if (!ids.length) return { rejected: 0 };
   await db
     .update(suggestions)
@@ -413,7 +415,7 @@ export async function rejectSuggestions(ids: number[], note?: string) {
 }
 
 export async function setSuggestionTier(id: number, tierName: string) {
-  await requireStaff();
+  await requirePermission("queue.review");
   const t = tierByName(tierName);
   await db
     .update(suggestions)
@@ -440,7 +442,7 @@ export async function updateEntry(
     speed?: string;
   },
 ) {
-  const staff = await requireStaff();
+  const staff = await requirePermission("bank.edit");
 
   const [current] = await db
     .select({
@@ -530,7 +532,7 @@ export async function updateEntry(
 }
 
 export async function removeEntry(entryId: number) {
-  const staff = await requireStaff();
+  const staff = await requirePermission("bank.edit");
   await db
     .update(entries)
     .set({ isActive: false, updatedAt: new Date() })
@@ -544,7 +546,7 @@ export async function removeEntry(entryId: number) {
 
 /** Puts a removed entry back on the ladder. Removing only clears the flag. */
 export async function restoreEntry(entryId: number) {
-  const staff = await requireStaff();
+  const staff = await requirePermission("bank.edit");
   await db
     .update(entries)
     .set({ isActive: true, updatedAt: new Date() })
@@ -556,16 +558,28 @@ export async function restoreEntry(entryId: number) {
   revalidatePath("/ladder");
 }
 
-export async function setUserRole(userId: number, role: "user" | "helper" | "admin") {
-  const admin = await requireAdmin();
-  if (userId === admin.id && role !== "admin") {
-    // Stops the last admin locking themselves out of the staff area.
-    const [{ n }] = await db
-      .select({ n: rawSql<number>`count(*)::int` })
-      .from(users)
-      .where(eq(users.role, "admin"));
-    if (n <= 1) throw new Error("You are the only admin, promote someone else first");
+/** Throws unless a key names a staff role, or a player where one is allowed. */
+async function assertRole(role: string, allowPlayer: boolean) {
+  if (role === PLAYER.key && allowPlayer) return;
+  if (role === PLAYER.key || (await getRole(role)).key !== role) {
+    throw new Error("That role doesn't exist");
   }
+}
+
+/** Stops the last admin locking themselves out of the staff area. */
+async function assertAdminStays(adminId: number, userId: number, role: string) {
+  if (userId !== adminId || role === "admin") return;
+  const [{ n }] = await db
+    .select({ n: rawSql<number>`count(*)::int` })
+    .from(users)
+    .where(eq(users.role, "admin"));
+  if (n <= 1) throw new Error("You are the only admin, promote someone else first");
+}
+
+export async function setUserRole(userId: number, role: string) {
+  const admin = await requireAdmin();
+  await assertRole(role, true);
+  await assertAdminStays(admin.id, userId, role);
   await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, userId));
   await record(admin.id, admin.name ?? undefined, "user.role", "user", userId, { role });
   revalidatePath("/staff/members");
@@ -574,9 +588,10 @@ export async function setUserRole(userId: number, role: "user" | "helper" | "adm
 /** Grants a role by osu! ID or username, creating the local row if needed. */
 export async function addStaffMember(
   identifier: string,
-  role: "helper" | "admin",
+  role: string,
 ): Promise<{ username: string; created: boolean }> {
   const admin = await requireAdmin();
+  await assertRole(role, false);
   const trimmed = identifier.trim();
   if (!trimmed) throw new Error("Enter an osu! user ID or username");
 
@@ -588,6 +603,7 @@ export async function addStaffMember(
   });
 
   if (existing) {
+    await assertAdminStays(admin.id, existing.id, role);
     await db
       .update(users)
       .set({ role, username: profile.username, updatedAt: new Date() })
@@ -617,6 +633,79 @@ export async function addStaffMember(
   return { username: profile.username, created: true };
 }
 
+/* ------------------------------------------------------------------ roles */
+
+/** A permission list from the form: known ones only, each once, in board order. */
+function permissionList(given: string[]): Permission[] {
+  return PERMISSIONS.map((p) => p.key).filter((key) => given.includes(key));
+}
+
+/** The names of the custom roles, less the one being renamed. */
+async function customNames(except?: number): Promise<string[]> {
+  const skip = except == null ? null : customRoleKey(except);
+  return (await getRoles()).filter((r) => !r.builtIn && r.key !== skip).map((r) => r.name);
+}
+
+/** Makes a role granting the chosen permissions. */
+export async function createRole(name: string, permissions: string[]): Promise<{ error?: string }> {
+  const admin = await requireAdmin();
+  const clean = String(name ?? "").trim();
+  const problem = roleNameProblem(clean, await customNames());
+  if (problem) return { error: problem };
+
+  const granted = permissionList(permissions);
+  const [row] = await db
+    .insert(roles)
+    .values({ name: clean, permissions: granted })
+    .returning({ id: roles.id });
+  await record(admin.id, admin.name ?? undefined, "role.create", "role", row.id, {
+    name: clean,
+    permissions: granted,
+  });
+  revalidatePath("/staff/roles");
+  return {};
+}
+
+/** Renames a custom role, or changes what it grants. */
+export async function updateRole(
+  id: number,
+  patch: { name?: string; permissions?: string[] },
+): Promise<{ error?: string }> {
+  const admin = await requireAdmin();
+  const set: { name?: string; permissions?: Permission[] } = {};
+  if (patch.name !== undefined) {
+    const clean = String(patch.name).trim();
+    const problem = roleNameProblem(clean, await customNames(id));
+    if (problem) return { error: problem };
+    set.name = clean;
+  }
+  if (patch.permissions) set.permissions = permissionList(patch.permissions);
+  if (!set.name && !set.permissions) return {};
+
+  const [row] = await db.update(roles).set(set).where(eq(roles.id, id)).returning({ id: roles.id });
+  if (!row) return { error: "That role no longer exists." };
+  await record(admin.id, admin.name ?? undefined, "role.update", "role", id, set);
+  revalidatePath("/staff/roles");
+  return {};
+}
+
+/** Deletes a custom role. Everyone who held it goes back to being a player. */
+export async function deleteRole(id: number) {
+  const admin = await requireAdmin();
+  const key = customRoleKey(id);
+  const players = await db.transaction(async (tx) => {
+    const moved = await tx
+      .update(users)
+      .set({ role: PLAYER.key, updatedAt: new Date() })
+      .where(eq(users.role, key))
+      .returning({ id: users.id });
+    await tx.delete(roles).where(eq(roles.id, id));
+    return moved.length;
+  });
+  await record(admin.id, admin.name ?? undefined, "role.delete", "role", id, { players });
+  revalidatePath("/staff/roles");
+}
+
 /* ----------------------------------------------------------------- scores */
 
 /**
@@ -624,20 +713,20 @@ export async function addStaffMember(
  * osu! score ID is kept, so neither the sync nor a link brings it back.
  */
 export async function deleteScore(scoreId: number) {
-  const admin = await requireAdmin();
+  const staff = await requirePermission("scores.delete");
   const gone = await db.transaction(async (tx) => {
     const [row] = await tx.delete(scores).where(eq(scores.id, scoreId)).returning();
     if (row?.osuScoreId != null) {
       await tx
         .insert(deletedScores)
-        .values({ osuScoreId: row.osuScoreId, deletedById: admin.id })
+        .values({ osuScoreId: row.osuScoreId, deletedById: staff.id })
         .onConflictDoNothing();
     }
     return row;
   });
   if (!gone) throw new Error("That score is already gone");
 
-  await record(admin.id, admin.name ?? undefined, "score.delete", "score", scoreId, {
+  await record(staff.id, staff.name ?? undefined, "score.delete", "score", scoreId, {
     userId: gone.userId,
     entryId: gone.entryId,
     osuScoreId: gone.osuScoreId,
@@ -655,7 +744,7 @@ export async function deleteScore(scoreId: number) {
  * boxes are dropped; anything that isn't a web address is refused.
  */
 export async function setMyLinks(given: string[]): Promise<{ error?: string }> {
-  const staff = await requireStaff();
+  const staff = await requireTeamMember();
   const filled = given.map((l) => String(l ?? "").trim()).filter(Boolean);
   if (filled.length > MAX_LINKS) return { error: "Two links at most." };
 

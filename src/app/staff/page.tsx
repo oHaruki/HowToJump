@@ -3,6 +3,8 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLog, suggestions } from "@/lib/schema";
+import { auth } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { getCoverage, getStaffStats } from "@/lib/queries";
 import { CATEGORIES, TIERS, normalizeCategories, tierByOrder, tierFill } from "@/lib/tiers";
 import { BEST_PLAYS } from "@/lib/levels";
@@ -20,7 +22,8 @@ export const metadata: Metadata = { title: "Staff" };
 const THIN = 5;
 
 export default async function StaffDashboard() {
-  const [stats, byTier, log, coverageRows] = await Promise.all([
+  const [session, stats, byTier, log, coverageRows] = await Promise.all([
+    auth(),
     getStaffStats(),
     db
       .select({ tierOrder: suggestions.proposedTierOrder })
@@ -60,9 +63,11 @@ export default async function StaffDashboard() {
           <span className="lbl">Staff</span>
           <h1>Dashboard</h1>
         </div>
-        <Link className="btn btn-primary" href="/staff/add">
-          Add maps
-        </Link>
+        {can(session, "maps.add") ? (
+          <Link className="btn btn-primary" href="/staff/add">
+            Add maps
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid-4">

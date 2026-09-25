@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth, isStaff } from "@/lib/auth";
+import { auth } from "@/lib/auth";
+import { can, canSeeQueue, canUseStaffArea } from "@/lib/roles";
 import { StaffNav } from "@/components/StaffNav";
 import { getStaffStats } from "@/lib/queries";
 
@@ -12,13 +13,21 @@ export default async function StaffLayout({
 }) {
   const session = await auth();
   // Gated on the layout, so no staff route is reachable by URL alone.
-  if (!session?.userId || !isStaff(session.role)) redirect("/");
+  if (!session?.userId || !canUseStaffArea(session)) redirect("/");
 
   const stats = await getStaffStats();
 
   return (
     <div className="shell">
-      <StaffNav pending={stats.pending} isAdmin={session.role === "admin"} />
+      <StaffNav
+        pending={stats.pending}
+        show={{
+          add: can(session, "maps.add"),
+          queue: canSeeQueue(session),
+          bank: can(session, "bank.edit"),
+          admin: session.role === "admin",
+        }}
+      />
       <div className="stack-lg" style={{ minWidth: 0 }}>
         {children}
       </div>

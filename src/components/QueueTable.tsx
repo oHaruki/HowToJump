@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { approveSuggestions, rejectSuggestions, setSuggestionTier } from "@/lib/actions";
 import { tierByOrder, tierBySlug } from "@/lib/tiers";
 import { CategoryChips, ModChip, NONE, PacingChips } from "@/components/ui";
-import { MapCard } from "@/components/MapCard";
+import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
 import { secondsToDrain } from "@/lib/import/parse";
 
@@ -35,14 +35,15 @@ export type QueueRow = {
 export function QueueTable({
   rows,
   canApprove,
+  canReview,
 }: {
   rows: QueueRow[];
   /**
-   * Admins only. The server action refuses a helper either way; this keeps a
-   * button a helper cannot use off the screen rather than letting them find
-   * out by being thrown an error.
+   * What the viewer's role allows. The server actions refuse anyone else
+   * either way; these keep buttons they cannot use off the screen.
    */
   canApprove: boolean;
+  canReview: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -95,35 +96,39 @@ export function QueueTable({
             ? " (" + (selected.size - approvable.length) + " without a pack)"
             : ""}
         </span>
-        <div className="row">
-          <button
-            className="btn btn-sm"
-            type="button"
-            onClick={() =>
-              setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))
-            }
-          >
-            {allSelected ? "Select none" : "Select all"}
-          </button>
-          {canApprove ? (
+        {canApprove || canReview ? (
+          <div className="row">
             <button
-              className="btn btn-sm btn-ok"
+              className="btn btn-sm"
               type="button"
-              disabled={pending || !approvable.length}
-              onClick={() => run(() => approveSuggestions(approvable))}
+              onClick={() =>
+                setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))
+              }
             >
-              Approve selected
+              {allSelected ? "Select none" : "Select all"}
             </button>
-          ) : null}
-          <button
-            className="btn btn-sm btn-no"
-            type="button"
-            disabled={pending || !selectedIds.length}
-            onClick={() => run(() => rejectSuggestions(selectedIds))}
-          >
-            Reject selected
-          </button>
-        </div>
+            {canApprove ? (
+              <button
+                className="btn btn-sm btn-ok"
+                type="button"
+                disabled={pending || !approvable.length}
+                onClick={() => run(() => approveSuggestions(approvable))}
+              >
+                Approve selected
+              </button>
+            ) : null}
+            {canReview ? (
+              <button
+                className="btn btn-sm btn-no"
+                type="button"
+                disabled={pending || !selectedIds.length}
+                onClick={() => run(() => rejectSuggestions(selectedIds))}
+              >
+                Reject selected
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="review-list">
@@ -144,24 +149,30 @@ export function QueueTable({
             od={r.od}
             tone={r.tierOrder == null ? "attention" : undefined}
             leading={
-              <input
-                type="checkbox"
-                checked={selected.has(r.id)}
-                onChange={() => toggle(r.id)}
-                aria-label={"Select " + (r.title ?? "map")}
-              />
+              canApprove || canReview ? (
+                <input
+                  type="checkbox"
+                  checked={selected.has(r.id)}
+                  onChange={() => toggle(r.id)}
+                  aria-label={"Select " + (r.title ?? "map")}
+                />
+              ) : undefined
             }
-            packEditable
+            packEditable={canReview}
             pack={
-              <PackPicker
-                value={tierByOrder(r.tierOrder)?.slug ?? ""}
-                placeholder="Pick a pack"
-                allowClear={false}
-                onChange={(slug) => {
-                  const t = tierBySlug(slug);
-                  run(() => setSuggestionTier(r.id, t ? t.name : ""));
-                }}
-              />
+              canReview ? (
+                <PackPicker
+                  value={tierByOrder(r.tierOrder)?.slug ?? ""}
+                  placeholder="Pick a pack"
+                  allowClear={false}
+                  onChange={(slug) => {
+                    const t = tierBySlug(slug);
+                    run(() => setSuggestionTier(r.id, t ? t.name : ""));
+                  }}
+                />
+              ) : (
+                <PackTile tierOrder={r.tierOrder} />
+              )
             }
             tags={
               <>
@@ -191,14 +202,16 @@ export function QueueTable({
                     Approve
                   </button>
                 ) : null}
-                <button
-                  className="btn btn-sm btn-no"
-                  type="button"
-                  disabled={pending}
-                  onClick={() => run(() => rejectSuggestions([r.id]))}
-                >
-                  Reject
-                </button>
+                {canReview ? (
+                  <button
+                    className="btn btn-sm btn-no"
+                    type="button"
+                    disabled={pending}
+                    onClick={() => run(() => rejectSuggestions([r.id]))}
+                  >
+                    Reject
+                  </button>
+                ) : null}
               </>
             }
           />

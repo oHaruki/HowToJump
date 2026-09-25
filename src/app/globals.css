@@ -2372,6 +2372,26 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
 .team-msg { color: var(--danger); font-size: var(--font-size-small); }
 .team-edit { align-self: flex-start; }
 
+/* ----------------------------------------------------------------- roles */
+
+table.roles-board { min-width: 900px; }
+.roles-board th.c, .roles-board td.c { text-align: center; }
+.roles-board input[type="checkbox"]:disabled { opacity: 0.55; }
+.roles-name { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.roles-name b { color: var(--text-focus); font-weight: 600; }
+.roles-rename { flex-wrap: nowrap; }
+.roles-rename input[type="text"] { width: 160px; height: 32px; }
+.roles-actions { justify-content: flex-end; flex-wrap: nowrap; }
+.roles-new-name { max-width: 320px; }
+.roles-perms {
+  display: grid; gap: 12px 18px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+}
+.roles-perm { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.roles-perm input { margin-top: 3px; flex: none; }
+.roles-perm > span { display: flex; flex-direction: column; gap: 2px; }
+.roles-perm b { color: var(--text-focus); font-weight: 600; }
+
 /* ------------------------------------------------------------- entrances */
 
 /*

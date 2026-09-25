@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { missFactor } from "@/lib/grading";
 import { playExp } from "@/lib/levels";
 import { normalizeMod } from "@/lib/mods";
@@ -122,7 +123,7 @@ export default async function BeatmapPage({
               scores={board}
               expOf={expOf}
               me={session?.userId ?? null}
-              admin={session?.role === "admin"}
+              canDelete={can(session, "scores.delete")}
             />
           </>
         ) : (
@@ -380,19 +381,19 @@ function ScoreCard({
 }
 
 /**
- * Every score, a row each, the way osu!'s beatmap scoreboard lists them. An
- * admin gets a delete on each row.
+ * Every score, a row each, the way osu!'s beatmap scoreboard lists them.
+ * Anyone who may delete scores gets a delete on each row.
  */
 function Scoreboard({
   scores,
   expOf,
   me,
-  admin,
+  canDelete,
 }: {
   scores: BoardScore[];
   expOf: (s: BoardScore) => number;
   me: number | null;
-  admin: boolean;
+  canDelete: boolean;
 }) {
   return (
     <div className="sb-list" role="table" aria-label="Scoreboard">
@@ -424,7 +425,7 @@ function Scoreboard({
           </span>
           <span role="cell" className="sb-who">
             <Player s={s} avatar />
-            {admin ? <ScoreDelete scoreId={s.scoreId} /> : null}
+            {canDelete ? <ScoreDelete scoreId={s.scoreId} /> : null}
           </span>
           <span role="cell" className="c sb-num sb-opt" data-fc={s.isFc || undefined}>
             {s.maxCombo != null ? fmt(s.maxCombo) + "x" : "·"}

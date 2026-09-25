@@ -1,5 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { getBankPage, getFacets, getTierCounts, type BankPage } from "@/lib/queries";
 import {
   bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
@@ -22,6 +25,7 @@ export default async function StaffBankPage({
 }: {
   searchParams: Promise<Search>;
 }) {
+  if (!can(await auth(), "bank.edit")) redirect("/staff");
   const sp = await searchParams;
   const filters = bankFiltersFrom(sp, true);
   const query = bankQueryFrom(sp);

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, inArray, isNull } from "drizzle-orm";
+import { and, asc, isNull, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { auth } from "@/lib/auth";
+import { getRoles } from "@/lib/queries";
+import { PLAYER } from "@/lib/roles";
 import { Flag, SectionHead } from "@/components/ui";
 import { LinkChip } from "@/components/LinkChip";
 import { TeamLinksForm } from "@/components/TeamLinksForm";
@@ -12,16 +14,15 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Team" };
 
-const ROLE_NAMES: Record<string, string> = { admin: "Admin", helper: "Helper" };
-
 /**
- * The people behind the site: the admins, then the helpers, each with their
- * osu! profile and up to two links of their own. A member sees a way to
- * change their own links on their card.
+ * The people behind the site, a role at a time in the order the roles board
+ * lists them, each with their osu! profile and up to two links of their
+ * own. A member sees a way to change their own links on their card.
  */
 export default async function TeamPage() {
-  const [session, team] = await Promise.all([
+  const [session, roles, members] = await Promise.all([
     auth(),
+    getRoles(),
     db
       .select({
         id: users.id,
@@ -33,9 +34,14 @@ export default async function TeamPage() {
         socialLinks: users.socialLinks,
       })
       .from(users)
-      .where(and(inArray(users.role, ["admin", "helper"]), isNull(users.bannedAt)))
-      .orderBy(asc(users.role), asc(users.createdAt)),
+      .where(and(ne(users.role, PLAYER.key), isNull(users.bannedAt)))
+      .orderBy(asc(users.createdAt)),
   ]);
+  const order = new Map(roles.map((r, i) => [r.key, i]));
+  const names = new Map(roles.map((r) => [r.key, r.name]));
+  const team = members
+    .filter((m) => order.has(m.role))
+    .sort((a, b) => order.get(a.role)! - order.get(b.role)!);
 
   return (
     <div className="view">
@@ -60,7 +66,7 @@ export default async function TeamPage() {
                     <Flag code={m.countryCode} />
                     <span>{m.username}</span>
                   </Link>
-                  <span className="chip">{ROLE_NAMES[m.role] ?? m.role}</span>
+                  <span className="chip">{names.get(m.role)}</span>
                 </div>
               </div>
               <div className="row-tight">

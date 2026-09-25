@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteScore } from "@/lib/actions";
 
-/** An admin's delete on a scoreboard row, asked a second time before it goes. */
+/** A delete on a scoreboard row, asked a second time before it goes. */
 export function ScoreDelete({ scoreId }: { scoreId: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();

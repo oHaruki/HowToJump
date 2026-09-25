@@ -40,6 +40,21 @@ export const users = pgTable(
   ],
 );
 
+/**
+ * Roles an admin made, beside the built in Admin and Helper. A member's
+ * users.role holds "custom:" and the role's id.
+ */
+export const roles = pgTable(
+  "roles",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 32 }).notNull(),
+    permissions: text("permissions").array().notNull().default(sql`'{}'`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("roles_name_idx").on(sql`lower(${t.name})`)],
+);
+
 /* -------------------------------------------------------------- beatmaps */
 
 /** Metadata cached from the osu! API, keyed by difficulty ID. */

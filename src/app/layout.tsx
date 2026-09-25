@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { auth, isStaff } from "@/lib/auth";
+import { auth } from "@/lib/auth";
+import { canUseStaffArea } from "@/lib/roles";
 import { AuthButton } from "@/components/AuthButton";
 import { NavLinks } from "@/components/NavLinks";
 
@@ -17,7 +18,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const role = session?.role;
 
   // Public destinations only. Personal and staff links live in the avatar menu.
   const links = [
@@ -41,13 +41,13 @@ export default async function RootLayout({
             <NavLinks links={links} />
             <div className="nav-tools">
               <AuthButton
-                isStaff={isStaff(role)}
+                isStaff={canUseStaffArea(session)}
                 user={
                   session?.userId
                     ? {
                         name: session.user?.name ?? "",
                         image: session.user?.image ?? null,
-                        role: session.role,
+                        roleName: session.roleName,
                         osuUserId: session.osuUserId,
                       }
                     : null

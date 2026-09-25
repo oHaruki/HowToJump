@@ -6,14 +6,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { fetchMe, type OsuMe } from "@/lib/osu/client";
-
-export type Role = "user" | "helper" | "admin";
+import { getRole } from "@/lib/queries";
+import { PLAYER, can, type Permission } from "@/lib/roles";
 
 declare module "next-auth/jwt" {
   interface JWT {
     userId: number;
     osuUserId: number;
-    role: Role;
+    role: string;
     osuAccessToken?: string;
     osuRefreshToken?: string;
     osuExpiresAt?: number;
@@ -26,7 +26,10 @@ declare module "next-auth" {
   interface Session {
     userId: number;
     osuUserId: number;
-    role: Role;
+    /** "user", "helper", "admin", or a custom role's key. */
+    role: string;
+    roleName: string;
+    permissions: Permission[];
     osuAccessToken?: string;
   }
 }
@@ -63,7 +66,7 @@ const bootstrapAdmins = new Set(
 );
 
 /** Creates the local row on first sign in, refreshes the cached profile after. */
-async function upsertUser(me: OsuMe): Promise<{ id: number; role: Role }> {
+async function upsertUser(me: OsuMe): Promise<{ id: number; role: string }> {
   const existing = await db.query.users.findFirst({
     where: eq(users.osuUserId, me.id),
   });
@@ -78,10 +81,10 @@ async function upsertUser(me: OsuMe): Promise<{ id: number; role: Role }> {
 
   if (existing) {
     await db.update(users).set(patch).where(eq(users.id, existing.id));
-    return { id: existing.id, role: existing.role as Role };
+    return { id: existing.id, role: existing.role };
   }
 
-  const role: Role = bootstrapAdmins.has(String(me.id)) ? "admin" : "user";
+  const role = bootstrapAdmins.has(String(me.id)) ? "admin" : "user";
   const [created] = await db
     .insert(users)
     .values({ osuUserId: me.id, role, ...patch })
@@ -112,13 +115,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       // Read from the database, not the token, so a role change applies at once.
-      let role: Role = token.role ?? "user";
+      let role = PLAYER;
       if (token.userId) {
         const row = await db.query.users.findFirst({
           where: eq(users.id, token.userId),
           columns: { role: true, bannedAt: true },
         });
-        if (row) role = row.bannedAt ? "user" : (row.role as Role);
+        if (row && !row.bannedAt) role = await getRole(row.role);
       }
 
       // Returned as a new object rather than mutated: the callback's session
@@ -128,7 +131,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         ...session,
         userId: token.userId,
         osuUserId: token.osuUserId,
-        role,
+        role: role.key,
+        roleName: role.name,
+        permissions: [...role.permissions],
         osuAccessToken: token.osuAccessToken,
       };
     },
@@ -140,7 +145,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 export type CurrentUser = {
   id: number;
   osuUserId: number;
-  role: Role;
+  role: string;
+  permissions: Permission[];
   name: string | null;
   image: string | null;
 };
@@ -152,19 +158,23 @@ export async function currentUser(): Promise<CurrentUser | null> {
     id: session.userId,
     osuUserId: session.osuUserId,
     role: session.role,
+    permissions: session.permissions,
     name: session.user?.name ?? null,
     image: session.user?.image ?? null,
   };
 }
 
-export function isStaff(role: string | undefined | null): boolean {
-  return role === "helper" || role === "admin";
+/** Throws unless the signed in user may do this. Used by every staff action. */
+export async function requirePermission(permission: Permission) {
+  const user = await currentUser();
+  if (!user || !can(user, permission)) throw new Error("You don't have permission to do that");
+  return user;
 }
 
-/** Throws if the signed in user is not staff. Used by every staff action. */
-export async function requireStaff() {
+/** Throws unless the signed in user holds a staff role, a custom one included. */
+export async function requireTeamMember() {
   const user = await currentUser();
-  if (!user || !isStaff(user.role)) throw new Error("Staff access required");
+  if (!user || user.role === PLAYER.key) throw new Error("Staff access required");
   return user;
 }
 
