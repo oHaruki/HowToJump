@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-/** Copies a beatmap's ID, not its set's, to the clipboard. */
-export function CopyBeatmapId({ id }: { id: number }) {
+/**
+ * Copies a beatmap's ID, not its set's, to the clipboard. Compact is the
+ * small line on a map card; otherwise it is a full button.
+ */
+export function CopyBeatmapId({ id, compact }: { id: number; compact?: boolean }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
   useEffect(() => {
@@ -12,9 +15,11 @@ export function CopyBeatmapId({ id }: { id: number }) {
     return () => clearTimeout(t);
   }, [state]);
 
+  const idle = compact ? "Copy ID " + id : "Copy beatmap ID";
+
   return (
     <button
-      className="btn btn-ghost"
+      className={compact ? "copyid" : "btn btn-ghost"}
       type="button"
       title={"Beatmap ID " + id}
       onClick={async () => {
@@ -26,7 +31,7 @@ export function CopyBeatmapId({ id }: { id: number }) {
         }
       }}
     >
-      {state === "copied" ? "Copied " + id : state === "failed" ? "Copy failed" : "Copy beatmap ID"}
+      {state === "copied" ? "Copied " + id : state === "failed" ? "Copy failed" : idle}
     </button>
   );
 }

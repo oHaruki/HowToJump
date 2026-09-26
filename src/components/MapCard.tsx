@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
+import { CopyBeatmapId } from "@/components/CopyBeatmapId";
 import { NONE } from "@/components/ui";
 import { tierByOrder, tierFill } from "@/lib/tiers";
 
@@ -31,6 +32,7 @@ export function MapCard({
   score,
   linkTitle = true,
   href,
+  copyId,
 }: {
   osuBeatmapId: number;
   osuBeatmapsetId: number | null;
@@ -58,6 +60,8 @@ export function MapCard({
   linkTitle?: boolean;
   /** The map's page on this site; the title links to osu! when there is none. */
   href?: string;
+  /** Adds a line under the map that copies its beatmap ID. */
+  copyId?: boolean;
 }) {
   const url = osuBeatmapsetId
     ? "https://osu.ppy.sh/beatmapsets/" + osuBeatmapsetId + "#osu/" + osuBeatmapId
@@ -98,6 +102,7 @@ export function MapCard({
               <span className="mapcard-title">{title || "beatmap " + osuBeatmapId}</span>
             )}
             <span className="mapcard-sub">{sub}</span>
+            {copyId ? <CopyBeatmapId id={osuBeatmapId} compact /> : null}
           </div>
 
           {tags ? <div className="mapcard-tags">{tags}</div> : null}

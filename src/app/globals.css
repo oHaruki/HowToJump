@@ -1017,6 +1017,14 @@ footer {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 0 1px 3px var(--main-bg);
 }
+.copyid {
+  appearance: none; background: none; border: 0; padding: 0;
+  align-self: flex-start; cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--font-size-small);
+  color: var(--text);
+  text-shadow: 0 1px 3px var(--main-bg), 0 0 8px var(--main-bg);
+}
+.copyid:hover { color: var(--text-focus); text-decoration: underline; }
 
 /* Beside the map, not beneath it. */
 .mapcard-tags {
