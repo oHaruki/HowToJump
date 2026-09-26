@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  importRows, previewPaste, starRatingFor, type PreviewRow,
+  addPackMaps, importRows, previewPaste, starRatingFor, type PreviewRow,
 } from "@/lib/actions";
 import { categoryNotes, normalizations, secondsToDrain } from "@/lib/import/parse";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
@@ -12,6 +12,7 @@ import {
   LENGTH_SCALE, SPEED_SCALE, normalizeCategories, scaleHint,
 } from "@/lib/tiers";
 import { MODS } from "@/lib/mods";
+import type { SpecialPack } from "@/lib/packs";
 import { MapCard } from "@/components/MapCard";
 import { PickSelect } from "@/components/ui";
 import { PackPicker } from "@/components/PackPicker";
@@ -36,7 +37,8 @@ const STATUS_CHIP: Record<string, [string, string]> = {
   error: ["bad", "Error"],
 };
 
-export function Importer() {
+/** Sends rows to the review queue, or straight into `pack` when one is given. */
+export function Importer({ pack }: { pack?: SpecialPack }) {
   const router = useRouter();
   const [source, setSource] = useState<"link" | "paste">("link");
   const [text, setText] = useState("");
@@ -181,35 +183,35 @@ export function Importer() {
     setError(null);
     start(async () => {
       try {
-        await importRows(
-          ready.map((r) => ({
-            beatmapId: r.beatmapId!,
-            beatmapsetId: r.beatmapsetId,
-            title: r.title,
-            version: r.version,
-            mapper: r.mapper,
-            mod: r.mod,
-            tierOrder: r.tierOrder!,
-            categories: r.categories,
-            length: r.length,
-            speed: r.speed,
-            stars: r.stars,
-            bpm: r.bpm,
-            drainSeconds: r.drainSeconds,
-            cs: r.cs,
-            ar: r.ar,
-            od: r.od,
-            raw: r.raw,
-          })),
-          fileName ? "upload" : source === "link" ? "link" : "paste",
-        );
+        const payload = ready.map((r) => ({
+          beatmapId: r.beatmapId!,
+          beatmapsetId: r.beatmapsetId,
+          title: r.title,
+          version: r.version,
+          mapper: r.mapper,
+          mod: r.mod,
+          tierOrder: r.tierOrder!,
+          categories: r.categories,
+          length: r.length,
+          speed: r.speed,
+          stars: r.stars,
+          bpm: r.bpm,
+          drainSeconds: r.drainSeconds,
+          cs: r.cs,
+          ar: r.ar,
+          od: r.od,
+          raw: r.raw,
+        }));
+        if (pack) await addPackMaps(pack.id, payload);
+        else await importRows(payload, fileName ? "upload" : source === "link" ? "link" : "paste");
         setRows((prev) => prev.filter((r) => r.status !== "new"));
-        router.push("/staff/queue");
+        if (pack) router.refresh();
+        else router.push("/staff/queue");
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
     });
-  }, [ready, fileName, source, router]);
+  }, [ready, fileName, source, router, pack]);
 
   return (
     <>
@@ -571,7 +573,7 @@ export function Importer() {
                 disabled={pending || !ready.length}
                 onClick={send}
               >
-                Send to queue
+                {pack ? "Add to " + pack.name : "Send to queue"}
               </button>
             </div>
           </div>

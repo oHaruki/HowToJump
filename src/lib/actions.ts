@@ -5,7 +5,7 @@ import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
-  auditLog, beatmaps, deletedScores, entries, roles, scores, siteConfig, suggestionBatches,
+  auditLog, beatmaps, deletedScores, entries, packs, roles, scores, siteConfig, suggestionBatches,
   suggestions, users, type Suggestion,
 } from "@/lib/schema";
 import { auth, requireAdmin, requirePermission, requireTeamMember } from "@/lib/auth";
@@ -24,6 +24,7 @@ import {
 import {
   CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
 } from "@/lib/tiers";
+import { packColor, packDescription, packNameProblem } from "@/lib/packs";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
@@ -424,6 +425,7 @@ export async function setSuggestionTier(id: number, tierName: string) {
   revalidatePath("/staff/queue");
 }
 
+
 /* ------------------------------------------------------------- bank admin */
 
 /**
@@ -528,6 +530,7 @@ export async function updateEntry(
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
+  revalidatePath("/packs/[id]", "page");
   revalidatePath("/");
 }
 
@@ -542,6 +545,7 @@ export async function removeEntry(entryId: number) {
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
+  revalidatePath("/packs/[id]", "page");
 }
 
 /** Puts a removed entry back on the ladder. Removing only clears the flag. */
@@ -556,6 +560,7 @@ export async function restoreEntry(entryId: number) {
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
+  revalidatePath("/packs/[id]", "page");
 }
 
 /** Throws unless a key names a staff role. */
@@ -755,6 +760,134 @@ export async function moveRole(key: string, direction: -1 | 1) {
     direction,
   });
   revalidatePath("/staff/roles");
+}
+
+/* ---------------------------------------------------------- special packs */
+
+/** The special packs' names, less the one being renamed. */
+async function packNames(except?: number): Promise<string[]> {
+  const rows = await db.select({ id: packs.id, name: packs.name }).from(packs);
+  return rows.filter((r) => r.id !== except).map((r) => r.name);
+}
+
+function revalidatePacks() {
+  revalidatePath("/staff/packs", "layout");
+  revalidatePath("/ladder");
+  revalidatePath("/packs/[id]", "page");
+}
+
+/** Makes a special pack, which staff can then add maps to. */
+export async function createPack(input: {
+  name: string;
+  color: string;
+  description?: string;
+}): Promise<{ error?: string }> {
+  const admin = await requireAdmin();
+  const name = String(input.name ?? "").trim();
+  const problem = packNameProblem(name, await packNames());
+  if (problem) return { error: problem };
+  const color = packColor(input.color);
+  if (!color) return { error: "Pick a colour." };
+  const description = packDescription(input.description);
+
+  const [row] = await db
+    .insert(packs)
+    .values({ name, color, description })
+    .returning({ id: packs.id });
+  await record(admin.id, admin.name ?? undefined, "pack.create", "pack", row.id, { name, color });
+  revalidatePacks();
+  return {};
+}
+
+/** Renames a special pack, or changes its colour or description. */
+export async function updatePack(
+  id: number,
+  patch: { name?: string; color?: string; description?: string },
+): Promise<{ error?: string }> {
+  const admin = await requireAdmin();
+  const set: { name?: string; color?: string; description?: string | null } = {};
+  if (patch.name !== undefined) {
+    const name = String(patch.name).trim();
+    const problem = packNameProblem(name, await packNames(id));
+    if (problem) return { error: problem };
+    set.name = name;
+  }
+  if (patch.color !== undefined) {
+    const color = packColor(patch.color);
+    if (!color) return { error: "Pick a colour." };
+    set.color = color;
+  }
+  if (patch.description !== undefined) set.description = packDescription(patch.description);
+  if (!Object.keys(set).length) return {};
+
+  const [row] = await db.update(packs).set(set).where(eq(packs.id, id)).returning({ id: packs.id });
+  if (!row) return { error: "That pack no longer exists." };
+  await record(admin.id, admin.name ?? undefined, "pack.update", "pack", id, set);
+  revalidatePacks();
+  return {};
+}
+
+/**
+ * Adds maps straight into a special pack, past the queue, from rows the
+ * importer previewed. A map already in the bank under that mod is skipped.
+ */
+export async function addPackMaps(packId: number, rowsInput: unknown) {
+  const admin = await requireAdmin();
+  const rows = z.array(ImportRow).parse(rowsInput);
+  const [pack] = await db.select({ id: packs.id }).from(packs).where(eq(packs.id, packId));
+  if (!pack) throw new Error("That special pack no longer exists");
+  if (!rows.length) return { added: 0 };
+
+  const beatmapRowIds = await ensureBeatmaps(rows.map((r) => r.beatmapId));
+  const created = await db
+    .insert(entries)
+    .values(
+      rows.map((r) => ({
+        beatmapId: beatmapRowIds.get(r.beatmapId)!,
+        mod: normalizeMod(r.mod),
+        tierOrder: r.tierOrder,
+        packId,
+        categories: normalizeCategories(r.categories),
+        lengthBucket: normalizeLength(r.length) || null,
+        speedBucket: normalizeSpeed(r.speed) || null,
+        stars: r.stars ?? null,
+        bpm: r.bpm ?? null,
+        drainSeconds: r.drainSeconds ?? null,
+        cs: r.cs ?? null,
+        ar: r.ar ?? null,
+        od: r.od ?? null,
+        judgedById: admin.id,
+        judgedByName: admin.name ?? null,
+      })),
+    )
+    .onConflictDoNothing()
+    .returning({ id: entries.id });
+
+  await record(admin.id, admin.name ?? undefined, "pack.maps.add", "pack", packId, {
+    rows: rows.length,
+    added: created.length,
+  });
+  await announceEntries(created.map((e) => e.id));
+  revalidatePacks();
+  revalidatePath("/staff/bank");
+  return { added: created.length };
+}
+
+/** Deletes a special pack with its maps and every score on them. */
+export async function deletePack(id: number) {
+  const admin = await requireAdmin();
+  const [{ n }] = await db
+    .select({ n: rawSql<number>`count(*)::int` })
+    .from(entries)
+    .where(eq(entries.packId, id));
+  const [row] = await db.delete(packs).where(eq(packs.id, id)).returning({ name: packs.name });
+  if (!row) return;
+  await record(admin.id, admin.name ?? undefined, "pack.delete", "pack", id, {
+    name: row.name,
+    maps: n,
+  });
+  revalidatePacks();
+  revalidatePath("/staff/bank");
 }
 
 /* ----------------------------------------------------------------- scores */

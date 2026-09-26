@@ -34,6 +34,10 @@ does not help and a new map never lowers anyone. The main level is the average
 of the five categories, and the leaderboard ranks by the EXP behind it, with a
 board per category beside it.
 
+Admins can also make special packs off the ladder. Their maps are judged into a
+pack and pay EXP as usual, but it counts toward no level, only toward the special
+pack's own board.
+
 Maps reach the bank through staff: helpers paste rows from the grading sheet
 into a queue, and an admin approves what the ladder actually holds.
 

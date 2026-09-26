@@ -10,7 +10,7 @@ import {
 import { compareResults, gradeFor, gradeRank, GRADE_RULES } from "@/lib/grading";
 import { modsText, normalizeMod } from "@/lib/mods";
 import { announceRecords, announceScores, type RecordTaken } from "@/lib/discord";
-import { getEntryLeader, getTopRanked, isDeletedScore } from "@/lib/queries";
+import { getEntryLeader, getTopRanked, isDeletedScore, onLadder } from "@/lib/queries";
 import { planPass, type SyncReason } from "@/lib/osu/plan";
 import { backfillProblem, type ScoreRef } from "@/lib/osu/backfill";
 
@@ -167,19 +167,21 @@ async function refreshWithTop(userId: number): Promise<RecordTaken | null> {
 
 /**
  * Recomputes the per pack rollup and the skill levels a profile reads, from
- * visible scores on listed entries valued at the entry's current pack.
+ * visible scores on listed ladder entries valued at the entry's current
+ * pack. Special packs count toward neither.
  */
 export async function refreshProgress(userId: number): Promise<void> {
   const counted = and(
     eq(scores.userId, userId),
     eq(scores.isHidden, false),
     eq(entries.isActive, true),
+    onLadder,
   );
 
   const totals = await db
     .select({ tierOrder: entries.tierOrder, total: raw<number>`count(*)::int` })
     .from(entries)
-    .where(eq(entries.isActive, true))
+    .where(and(eq(entries.isActive, true), onLadder))
     .groupBy(entries.tierOrder);
 
   const cleared = await db

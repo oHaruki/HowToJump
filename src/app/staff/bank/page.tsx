@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/roles";
-import { getBankPage, getFacets, getTierCounts, type BankPage } from "@/lib/queries";
+import {
+  getBankPage, getFacets, getSpecialPacks, getTierCounts, type BankPage,
+} from "@/lib/queries";
 import {
   bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
 } from "@/lib/bank-params";
@@ -37,13 +39,17 @@ export default async function StaffBankPage({
   // The dropdowns and the pack counts read the same side of the ladder the
   // list does, so switching to removed entries cannot offer a category or a
   // pack that has nothing in it.
-  const [facets, tierCounts] = await Promise.all([
-    getFacets(filters.status),
+  const [facets, tierCounts, specialRows] = await Promise.all([
+    getFacets(filters.status, true),
     getTierCounts(filters.status),
+    getSpecialPacks(),
   ]);
 
   const packCounts: Record<string, number> = {};
   for (const t of TIERS) packCounts[t.slug] = tierCounts.get(t.order) ?? 0;
+  // A special pack's count is its listed maps, so it only shows beside listed ones.
+  if (filters.status === "listed") for (const p of specialRows) packCounts[String(p.id)] = p.maps;
+  const special = specialRows.map(({ id, name, color }) => ({ id, name, color }));
 
   return (
     <>
@@ -51,7 +57,7 @@ export default async function StaffBankPage({
         Move an entry between packs, or pull it out of the bank. Removing keeps the
         row and its scores, it just stops showing. Search to find one entry, or
         filter to Stale label for the rows still carrying wording the grading
-        scale has dropped.
+        scale has dropped. Special packs&apos; maps are listed after the ladder&apos;s.
       </SectionHead>
 
       <BankFilters
@@ -64,6 +70,7 @@ export default async function StaffBankPage({
         speeds={facets.speeds}
         current={bankCurrentFrom(sp)}
         count={<Suspense fallback="…"><BankCount bank={bank} /></Suspense>}
+        special={special}
       />
 
       <Suspense key={query + "#" + page} fallback={<Loading label="Loading entries" />}>

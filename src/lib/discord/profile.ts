@@ -69,6 +69,7 @@ export async function profileReply(name: string): Promise<Message> {
         mapper: best.mapper,
         mod: best.mod,
         tierOrder: best.tierOrder,
+        pack: null,
         categories: best.categories,
         stars: best.stars,
         noteCount: best.noteCount,

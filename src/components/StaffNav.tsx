@@ -19,6 +19,7 @@ export function StaffNav({
   if (show.queue) items.push({ href: "/staff/queue", label: "Queue", badge: pending });
   if (show.bank) items.push({ href: "/staff/bank", label: "Map bank" });
   if (show.admin) {
+    items.push({ href: "/staff/packs", label: "Special packs" });
     items.push({ href: "/staff/members", label: "Members" });
     items.push({ href: "/staff/roles", label: "Roles" });
   }

@@ -1163,6 +1163,7 @@ footer {
   border-radius: 7px; corner-shape: var(--corner-shape);
 }
 .packgrid-all:hover { background: var(--bg-c); color: var(--text-focus); }
+.packgrid-head { padding: 6px 6px 0; }
 
 /* -------------------------------------------------------- category picker */
 
@@ -2413,6 +2414,21 @@ table.roles-board { min-width: 820px; }
 .roles-perm input { margin-top: 3px; flex: none; }
 .roles-perm > span { display: flex; flex-direction: column; gap: 2px; }
 .roles-perm b { color: var(--text-focus); font-weight: 600; }
+
+/* ---------------------------------------------------------- special packs */
+
+.packs-list { display: flex; flex-direction: column; gap: 10px; }
+.packs-item { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.packs-item .pk-gem { width: 30px; height: 30px; border-radius: 9px; }
+.packs-info { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.packs-info b { color: var(--text-focus); font-weight: 600; }
+.packs-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.packs-form-top { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+input[type="color"] {
+  width: 56px; height: var(--control-height); padding: 4px; cursor: pointer;
+  background: var(--bg-b); border: var(--border-width) solid var(--border);
+  border-radius: var(--control-radius); corner-shape: var(--corner-shape);
+}
 .chip-x {
   margin-left: 2px; padding: 0 2px; border: 0; background: none;
   font: inherit; font-size: 14px; line-height: 1; color: var(--text-dark); cursor: pointer;

@@ -1,6 +1,7 @@
 import type { BankRow, ScoreLine } from "@/lib/queries";
 import { entryName, gradeText } from "@/lib/queries";
 import { playExp } from "@/lib/levels";
+import type { SpecialPack } from "@/lib/packs";
 import { shortCategory, tierByOrder } from "@/lib/tiers";
 import { clamp, fitLines, md, type Embed, type EmbedField, type Message } from "@/lib/discord/api";
 
@@ -36,6 +37,20 @@ function cover(osuBeatmapsetId: number | null): { url: string } | undefined {
 /** A pack's colour, as Discord takes one. */
 export function tierColor(tierOrder: number | null | undefined): number {
   return parseInt((tierByOrder(tierOrder)?.color ?? "#777777").slice(1), 16);
+}
+
+/** A map's ladder pack, and the special pack it sits in if any. */
+type Placed = { tierOrder: number; pack: SpecialPack | null };
+
+/** A special pack's colour, or else the ladder pack's. */
+function placeColor(r: Placed | null | undefined): number {
+  return r?.pack ? parseInt(r.pack.color.slice(1), 16) : tierColor(r?.tierOrder);
+}
+
+/** "Diamond", or "Summer Event (Diamond)" for a map in a special pack. */
+function packText(r: Placed): string {
+  const tier = tierByOrder(r.tierOrder)?.name ?? "?";
+  return r.pack ? r.pack.name + " (" + tier + ")" : tier;
 }
 
 export const fmt = (n: number) => Math.round(n).toLocaleString("en");
@@ -89,9 +104,8 @@ const categoryText = (categories: string[]) =>
 
 /** One score as a line: map, grade, pack and what it is worth. */
 export function scoreLine(s: ScoreLine): string {
-  const pack = tierByOrder(s.tierOrder)?.name ?? "?";
   const worth = fmt(scoreExp(s)) + " EXP";
-  return md(entryName(s)) + " · " + gradeText(s) + " · " + pack + " · " + worth;
+  return md(entryName(s)) + " · " + gradeText(s) + " · " + md(packText(s)) + " · " + worth;
 }
 
 /* ------------------------------------------------------------ the feed */
@@ -101,7 +115,7 @@ export function scoreEmbed(who: PlayerLike, s: ScoreLine): Embed {
   const skills = categoryText(s.categories);
   const mapper = s.mapper ? " · mapped by " + s.mapper : "";
   return {
-    color: tierColor(s.tierOrder),
+    color: placeColor(s),
     author: playerAuthor(who),
     title: mapTitle(s),
     url: mapUrl(s),
@@ -109,7 +123,7 @@ export function scoreEmbed(who: PlayerLike, s: ScoreLine): Embed {
     fields: [
       { name: "Grade", value: gradeText(s), inline: true },
       { name: "EXP", value: fmt(scoreExp(s)), inline: true },
-      { name: "Pack", value: tierByOrder(s.tierOrder)?.name ?? "?", inline: true },
+      { name: "Pack", value: packText(s), inline: true },
     ],
     footer: { text: stars(s.stars) + " · " + skills + mapper },
   };
@@ -149,7 +163,7 @@ export type RecentPlay = {
   mod: string;
   stars: number | null;
   /** The entry it landed on, when the map is in the bank under these mods. */
-  entry: { mod: string; tierOrder: number; categories: string[] } | null;
+  entry: { mod: string; tierOrder: number; pack: SpecialPack | null; categories: string[] } | null;
   passed: boolean;
   grade: string;
   missCount: number;
@@ -179,7 +193,7 @@ export function recentEmbed(who: PlayerLike, p: RecentPlay): Embed {
   if (p.entry) {
     fields.push(
       { name: "EXP", value: p.exp == null ? "—" : fmt(p.exp), inline: true },
-      { name: "Pack", value: tierByOrder(p.entry.tierOrder)?.name ?? "?", inline: true },
+      { name: "Pack", value: packText(p.entry), inline: true },
     );
   }
   if (p.playedAt) {
@@ -189,7 +203,7 @@ export function recentEmbed(who: PlayerLike, p: RecentPlay): Embed {
   const skills = p.entry ? " · " + categoryText(p.entry.categories) : "";
   const mapper = p.mapper ? " · mapped by " + p.mapper : "";
   return {
-    color: tierColor(p.entry?.tierOrder),
+    color: placeColor(p.entry),
     author: playerAuthor(who, "most recent"),
     title: mapTitle(p),
     url: p.entry ? mapUrl({ ...p, mod: p.entry.mod }) : osuBeatmapUrl(p),
@@ -205,7 +219,7 @@ export function recentEmbed(who: PlayerLike, p: RecentPlay): Embed {
 /** Somebody taking a map's first place. */
 export function mapRecordEmbed(who: PlayerLike, s: ScoreLine, previous: string | null): Embed {
   return {
-    color: tierColor(s.tierOrder),
+    color: placeColor(s),
     author: playerAuthor(who, "new #1"),
     title: "🥇 " + mapTitle(s),
     url: mapUrl(s),
@@ -216,7 +230,7 @@ export function mapRecordEmbed(who: PlayerLike, s: ScoreLine, previous: string |
     fields: [
       { name: "Grade", value: gradeText(s), inline: true },
       { name: "EXP", value: fmt(scoreExp(s)), inline: true },
-      { name: "Pack", value: tierByOrder(s.tierOrder)?.name ?? "?", inline: true },
+      { name: "Pack", value: packText(s), inline: true },
     ],
     footer: { text: stars(s.stars) + " · " + categoryText(s.categories) },
   };
@@ -260,13 +274,15 @@ function newEntryEmbed(r: BankRow): Embed {
   const mapper = r.mapper ? "mapped by " + r.mapper : "";
   const judge = r.judgedByName ? (mapper ? " · " : "") + "judged by " + r.judgedByName : "";
   return {
-    color: tierColor(r.tierOrder),
-    author: { name: "New in " + (pack?.name ?? "the bank"), url: siteUrl("/maps") },
+    color: placeColor(r),
+    author: r.pack
+      ? { name: "New in " + r.pack.name, url: siteUrl("/packs/" + r.pack.id) }
+      : { name: "New in " + (pack?.name ?? "the bank"), url: siteUrl("/maps") },
     title: entryName(nameOf(r)),
     url: mapUrl(r),
     thumbnail: cover(r.osuBeatmapsetId),
     fields: [
-      { name: "Pack", value: pack?.name ?? "?", inline: true },
+      { name: "Pack", value: packText(r), inline: true },
       { name: "Stars", value: stars(r.stars), inline: true },
       { name: "BPM", value: r.bpm == null ? "?" : String(Math.round(r.bpm)), inline: true },
       { name: "Length", value: r.drain || "?", inline: true },
@@ -284,12 +300,15 @@ const ENTRIES_DRAWN = 4;
 export function newEntriesMessage(rows: BankRow[]): Message {
   if (rows.length <= ENTRIES_DRAWN) return { embeds: rows.map(newEntryEmbed) };
 
-  const byPack = new Map<number, BankRow[]>();
-  for (const r of rows) byPack.set(r.tierOrder, [...(byPack.get(r.tierOrder) ?? []), r]);
+  // Each ladder pack, hardest first, then each special pack.
+  const heading = (r: BankRow) => r.pack?.name ?? tierByOrder(r.tierOrder)?.name ?? "?";
+  const byPack = new Map<string, BankRow[]>();
+  for (const r of rows) byPack.set(heading(r), [...(byPack.get(heading(r)) ?? []), r]);
+  const rank = (r: BankRow) => (r.pack ? -r.pack.id : r.tierOrder);
   const lines = [...byPack.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .flatMap(([tierOrder, packRows]) => [
-      "**" + (tierByOrder(tierOrder)?.name ?? "?") + "**",
+    .sort((a, b) => rank(b[1][0]) - rank(a[1][0]))
+    .flatMap(([name, packRows]) => [
+      "**" + md(name) + "**",
       ...packRows.map((r) => "• " + md(entryName(nameOf(r))) + " · " + stars(r.stars)),
     ]);
 

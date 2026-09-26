@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { SpecialPack } from "@/lib/packs";
 import { TIERS, tierBySlug, tierFill } from "@/lib/tiers";
 
 /**
@@ -8,7 +9,11 @@ import { TIERS, tierBySlug, tierFill } from "@/lib/tiers";
  *
  * A native select renders sixteen identical lines of text, which throws away
  * the one thing that makes a pack recognisable. This lays them out four
- * across, in the same bands as the ladder page, each with its own colour.
+ * across, in the same bands as the ladder page, each with its own colour,
+ * with any special packs under them.
+ *
+ * A pack is keyed by its slug on the ladder and by its ID as a string when
+ * special.
  */
 export function PackPicker({
   value,
@@ -16,18 +21,24 @@ export function PackPicker({
   onChange,
   placeholder = "All packs",
   allowClear = true,
+  special = [],
 }: {
   value: string;
+  /** Maps per pack, keyed like `value`. */
   counts?: Record<string, number>;
-  onChange: (slug: string) => void;
+  onChange: (key: string) => void;
   /** Shown when nothing is picked. "Set pack" when used as a bulk action. */
   placeholder?: string;
   /** Off where clearing makes no sense, such as setting a pack on a row. */
   allowClear?: boolean;
+  /** Special packs, offered under the ladder's. */
+  special?: readonly SpecialPack[];
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  const selected = value ? tierBySlug(value) : null;
+  const tier = value ? tierBySlug(value) : null;
+  const pack = tier ? null : (special.find((p) => String(p.id) === value) ?? null);
+  const fill = tier ? tierFill(tier) : pack?.color;
 
   useEffect(() => {
     if (!open) return;
@@ -59,10 +70,8 @@ export function PackPicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {selected ? (
-          <span className="dot" style={{ background: tierFill(selected) }} />
-        ) : null}
-        <span className="packpick-label">{selected ? selected.name : placeholder}</span>
+        {fill ? <span className="dot" style={{ background: fill }} /> : null}
+        <span className="packpick-label">{tier?.name ?? pack?.name ?? placeholder}</span>
         <span className="caret" aria-hidden="true" />
       </button>
 
@@ -96,6 +105,30 @@ export function PackPicker({
               );
             })}
           </div>
+          {special.length ? (
+            <>
+              <span className="lbl packgrid-head">Special packs</span>
+              <div className="packgrid">
+                {special.map((p) => {
+                  const key = String(p.id);
+                  const n = counts?.[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className="packgrid-item"
+                      data-active={String(value === key)}
+                      onClick={() => pick(key)}
+                    >
+                      <span className="packgrid-gem" style={{ background: p.color }} />
+                      <span className="packgrid-name">{p.name}</span>
+                      {n != null ? <span className="packgrid-count">{n}</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>

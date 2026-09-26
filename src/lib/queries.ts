@@ -4,13 +4,21 @@ import {
 } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  beatmaps, deletedScores, entries, roles, scores, siteConfig, suggestions, userLevels, users,
+  beatmaps, deletedScores, entries, packs, roles, scores, siteConfig, suggestions, userLevels,
+  users,
 } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
 import {
   BUILT_IN_ROLES, PLAYER, customRoleId, customRoleKey, isPermission, orderRoles, type RoleView,
 } from "@/lib/roles";
+import { packStandings, type PackStanding, type SpecialPack } from "@/lib/packs";
 import { CATEGORIES, LENGTHS, SPEEDS, normalizeCategory, orderByScale } from "@/lib/tiers";
+
+/** On the ladder rather than in a special pack. */
+export const onLadder = isNull(entries.packId);
+
+/** A special pack as a row carries it, null for a ladder entry. Needs packs left joined. */
+const packSelection = { id: packs.id, name: packs.name, color: packs.color };
 
 /** One row of the map bank, flattened for display. */
 export type BankRow = {
@@ -24,6 +32,8 @@ export type BankRow = {
   cardUrl: string | null;
   mod: string;
   tierOrder: number;
+  /** The special pack a map sits in, off the ladder. */
+  pack: SpecialPack | null;
   /** Every skill the map is judged on, in the scale's order. */
   categories: string[];
   lengthBucket: string | null;
@@ -45,7 +55,12 @@ export type BankStatus = "listed" | "removed" | "all";
 
 export type BankFilters = {
   q?: string;
+  /** A ladder pack's order. */
   pack?: number;
+  /** A special pack's ID. */
+  specialPack?: number;
+  /** Staff only: special packs' maps beside the ladder's when no pack is picked. */
+  everyPack?: boolean;
   category?: string;
   mod?: string;
   length?: string;
@@ -80,6 +95,7 @@ const bankSelection = {
   cardUrl: beatmaps.cardUrl,
   mod: entries.mod,
   tierOrder: entries.tierOrder,
+  pack: packSelection,
   categories: entries.categories,
   lengthBucket: entries.lengthBucket,
   speedBucket: entries.speedBucket,
@@ -92,6 +108,14 @@ const bankSelection = {
   judgedByName: entries.judgedByName,
   isActive: entries.isActive,
 };
+
+/** Entries with their beatmap and special pack, which is what bankSelection reads. */
+const bankFrom = () =>
+  db
+    .select(bankSelection)
+    .from(entries)
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .leftJoin(packs, eq(entries.packId, packs.id));
 
 function shape(rows: Array<Record<string, unknown>>): BankRow[] {
   return rows.map((r) => ({
@@ -118,6 +142,8 @@ function bankWhere(filters: BankFilters) {
       )!,
     );
   }
+  if (filters.specialPack) where.push(eq(entries.packId, filters.specialPack));
+  else if (!filters.everyPack) where.push(onLadder);
   if (filters.pack) where.push(eq(entries.tierOrder, filters.pack));
   if (filters.category) where.push(arrayContains(entries.categories, [filters.category]));
   if (filters.mod) where.push(eq(entries.mod, filters.mod));
@@ -137,16 +163,19 @@ function bankWhere(filters: BankFilters) {
   return and(...where);
 }
 
-/* Hardest pack first, hardest map within it. The entry ID breaks ties, so
-   a paged list keeps a stable order across queries. */
-const bankOrder = [desc(entries.tierOrder), desc(entries.stars), desc(entries.id)];
+/* The ladder, then each special pack. Hardest pack first, hardest map
+   within it. The entry ID breaks ties, so a paged list keeps a stable
+   order across queries. */
+const bankOrder = [
+  raw`${entries.packId} asc nulls first`,
+  desc(entries.tierOrder),
+  desc(entries.stars),
+  desc(entries.id),
+];
 
 /** The whole filtered bank, for staff screens and one pack's page. The bank itself takes a page. */
 export async function getBank(filters: BankFilters = {}): Promise<BankRow[]> {
-  const rows = await db
-    .select(bankSelection)
-    .from(entries)
-    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+  const rows = await bankFrom()
     .where(bankWhere(filters))
     .orderBy(...bankOrder)
     .limit(1000);
@@ -176,10 +205,7 @@ export async function getBankPage(
   const current = Math.min(Math.max(1, Math.trunc(page) || 1), pageCount);
 
   const rows = total
-    ? await db
-        .select(bankSelection)
-        .from(entries)
-        .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    ? await bankFrom()
         .where(where)
         .orderBy(...bankOrder)
         .limit(BANK_PAGE_SIZE)
@@ -202,9 +228,30 @@ export async function getTierCounts(
   const rows = await db
     .select({ tierOrder: entries.tierOrder, n: raw<number>`count(*)::int` })
     .from(entries)
-    .where(statusWhere(status))
+    .where(and(statusWhere(status), onLadder))
     .groupBy(entries.tierOrder);
   return new Map(rows.map((r) => [r.tierOrder, r.n]));
+}
+
+export type SpecialPackRow = SpecialPack & { description: string | null; maps: number };
+
+/** Every special pack, oldest first, with how many listed maps each holds. */
+export async function getSpecialPacks(): Promise<SpecialPackRow[]> {
+  return db
+    .select({
+      ...packSelection,
+      description: packs.description,
+      maps: raw<number>`(count(${entries.id}) filter (where ${entries.isActive}))::int`,
+    })
+    .from(packs)
+    .leftJoin(entries, eq(entries.packId, packs.id))
+    .groupBy(packs.id)
+    .orderBy(asc(packs.id));
+}
+
+/** One special pack, or null. */
+export async function getSpecialPack(id: number): Promise<SpecialPackRow | null> {
+  return (await getSpecialPacks()).find((p) => p.id === id) ?? null;
 }
 
 /**
@@ -222,7 +269,7 @@ export async function getCoverage(): Promise<
       n: raw<number>`count(*)::int`,
     })
     .from(entries)
-    .where(eq(entries.isActive, true))
+    .where(and(eq(entries.isActive, true), onLadder))
     .groupBy(entries.tierOrder, entries.categories);
 }
 
@@ -233,15 +280,16 @@ export async function getBankStats() {
       hardest: raw<number | null>`max(${entries.stars})`,
     })
     .from(entries)
-    .where(eq(entries.isActive, true));
+    .where(and(eq(entries.isActive, true), onLadder));
   return { total: row?.total ?? 0, hardest: row?.hardest ?? null };
 }
 
 /**
  * Distinct values present in the bank, for the filter dropdowns. Distinct
  * in SQL, so this stays a few dozen rows however big the bank gets.
+ * `everyPack` reads special packs' maps too.
  */
-export async function getFacets(status: BankStatus = "listed") {
+export async function getFacets(status: BankStatus = "listed", everyPack = false) {
   const rows = await db
     .selectDistinct({
       categories: entries.categories,
@@ -250,7 +298,7 @@ export async function getFacets(status: BankStatus = "listed") {
       speedBucket: entries.speedBucket,
     })
     .from(entries)
-    .where(statusWhere(status));
+    .where(and(statusWhere(status), everyPack ? undefined : onLadder));
 
   const uniq = (xs: Array<string | null>) =>
     Array.from(new Set(xs.filter((x): x is string => Boolean(x)))).sort();
@@ -265,11 +313,8 @@ export async function getFacets(status: BankStatus = "listed") {
 }
 
 export async function getRecentEntries(limit = 4): Promise<BankRow[]> {
-  const rows = await db
-    .select(bankSelection)
-    .from(entries)
-    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
-    .where(eq(entries.isActive, true))
+  const rows = await bankFrom()
+    .where(and(eq(entries.isActive, true), onLadder))
     .orderBy(desc(entries.createdAt))
     .limit(limit);
   return shape(rows);
@@ -278,10 +323,7 @@ export async function getRecentEntries(limit = 4): Promise<BankRow[]> {
 /** Some entries by their IDs, in the bank's own order. */
 export async function getEntriesByIds(ids: number[]): Promise<BankRow[]> {
   if (!ids.length) return [];
-  const rows = await db
-    .select(bankSelection)
-    .from(entries)
-    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+  const rows = await bankFrom()
     .where(inArray(entries.id, ids))
     .orderBy(...bankOrder);
   return shape(rows);
@@ -327,6 +369,7 @@ export async function getPendingSuggestions() {
     .where(eq(suggestions.status, "pending"))
     .orderBy(asc(suggestions.batchId), asc(suggestions.id));
 }
+
 
 export async function getStaffStats() {
   const [pending] = await db
@@ -390,7 +433,8 @@ export async function getRole(key: string): Promise<RoleView> {
 
 /**
  * Every play a profile shows, newest first: visible scores on maps still on
- * the ladder. All of them, since top plays are ranked by EXP across the lot.
+ * the ladder, special packs left out. All of them, since top plays are
+ * ranked by EXP across the lot.
  */
 export async function getProfilePlays(userId: number) {
   return db
@@ -420,7 +464,12 @@ export async function getProfilePlays(userId: number) {
     .innerJoin(entries, eq(scores.entryId, entries.id))
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
     .where(
-      and(eq(scores.userId, userId), eq(scores.isHidden, false), eq(entries.isActive, true)),
+      and(
+        eq(scores.userId, userId),
+        eq(scores.isHidden, false),
+        eq(entries.isActive, true),
+        onLadder,
+      ),
     )
     .orderBy(desc(scores.playedAt), desc(scores.id));
 }
@@ -437,6 +486,8 @@ export type ScoreLine = {
   mapper: string | null;
   mod: string;
   tierOrder: number;
+  /** The special pack a map sits in, off the ladder. */
+  pack: SpecialPack | null;
   categories: string[];
   stars: number | null;
   noteCount: number | null;
@@ -461,12 +512,14 @@ export async function describeScores(
       mapper: beatmaps.mapper,
       mod: entries.mod,
       tierOrder: entries.tierOrder,
+      pack: packSelection,
       categories: entries.categories,
       stars: entries.stars,
       noteCount: beatmaps.noteCount,
     })
     .from(entries)
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .leftJoin(packs, eq(entries.packId, packs.id))
     .where(inArray(entries.id, imported.map((i) => i.entryId)));
   const byId = new Map(rows.map((r) => [r.entryId, r]));
   return imported.flatMap((i) => {
@@ -613,6 +666,7 @@ export async function getBeatmapPage(osuBeatmapId: number) {
       entryId: entries.id,
       mod: entries.mod,
       tierOrder: entries.tierOrder,
+      pack: packSelection,
       categories: entries.categories,
       lengthBucket: entries.lengthBucket,
       speedBucket: entries.speedBucket,
@@ -635,6 +689,7 @@ export async function getBeatmapPage(osuBeatmapId: number) {
     })
     .from(entries)
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .leftJoin(packs, eq(entries.packId, packs.id))
     .where(and(eq(beatmaps.osuBeatmapId, osuBeatmapId), eq(entries.isActive, true)))
     .orderBy(asc(entries.tierOrder), asc(entries.id));
 }
@@ -749,7 +804,7 @@ async function categorySpellings(category: string): Promise<string[]> {
 }
 
 /**
- * Clears, full combos and top grades for some players, on maps still
+ * Clears, full combos and top grades for some players, on ladder maps still
  * listed. With a category, only maps in it.
  */
 export async function getPlayerTallies(
@@ -776,9 +831,87 @@ export async function getPlayerTallies(
         inArray(scores.userId, userIds),
         eq(scores.isHidden, false),
         eq(entries.isActive, true),
+        onLadder,
         inCategory,
       ),
     )
     .groupBy(scores.userId);
   return new Map(rows.map(({ userId, ...t }) => [userId, t]));
+}
+
+/* ----------------------------------------------------------- pack boards */
+
+export type PackRankingRow = PackStanding & {
+  osuUserId: number;
+  username: string;
+  avatarUrl: string | null;
+  countryCode: string | null;
+};
+
+/**
+ * A special pack's board, most EXP first: visible scores on its listed maps
+ * by players not banned. Worked out on each read, since a pack holds few maps.
+ */
+export async function getPackStandings(packId: number): Promise<PackRankingRow[]> {
+  const rows = await db
+    .select({
+      userId: users.id,
+      osuUserId: users.osuUserId,
+      username: users.username,
+      avatarUrl: users.avatarUrl,
+      countryCode: users.countryCode,
+      tierOrder: entries.tierOrder,
+      grade: scores.grade,
+      missCount: scores.missCount,
+      accuracy: scores.accuracy,
+      isFc: scores.isFc,
+      noteCount: beatmaps.noteCount,
+    })
+    .from(scores)
+    .innerJoin(users, eq(scores.userId, users.id))
+    .innerJoin(entries, eq(scores.entryId, entries.id))
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .where(
+      and(
+        eq(entries.packId, packId),
+        eq(entries.isActive, true),
+        eq(scores.isHidden, false),
+        isNull(users.bannedAt),
+      ),
+    );
+  const who = new Map(rows.map((r) => [r.userId, r]));
+  return packStandings(rows).map((s) => {
+    const p = who.get(s.userId)!;
+    return {
+      ...s,
+      osuUserId: p.osuUserId,
+      username: p.username,
+      avatarUrl: p.avatarUrl,
+      countryCode: p.countryCode,
+    };
+  });
+}
+
+/** A player's scores in a special pack, by entry. */
+export async function getPackScoresOf(packId: number, userId: number) {
+  const rows = await db
+    .select({
+      entryId: scores.entryId,
+      tierOrder: entries.tierOrder,
+      grade: scores.grade,
+      missCount: scores.missCount,
+      accuracy: scores.accuracy,
+      noteCount: beatmaps.noteCount,
+    })
+    .from(scores)
+    .innerJoin(entries, eq(scores.entryId, entries.id))
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .where(
+      and(
+        eq(entries.packId, packId),
+        eq(scores.userId, userId),
+        eq(scores.isHidden, false),
+      ),
+    );
+  return new Map(rows.map((r) => [r.entryId, r]));
 }

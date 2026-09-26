@@ -3,6 +3,7 @@
  * read the same query keys from here.
  */
 import { tierBySlug } from "@/lib/tiers";
+import { specialPackId } from "@/lib/packs";
 import type { BankFilters, BankStatus } from "@/lib/queries";
 
 export type Search = Record<string, string | string[] | undefined>;
@@ -17,16 +18,19 @@ export const FILTER_KEYS = [
 ] as const;
 
 /**
- * Turns the query string into filters. `staff` gates the two filters that
- * can reach entries taken off the ladder.
+ * Turns the query string into filters. `staff` gates the filters that can
+ * reach entries taken off the ladder, and special packs' maps.
  */
 export function bankFiltersFrom(sp: Search, staff = false): BankFilters {
   const pack = tierBySlug(one(sp.pack));
+  const special = staff ? specialPackId(one(sp.pack)) : null;
   const status = one(sp.status);
 
   return {
     q: one(sp.q) || undefined,
     pack: pack?.order,
+    specialPack: special ?? undefined,
+    everyPack: staff,
     category: one(sp.category) || undefined,
     mod: one(sp.mod) || undefined,
     length: one(sp.length) || undefined,

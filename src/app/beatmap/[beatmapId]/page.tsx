@@ -13,7 +13,7 @@ import {
 } from "@/lib/queries";
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
-import { Flag, GradeLetter, ModChip, PacingChips, mapHref } from "@/components/ui";
+import { Flag, GradeLetter, ModChip, PacingChips, SpecialChip, mapHref } from "@/components/ui";
 import { ScoreDelete } from "@/components/ScoreDelete";
 import { timeAgo } from "@/lib/time";
 
@@ -183,8 +183,8 @@ function Header({
 
       <div className="bm-in">
         <div className="bm-top">
-          <Link className="lbl bm-back" href="/maps">
-            ← Map bank
+          <Link className="lbl bm-back" href={map.pack ? "/packs/" + map.pack.id : "/maps"}>
+            ← {map.pack ? map.pack.name : "Map bank"}
           </Link>
           {choices.length > 1 ? (
             <nav className="bm-mods" aria-label="Banked under">
@@ -218,6 +218,7 @@ function Header({
               {map.mapper ? <span> mapped by {map.mapper}</span> : null}
             </p>
             <div className="row-tight">
+              {map.pack ? <SpecialChip pack={map.pack} /> : null}
               <span className="chip chip-tier">
                 <span className="dot" style={{ background: tierFill(tier) }} />
                 {tier ? tier.name : "unassigned"}
@@ -271,6 +272,11 @@ function Header({
             <p className="bm-misses">
               Accuracy lifts it to <b>{fmt(playExp(map.tierOrder, "SSS", 0))}</b> at 100%
             </p>
+            {map.pack ? (
+              <p className="bm-misses">
+                It counts on the {map.pack.name} board, not toward your level
+              </p>
+            ) : null}
             {map.noteCount ? <MissNote notes={map.noteCount} /> : null}
           </aside>
         </div>

@@ -94,6 +94,26 @@ export const beatmaps = pgTable(
   (t) => [uniqueIndex("beatmaps_osu_id_idx").on(t.osuBeatmapId)],
 );
 
+/* ----------------------------------------------------------- special packs */
+
+/**
+ * Packs an admin made beside the ladder. Their maps are judged into a
+ * ladder pack like any other, but their EXP counts toward no level, only
+ * toward the special pack's own board.
+ */
+export const packs = pgTable(
+  "packs",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 40 }).notNull(),
+    /** "#rrggbb". */
+    color: varchar("color", { length: 7 }).notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("packs_name_idx").on(sql`lower(${t.name})`)],
+);
+
 /* ------------------------------------------------------------ bank entries */
 
 /** One row is a beatmap under a specific mod, with its own pack and board. */
@@ -105,6 +125,8 @@ export const entries = pgTable(
     /** Canonical mod string, "NM" when nomod. */
     mod: varchar("mod", { length: 16 }).notNull().default("NM"),
     tierOrder: integer("tier_order").notNull(),
+    /** A special pack, which takes the map off the ladder. */
+    packId: integer("pack_id").references(() => packs.id, { onDelete: "cascade" }),
     /** One map can train more than one skill, so it can sit in several. */
     categories: varchar("categories", { length: 48 }).array().notNull().default(sql`'{}'`),
     lengthBucket: varchar("length_bucket", { length: 24 }),
@@ -134,6 +156,7 @@ export const entries = pgTable(
     index("entries_bank_sort_idx").on(t.isActive, t.tierOrder, t.stars),
     index("entries_bank_mod_idx").on(t.isActive, t.mod),
     index("entries_bank_pacing_idx").on(t.isActive, t.lengthBucket, t.speedBucket),
+    index("entries_pack_idx").on(t.packId),
   ],
 );
 
@@ -336,6 +359,7 @@ export const auditLog = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type Beatmap = typeof beatmaps.$inferSelect;
+export type Pack = typeof packs.$inferSelect;
 export type Entry = typeof entries.$inferSelect;
 export type Suggestion = typeof suggestions.$inferSelect;
 export type Score = typeof scores.$inferSelect;

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { TIERS, tierByName, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
+import type { SpecialPack } from "@/lib/packs";
 import { modLabel } from "@/lib/mods";
 import { Cover } from "@/components/Cover";
 
@@ -56,6 +57,16 @@ function KeyedChip({ label, value }: { label: string; value: string }) {
     <span className="chip chip-keyed">
       <i>{label}</i>
       <b>{value}</b>
+    </span>
+  );
+}
+
+/** The special pack a map sits in, as a chip. */
+export function SpecialChip({ pack }: { pack: SpecialPack }) {
+  return (
+    <span className="chip chip-tier">
+      <span className="dot" style={{ background: pack.color }} />
+      {pack.name}
     </span>
   );
 }
@@ -333,6 +344,30 @@ export function LadderGrid({
           </Link>
         );
       })}
+    </div>
+  );
+}
+
+/** The special packs as tiles, each opening its own page and board. */
+export function SpecialPackGrid({ packs }: { packs: Array<SpecialPack & { maps: number }> }) {
+  return (
+    <div className="ladder">
+      {packs.map((p) => (
+        <Link
+          key={p.id}
+          className="gem"
+          href={"/packs/" + p.id}
+          style={{ "--tier": p.color } as CSSProperties}
+        >
+          <span className="gem-swatch" style={{ background: p.color }} />
+          <span>
+            <span className="gem-name">{p.name}</span>
+            <span className="gem-meta">
+              {p.maps} {p.maps === 1 ? "entry" : "entries"}
+            </span>
+          </span>
+        </Link>
+      ))}
     </div>
   );
 }

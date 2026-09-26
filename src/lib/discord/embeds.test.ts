@@ -27,6 +27,7 @@ const score = (over: Partial<ScoreLine> = {}): ScoreLine => ({
   mapper: "Sotarks",
   mod: "NM",
   tierOrder: 10,
+  pack: null,
   categories: ["Aim - raw mechanic"],
   stars: 7.5,
   noteCount: 1000,
@@ -47,6 +48,7 @@ const row =(over: Partial<BankRow> = {}): BankRow => ({
   cardUrl: null,
   mod: "NM",
   tierOrder: 10,
+  pack: null,
   categories: ["Aim - raw mechanic"],
   lengthBucket: "Medium",
   speedBucket: "High",
@@ -96,6 +98,18 @@ test("a score names its pack, its grade and what it is worth", () => {
   assert.ok(Number(worth?.value.replace(/,/g, "")) > 0);
 });
 
+const event = { id: 3, name: "Summer Event", color: "#ff8800" };
+
+test("a score in a special pack names it beside its pack, worth the same EXP", () => {
+  const ladder = E.scoreEmbed(who, score());
+  const embed = E.scoreEmbed(who, score({ pack: event }));
+  assert.equal(embed.color, 0xff8800);
+  const value = (e: typeof embed, name: string) => e.fields?.find((f) => f.name === name)?.value;
+  assert.equal(value(embed, "Pack"), "Summer Event (Topaz)");
+  assert.equal(value(embed, "EXP"), value(ladder, "EXP"));
+  assert.match(E.scoreLine(score({ pack: event })), /Summer Event \(Topaz\) · [\d,]+ EXP$/);
+});
+
 const recent = (over: Partial<RecentPlay> = {}): RecentPlay => ({
   osuBeatmapId: 100,
   osuBeatmapsetId: 200,
@@ -105,7 +119,7 @@ const recent = (over: Partial<RecentPlay> = {}): RecentPlay => ({
   mapper: "Sotarks",
   mod: "HDDT",
   stars: 7.5,
-  entry: { mod: "DT", tierOrder: 10, categories: ["Aim - raw mechanic"] },
+  entry: { mod: "DT", tierOrder: 10, pack: null, categories: ["Aim - raw mechanic"] },
   passed: true,
   grade: "A",
   missCount: 2,
@@ -165,6 +179,19 @@ test("a few new maps are drawn one by one, and many are listed by pack", () => {
   const text = lots.embeds?.[0].description ?? "";
   // Hardest pack heads the list, the way the bank itself is ordered.
   assert.ok(text.indexOf("Diamond") < text.indexOf("Topaz"));
+});
+
+test("new maps in a special pack are listed after the ladder's, and link to the pack", () => {
+  const one = E.newEntriesMessage([row({ pack: event })]);
+  assert.equal(one.embeds?.[0].author?.name, "New in Summer Event");
+  assert.equal(one.embeds?.[0].author?.url, "https://howtojump.test/packs/3");
+
+  const lots = E.newEntriesMessage([
+    ...many(3, (i) => row({ entryId: i, tierOrder: 15, pack: event })),
+    ...many(3, (i) => row({ entryId: 10 + i, tierOrder: 2 })),
+  ]);
+  const text = lots.embeds?.[0].description ?? "";
+  assert.ok(text.indexOf("Copper") < text.indexOf("Summer Event"));
 });
 
 test("the overall place is drawn above the maps, and says who was passed", () => {

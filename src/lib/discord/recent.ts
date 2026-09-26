@@ -1,9 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { beatmaps, entries, scores } from "@/lib/schema";
+import { beatmaps, entries, packs, scores } from "@/lib/schema";
 import { completionOf, fetchLatestScore, toPlay, type OsuScore, type PlayFacts } from "@/lib/osu/client";
 import { compareResults, gradeFor, gradeRank } from "@/lib/grading";
 import { playExp } from "@/lib/levels";
+import type { SpecialPack } from "@/lib/packs";
 import { modsAsPlayed, modsText, normalizeMod } from "@/lib/mods";
 import { gradeText, isDeletedScore } from "@/lib/queries";
 import { md, type Message } from "@/lib/discord/api";
@@ -28,6 +29,7 @@ type Banked = {
   id: number;
   mod: string;
   tierOrder: number;
+  pack: SpecialPack | null;
   categories: string[];
   stars: number | null;
   artist: string | null;
@@ -48,6 +50,7 @@ export async function describeRecent(userId: number, score: OsuScore): Promise<R
       id: entries.id,
       mod: entries.mod,
       tierOrder: entries.tierOrder,
+      pack: { id: packs.id, name: packs.name, color: packs.color },
       categories: entries.categories,
       stars: entries.stars,
       artist: beatmaps.artist,
@@ -60,6 +63,7 @@ export async function describeRecent(userId: number, score: OsuScore): Promise<R
     })
     .from(entries)
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .leftJoin(packs, eq(entries.packId, packs.id))
     .where(and(eq(beatmaps.osuBeatmapId, play.osuBeatmapId), eq(entries.isActive, true)));
 
   const entry = banked.find((e) => normalizeMod(e.mod) === play.mods) ?? null;
@@ -81,7 +85,9 @@ export async function describeRecent(userId: number, score: OsuScore): Promise<R
     mapper: known?.mapper ?? set?.creator ?? null,
     mod: modsAsPlayed(score.mods),
     stars: entry ? entry.stars : (map?.difficulty_rating ?? null),
-    entry: entry ? { mod: entry.mod, tierOrder: entry.tierOrder, categories: entry.categories } : null,
+    entry: entry
+      ? { mod: entry.mod, tierOrder: entry.tierOrder, pack: entry.pack, categories: entry.categories }
+      : null,
     passed: play.passed,
     grade,
     missCount: play.missCount,
@@ -119,10 +125,11 @@ async function standing(
     where: and(eq(scores.userId, userId), eq(scores.entryId, entry.id)),
     columns: { osuScoreId: true, grade: true, gradeRank: true, missCount: true, accuracy: true },
   });
-  if (best && best.osuScoreId === play.osuScoreId) return "On their profile.";
+  const where = entry.pack ? "the " + md(entry.pack.name) + " board" : "their profile";
+  if (best && best.osuScoreId === play.osuScoreId) return "On " + where + ".";
   const candidate = { gradeRank: gradeRank(grade), missCount: play.missCount, accuracy: play.accuracy };
   if (best && compareResults(best, candidate) <= 0) {
     return "Their best here is still " + gradeText(best) + ".";
   }
-  return "Not on their profile yet. It lands within a minute, or /sync pulls it in now.";
+  return "Not on " + where + " yet. It lands within a minute, or /sync pulls it in now.";
 }

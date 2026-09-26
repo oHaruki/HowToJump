@@ -8,7 +8,8 @@ import {
   tierByName, tierByOrder, tierBySlug,
 } from "@/lib/tiers";
 import { MODS, modsText } from "@/lib/mods";
-import { CategoryChips, ModChip, PacingChips, PickSelect } from "@/components/ui";
+import type { SpecialPack } from "@/lib/packs";
+import { CategoryChips, ModChip, PacingChips, PickSelect, SpecialChip } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
 import { CategoryPicker } from "@/components/CategoryPicker";
@@ -25,6 +26,8 @@ export type BankAdminRow = {
   mapper: string | null;
   mod: string;
   tierOrder: number;
+  /** The special pack it sits in, off the ladder. */
+  pack: SpecialPack | null;
   categories: string[];
   lengthBucket: string | null;
   speedBucket: string | null;
@@ -118,7 +121,10 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                     }}
                   />
                 ) : (
-                  <PackTile tierOrder={r.tierOrder} />
+                  <>
+                    <PackTile tierOrder={r.tierOrder} />
+                    {r.pack ? <SpecialChip pack={r.pack} /> : null}
+                  </>
                 )
               }
               tags={

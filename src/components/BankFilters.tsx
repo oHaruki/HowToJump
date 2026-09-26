@@ -5,6 +5,7 @@ import {
   useCallback, useEffect, useRef, useState, useTransition, type ReactNode,
 } from "react";
 import { PackPicker } from "@/components/PackPicker";
+import type { SpecialPack } from "@/lib/packs";
 import { tierBySlug, tierFill } from "@/lib/tiers";
 
 type Current = {
@@ -57,10 +58,14 @@ export function BankFilters({
   current,
   count,
   staff,
+  special = [],
 }: {
   /** Which bank this bar filters. The staff one lives at its own route. */
   basePath?: string;
+  /** Maps per pack, keyed by slug, or by ID for a special pack. */
   packCounts: Record<string, number>;
+  /** Special packs the pack filter offers. The staff bank lists their maps too. */
+  special?: SpecialPack[];
   categories: string[];
   mods: string[];
   lengths: string[];
@@ -125,6 +130,7 @@ export function BankFilters({
           <PackPicker
             value={current.pack}
             counts={packCounts}
+            special={special}
             onChange={(v) => setParam("pack", v)}
           />
         </label>
@@ -170,8 +176,8 @@ export function BankFilters({
               <FilterChip
                 key={f.key}
                 label={f.label}
-                value={chipValue(f.key, current)}
-                fill={f.key === "pack" ? tierFill(tierBySlug(current.pack)) : undefined}
+                value={chipValue(f.key, current, special)}
+                fill={f.key === "pack" ? packFill(current.pack, special) : undefined}
                 onRemove={() => setParam(f.key, "")}
               />
             ))}
@@ -191,11 +197,21 @@ export function BankFilters({
   );
 }
 
+const specialByKey = (key: string, special: readonly SpecialPack[]) =>
+  special.find((p) => String(p.id) === key);
+
 /** What a chip shows: a pack name, a spelled out staff value, or the word itself. */
-function chipValue(key: keyof Current, current: Current): string {
-  if (key === "pack") return tierBySlug(current.pack)?.name ?? current.pack;
+function chipValue(key: keyof Current, current: Current, special: readonly SpecialPack[]): string {
+  if (key === "pack") {
+    return tierBySlug(current.pack)?.name ?? specialByKey(current.pack, special)?.name ?? current.pack;
+  }
   const v = current[key] ?? "";
   return VALUE_LABELS[v] ?? v;
+}
+
+/** A pack chip's swatch, ladder or special. */
+function packFill(key: string, special: readonly SpecialPack[]): string {
+  return specialByKey(key, special)?.color ?? tierFill(tierBySlug(key));
 }
 
 /** One applied filter. The whole chip removes it, so there is no small target. */

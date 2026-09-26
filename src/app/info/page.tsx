@@ -113,6 +113,21 @@ export default function InfoPage() {
       </section>
 
       <section className="iband">
+        <span className="lbl">Special packs</span>
+        <div className="iband-main">
+          <h3>Packs off the ladder</h3>
+          <div className="iband-cols">
+            <p>
+              Admins can make packs beside the sixteen, for events and the like. Each
+              map in one is judged into a pack and pays EXP like any other, but that
+              EXP doesn&apos;t count toward your level. It goes on the special
+              pack&apos;s own board instead, which adds up everyone&apos;s maps.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="iband">
         <span className="lbl">Purpose</span>
         <div className="iband-main">
           <h3>What this is for</h3>
