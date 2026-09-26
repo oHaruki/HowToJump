@@ -15,6 +15,7 @@ import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, ModChip, PacingChips, SpecialChip, mapHref } from "@/components/ui";
 import { ScoreDelete } from "@/components/ScoreDelete";
+import { CopyBeatmapId } from "@/components/CopyBeatmapId";
 import { timeAgo } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -236,6 +237,7 @@ function Header({
               <a className="btn btn-ghost" href={"osu://b/" + map.osuBeatmapId}>
                 osu!direct
               </a>
+              <CopyBeatmapId id={map.osuBeatmapId} />
             </div>
           </div>
 
