@@ -31,7 +31,8 @@ Every play earns EXP: its pack's value times the share its grade earns, which
 falls with every miss on one curve rather than stepping from grade to grade. A
 category's level adds up a player's best ten plays in it, so grinding easy maps
 does not help and a new map never lowers anyone. The main level is the average
-of the five categories, and the leaderboard ranks by the EXP behind it.
+of the five categories, and the leaderboard ranks by the EXP behind it, with a
+board per category beside it.
 
 Maps reach the bank through staff: helpers paste rows from the grading sheet
 into a queue, and an admin approves what the ladder actually holds.

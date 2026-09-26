@@ -200,6 +200,16 @@ export function shortCategory(input: string | null | undefined): string {
   return CATEGORY_SHORT[c] ?? c;
 }
 
+/** A category as it travels in a URL: "raw-mechanic". */
+export function categorySlug(category: string): string {
+  return shortCategory(category).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+/** The category a URL names, or null. */
+export function categoryBySlug(slug: string | null | undefined): string | null {
+  return CATEGORIES.find((c) => categorySlug(c) === slug) ?? null;
+}
+
 /** Whether a category is one the grading team still judges on. */
 export function isCategory(input: string | null | undefined): boolean {
   return CATEGORIES.includes(normalizeCategory(input));

@@ -13,8 +13,8 @@ import {
 } from "./parse";
 import { normalizeMod, modsFromApi } from "../mods";
 import {
-  CATEGORIES, LENGTHS, SPEEDS, isCategory, normalizeCategories, normalizeCategory,
-  normalizeLength, normalizeSpeed, orderByScale,
+  CATEGORIES, LENGTHS, SPEEDS, categoryBySlug, categorySlug, isCategory, normalizeCategories,
+  normalizeCategory, normalizeLength, normalizeSpeed, orderByScale,
 } from "../tiers";
 import { gradeFor } from "../grading";
 import {
@@ -417,4 +417,12 @@ test("filters read along their list, not the alphabet", () => {
     orderByScale(["Flow Aim", "Precision"], CATEGORIES),
     ["Precision", "Flow Aim"],
   );
+});
+
+test("every category has a board URL that reads back to it", () => {
+  const slugs = CATEGORIES.map(categorySlug);
+  assert.deepEqual(slugs, ["consistency", "raw-mechanic", "anti-aim", "control", "precision"]);
+  for (const c of CATEGORIES) assert.equal(categoryBySlug(categorySlug(c)), c);
+  assert.equal(categoryBySlug("main"), null);
+  assert.equal(categoryBySlug(undefined), null);
 });

@@ -1,6 +1,6 @@
 import {
-  and, arrayContained, arrayContains, asc, desc, eq, ilike, inArray, isNull, not, or,
-  sql as raw,
+  and, arrayContained, arrayContains, arrayOverlaps, asc, desc, eq, ilike, inArray, isNull, not,
+  or, sql as raw,
 } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -10,7 +10,7 @@ import { secondsToDrain } from "@/lib/import/parse";
 import {
   BUILT_IN_ROLES, PLAYER, customRoleId, customRoleKey, isPermission, orderRoles, type RoleView,
 } from "@/lib/roles";
-import { CATEGORIES, LENGTHS, SPEEDS, orderByScale } from "@/lib/tiers";
+import { CATEGORIES, LENGTHS, SPEEDS, normalizeCategory, orderByScale } from "@/lib/tiers";
 
 /** One row of the map bank, flattened for display. */
 export type BankRow = {
@@ -736,9 +736,30 @@ export async function getTopRanked(scope: string): Promise<RankingRow | null> {
 
 export type PlayerTally = { clears: number; fcs: number; sss: number; ss: number; s: number };
 
-/** Clears, full combos and top grades for some players, on maps still listed. */
-export async function getPlayerTallies(userIds: number[]): Promise<Map<number, PlayerTally>> {
+/**
+ * Every spelling of a category the bank holds, renamed labels included,
+ * the way levels count them.
+ */
+async function categorySpellings(category: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ label: raw<string>`unnest(${entries.categories})` })
+    .from(entries);
+  const found = rows.map((r) => r.label).filter((l) => normalizeCategory(l) === category);
+  return found.length ? found : [category];
+}
+
+/**
+ * Clears, full combos and top grades for some players, on maps still
+ * listed. With a category, only maps in it.
+ */
+export async function getPlayerTallies(
+  userIds: number[],
+  category?: string,
+): Promise<Map<number, PlayerTally>> {
   if (!userIds.length) return new Map();
+  const inCategory = category
+    ? arrayOverlaps(entries.categories, await categorySpellings(category))
+    : undefined;
   const rows = await db
     .select({
       userId: scores.userId,
@@ -751,7 +772,12 @@ export async function getPlayerTallies(userIds: number[]): Promise<Map<number, P
     .from(scores)
     .innerJoin(entries, eq(scores.entryId, entries.id))
     .where(
-      and(inArray(scores.userId, userIds), eq(scores.isHidden, false), eq(entries.isActive, true)),
+      and(
+        inArray(scores.userId, userIds),
+        eq(scores.isHidden, false),
+        eq(entries.isActive, true),
+        inCategory,
+      ),
     )
     .groupBy(scores.userId);
   return new Map(rows.map(({ userId, ...t }) => [userId, t]));

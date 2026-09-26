@@ -6,7 +6,9 @@ import { MAIN_LEVEL, progressText } from "@/lib/levels";
 import {
   getPlayerTallies, getRankOf, getRankings, type PlayerTally, type RankingRow,
 } from "@/lib/queries";
-import { tierByOrder, tierFill } from "@/lib/tiers";
+import {
+  CATEGORIES, categoryBySlug, categorySlug, shortCategory, tierByOrder, tierFill,
+} from "@/lib/tiers";
 import { Flag, GradeLetter, SectionHead } from "@/components/ui";
 import { BankPager } from "@/components/BankPager";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -23,36 +25,48 @@ const NO_TALLY: PlayerTally = { clears: 0, fcs: 0, sss: 0, ss: 0, s: 0 };
  * The EXP leaderboard, laid out like osu!'s rankings: the place, the player
  * with their flag, what they have reached, and the figure it is ranked by,
  * with their clears and top grades beside it. Your own row is highlighted,
- * and pinned below the table when it is on another page.
+ * and pinned below the table when it is on another page. The main level's
+ * board is the default; a switch above it reads one category's instead.
  */
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; board?: string }>;
 }) {
   const sp = await searchParams;
+  const category = categoryBySlug(sp.board);
+  const scope = category ?? MAIN_LEVEL;
   const [board, session] = await Promise.all([
-    getRankings(MAIN_LEVEL, Number(sp.page) || 1),
+    getRankings(scope, Number(sp.page) || 1),
     auth(),
   ]);
-  const mine = session?.userId ? await getRankOf(session.userId, MAIN_LEVEL) : null;
+  const mine = session?.userId ? await getRankOf(session.userId, scope) : null;
   const mineShown = !!mine && board.rows.some((r) => r.userId === mine.userId);
   const tallies = await getPlayerTallies(
     [...board.rows.map((r) => r.userId), ...(mine && !mineShown ? [mine.userId] : [])],
+    category ?? undefined,
   );
 
   return (
     <div className="view">
       <LiveRefresh />
-      <SectionHead label="Leaderboard" title="Project Aim Leaderboard" />
+      <SectionHead
+        label="Leaderboard"
+        title={category ? shortCategory(category) + " Leaderboard" : "Project Aim Leaderboard"}
+      />
 
-      {board.rows.length ? (
-        <RankTable rows={board.rows} tallies={tallies} me={session?.userId ?? null} />
-      ) : (
-        <p className="small">
-          Nobody has EXP here yet. Play any map from the bank to be the first.
-        </p>
-      )}
+      <div className="stack-lg">
+        <BoardSwitch current={category} />
+        {board.rows.length ? (
+          <RankTable rows={board.rows} tallies={tallies} me={session?.userId ?? null} />
+        ) : (
+          <p className="small">
+            {category
+              ? "Nobody has EXP in " + category + " yet. Play any of its maps to be the first."
+              : "Nobody has EXP here yet. Play any map from the bank to be the first."}
+          </p>
+        )}
+      </div>
 
       {mine && !mineShown ? (
         <div className="stack">
@@ -67,10 +81,36 @@ export default async function LeaderboardPage({
         pageCount={board.pageCount}
         total={board.total}
         pageSize={board.pageSize}
-        query=""
+        query={category ? "board=" + categorySlug(category) : ""}
         noun={["player", "players"]}
       />
     </div>
+  );
+}
+
+/** The main board, then one per category. The main one lives at the bare URL. */
+function BoardSwitch({ current }: { current: string | null }) {
+  const boards = [
+    { href: "/leaderboard", label: "Main", category: null as string | null },
+    ...CATEGORIES.map((c) => ({
+      href: "/leaderboard?board=" + categorySlug(c),
+      label: shortCategory(c),
+      category: c,
+    })),
+  ];
+  return (
+    <nav className="tabs" aria-label="Leaderboards">
+      {boards.map((b) => (
+        <Link
+          key={b.href}
+          href={b.href}
+          scroll={false}
+          aria-current={b.category === current ? "page" : undefined}
+        >
+          {b.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 

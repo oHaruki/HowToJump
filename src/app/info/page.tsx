@@ -93,7 +93,8 @@ export default function InfoPage() {
                 {packLine("Emerald")},{" "}
                 {packLine("Amethyst")}. Full combos on the pack below never get there on
                 their own, so reaching a pack means playing it. Your main level is the
-                average of the five categories.
+                average of the five categories. The leaderboard ranks the main level,
+                and each category has a board of its own beside it.
               </p>
             </div>
             <SkillSlots />
