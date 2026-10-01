@@ -160,6 +160,25 @@ export const entries = pgTable(
   ],
 );
 
+/* ------------------------------------------------------------- pack votes */
+
+/**
+ * Players' calls on an entry's pack. The pack picked is stored rather than
+ * up or down, so the counts still read right after staff move the entry.
+ */
+export const entryVotes = pgTable(
+  "entry_votes",
+  {
+    entryId: integer("entry_id").notNull().references(() => entries.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** The pack the player thinks the entry belongs in. */
+    tierOrder: integer("tier_order").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.entryId, t.userId] })],
+);
+
 /* -------------------------------------------------------------- suggestions */
 
 export const suggestionBatches = pgTable("suggestion_batches", {

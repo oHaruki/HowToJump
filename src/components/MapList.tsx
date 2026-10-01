@@ -1,10 +1,20 @@
 import type { ReactNode } from "react";
 import { MapCard, PackTile } from "@/components/MapCard";
+import { PackVote } from "@/components/PackVote";
 import { CategoryChips, ModChip, PacingChips, mapHref } from "@/components/ui";
 import type { BankRow } from "@/lib/queries";
+import { NO_VOTES, type VoteTally } from "@/lib/votes";
 
-/** The public bank. Read only, so the pack is a tile and there are no actions. */
-export function MapList({ rows }: { rows: BankRow[] }) {
+/** The public bank: the pack as a tile, and players' votes on it. */
+export function MapList({
+  rows,
+  votes,
+  signedIn,
+}: {
+  rows: BankRow[];
+  votes: Map<number, VoteTally>;
+  signedIn: boolean;
+}) {
   if (!rows.length) {
     return <p className="small">Nothing matches those filters yet.</p>;
   }
@@ -12,21 +22,30 @@ export function MapList({ rows }: { rows: BankRow[] }) {
   return (
     <div className="review-list">
       {rows.map((m) => (
-        <BankCard key={m.entryId} map={m} />
+        <BankCard
+          key={m.entryId}
+          map={m}
+          votes={{ tally: votes.get(m.entryId) ?? NO_VOTES, signedIn }}
+        />
       ))}
     </div>
   );
 }
 
-/** One bank entry as its card, with a player's score where a page has one. */
+/**
+ * One bank entry as its card, with a player's score or the pack votes where
+ * a page has them.
+ */
 export function BankCard({
   map: m,
   score,
   tone,
+  votes,
 }: {
   map: BankRow;
   score?: ReactNode;
   tone?: "muted";
+  votes?: { tally: VoteTally; signedIn: boolean };
 }) {
   return (
     <MapCard
@@ -50,6 +69,14 @@ export function BankCard({
           <ModChip mod={m.mod} />
           <CategoryChips categories={m.categories} />
           <PacingChips length={m.lengthBucket} speed={m.speedBucket} />
+          {votes ? (
+            <PackVote
+              entryId={m.entryId}
+              tierOrder={m.tierOrder}
+              tally={votes.tally}
+              signedIn={votes.signedIn}
+            />
+          ) : null}
         </>
       }
       score={score}

@@ -4,8 +4,8 @@ import {
 } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  beatmaps, deletedScores, entries, packs, roles, scores, siteConfig, suggestions, userLevels,
-  users,
+  beatmaps, deletedScores, entries, entryVotes, packs, roles, scores, siteConfig, suggestions,
+  userLevels, users,
 } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/lib/roles";
 import { packStandings, type PackStanding, type SpecialPack } from "@/lib/packs";
 import { CATEGORIES, LENGTHS, SPEEDS, normalizeCategory, orderByScale } from "@/lib/tiers";
+import type { PackVote, VoteTally } from "@/lib/votes";
 
 /** On the ladder rather than in a special pack. */
 export const onLadder = isNull(entries.packId);
@@ -695,6 +696,43 @@ export async function getBeatmapPage(osuBeatmapId: number) {
 }
 
 export type BeatmapEntry = Awaited<ReturnType<typeof getBeatmapPage>>[number];
+
+/**
+ * Pack vote counts for some entries, and the player's own vote on each.
+ * A stored pack counts only while it is a neighbour of the entry's, and a
+ * banned player's votes don't count. Entries nobody voted on are absent.
+ */
+export async function getPackVotes(
+  entryIds: number[],
+  userId: number | null,
+): Promise<Map<number, VoteTally>> {
+  const out = new Map<number, VoteTally>();
+  if (!entryIds.length) return out;
+
+  const offset = raw`${entryVotes.tierOrder} - ${entries.tierOrder}`;
+  const rows = await db
+    .select({
+      entryId: entryVotes.entryId,
+      down: raw<number>`(count(*) filter (where ${offset} = -1))::int`,
+      par: raw<number>`(count(*) filter (where ${offset} = 0))::int`,
+      up: raw<number>`(count(*) filter (where ${offset} = 1))::int`,
+      mine: raw<PackVote | null>`max(${offset}) filter (where ${entryVotes.userId} = ${userId ?? 0})`,
+    })
+    .from(entryVotes)
+    .innerJoin(entries, eq(entryVotes.entryId, entries.id))
+    .innerJoin(users, eq(entryVotes.userId, users.id))
+    .where(
+      and(
+        inArray(entryVotes.entryId, entryIds),
+        isNull(users.bannedAt),
+        raw`abs(${offset}) <= 1`,
+      ),
+    )
+    .groupBy(entryVotes.entryId);
+
+  for (const r of rows) out.set(r.entryId, { down: r.down, par: r.par, up: r.up, mine: r.mine });
+  return out;
+}
 
 /* -------------------------------------------------------------- rankings */
 

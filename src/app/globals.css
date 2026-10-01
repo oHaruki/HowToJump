@@ -1039,6 +1039,40 @@ footer {
    cannot share a row, so the break happens whatever the words are wide, and
    every card ends up the same shape. */
 .mapcard-tags .pacing { display: flex; gap: 6px; flex: 1 0 100%; }
+.mapcard-tags .pvote { flex: 1 0 100%; }
+
+/*
+ * Players' calls on a map's pack, a pack lower, on par or a pack higher, as
+ * one segmented control the height of a chip. The player's own vote is the
+ * raised segment.
+ */
+.pvote { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pvote-group {
+  display: inline-flex; gap: 2px; padding: 2px;
+  background: color-mix(in srgb, var(--bg-b) 80%, transparent);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--control-radius); corner-shape: var(--corner-shape);
+}
+.pvote-btn {
+  appearance: none; cursor: pointer; font: inherit;
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 1px 9px; border: 0; background: none; color: var(--text);
+  font-size: var(--font-size-small);
+  border-radius: 8px; corner-shape: var(--corner-shape);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.pvote-btn:hover:not(:disabled) { color: var(--text-focus); background: var(--bg-c); }
+.pvote-btn[aria-pressed="true"] {
+  color: var(--text-focus); background: var(--bg-d);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border);
+}
+.pvote-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.pvote-sym { font-family: var(--font-mono); font-weight: 600; color: var(--text-focus); }
+.pvote-btn b {
+  font-family: var(--font-mono); font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.pvote-note { font-size: var(--font-size-small); color: var(--text-dark); }
 
 .mapcard-stats { display: flex; gap: 22px; align-items: baseline; flex: none; }
 .mapcard-stats > span { display: flex; flex-direction: column; gap: 1px; text-align: right; }
@@ -2206,6 +2240,8 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
 .bm-diff { color: var(--text); text-shadow: 0 1px 10px var(--main-bg); }
 .bm-diff b { color: var(--text-focus); font-weight: 600; }
 .bm-actions { margin-top: 8px; }
+.bm-vote { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bm-vote .pvote-btn { padding: 4px 11px; }
 .bm-panel {
   display: flex; flex-direction: column; gap: 16px; flex: 0 1 360px;
   padding: 18px 20px;

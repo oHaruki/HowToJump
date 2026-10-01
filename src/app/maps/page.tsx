@@ -1,6 +1,9 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getBankPage, getFacets, getTierCounts, type BankPage } from "@/lib/queries";
+import { auth } from "@/lib/auth";
+import {
+  getBankPage, getFacets, getPackVotes, getTierCounts, type BankPage,
+} from "@/lib/queries";
 import {
   bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
 } from "@/lib/bank-params";
@@ -63,10 +66,12 @@ export default async function MapsPage({
 }
 
 async function Maps({ bank, query }: { bank: Promise<BankPage>; query: string }) {
-  const b = await bank;
+  const [b, session] = await Promise.all([bank, auth()]);
+  const userId = session?.userId ?? null;
+  const votes = await getPackVotes(b.rows.map((r) => r.entryId), userId);
   return (
     <>
-      <MapList rows={b.rows} />
+      <MapList rows={b.rows} votes={votes} signedIn={userId != null} />
       <BankPager
         page={b.page}
         pageCount={b.pageCount}

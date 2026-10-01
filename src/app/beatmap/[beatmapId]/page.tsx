@@ -9,13 +9,15 @@ import { playExp } from "@/lib/levels";
 import { normalizeMod } from "@/lib/mods";
 import {
   BOARD_ORDER_TEXT, getBeatmapPage, getEntryLeaderboard, getEntryPlayerCount,
-  getEntryRankOf, type BeatmapEntry, type BoardScore,
+  getEntryRankOf, getPackVotes, type BeatmapEntry, type BoardScore,
 } from "@/lib/queries";
+import { NO_VOTES, type VoteTally } from "@/lib/votes";
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, ModChip, PacingChips, SpecialChip, mapHref } from "@/components/ui";
 import { ScoreDelete } from "@/components/ScoreDelete";
 import { CopyBeatmapId } from "@/components/CopyBeatmapId";
+import { PackVote } from "@/components/PackVote";
 import { timeAgo } from "@/lib/time";
 import { SITE_NAME } from "@/lib/site";
 
@@ -110,10 +112,12 @@ export default async function BeatmapPage(props: Props) {
   const { map, choices } = picked;
 
   const session = await auth();
-  const [board, players, mine] = await Promise.all([
+  const userId = session?.userId ?? null;
+  const [board, players, mine, votes] = await Promise.all([
     getEntryLeaderboard(map.entryId, 50),
     getEntryPlayerCount(map.entryId),
-    session?.userId ? getEntryRankOf(map.entryId, session.userId) : null,
+    userId ? getEntryRankOf(map.entryId, userId) : null,
+    getPackVotes([map.entryId], userId),
   ]);
 
   const tier = tierByOrder(map.tierOrder);
@@ -123,7 +127,13 @@ export default async function BeatmapPage(props: Props) {
 
   return (
     <div className="view">
-      <Header map={map} choices={choices} colour={colour} />
+      <Header
+        map={map}
+        choices={choices}
+        colour={colour}
+        votes={votes.get(map.entryId) ?? NO_VOTES}
+        signedIn={userId != null}
+      />
 
       <section className="sb">
         <div className="sb-head">
@@ -164,10 +174,14 @@ function Header({
   map,
   choices,
   colour,
+  votes,
+  signedIn,
 }: {
   map: BeatmapEntry;
   choices: BeatmapEntry[];
   colour: string;
+  votes: VoteTally;
+  signedIn: boolean;
 }) {
   const tier = tierByOrder(map.tierOrder);
   const osuUrl = map.osuBeatmapsetId
@@ -260,6 +274,17 @@ function Header({
                 osu!direct
               </a>
               <CopyBeatmapId id={map.osuBeatmapId} />
+            </div>
+            <div className="bm-vote">
+              <span className="lbl">Right pack?</span>
+              <PackVote
+                key={map.entryId}
+                entryId={map.entryId}
+                tierOrder={map.tierOrder}
+                tally={votes}
+                signedIn={signedIn}
+                named
+              />
             </div>
           </div>
 

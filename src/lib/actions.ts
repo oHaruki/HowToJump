@@ -5,8 +5,8 @@ import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
-  auditLog, beatmaps, deletedScores, entries, packs, roles, scores, siteConfig, suggestionBatches,
-  suggestions, users, type Suggestion,
+  auditLog, beatmaps, deletedScores, entries, entryVotes, packs, roles, scores, siteConfig,
+  suggestionBatches, suggestions, users, type Suggestion,
 } from "@/lib/schema";
 import { auth, requireAdmin, requirePermission, requireTeamMember } from "@/lib/auth";
 import {
@@ -22,7 +22,7 @@ import {
   PERMISSIONS, PLAYER, customRoleId, customRoleKey, roleNameProblem, type Permission,
 } from "@/lib/roles";
 import {
-  CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName,
+  CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName, tierByOrder,
 } from "@/lib/tiers";
 import { packColor, packDescription, packNameProblem } from "@/lib/packs";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
@@ -30,8 +30,10 @@ import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
 } from "@/lib/import/parse";
 import {
-  ROLE_ORDER_KEY, describeScores, entryName, getExistingEntryKeys, getRole, getRoles, gradeText,
+  ROLE_ORDER_KEY, describeScores, entryName, getExistingEntryKeys, getPackVotes, getRole, getRoles,
+  gradeText,
 } from "@/lib/queries";
+import { NO_VOTES, voteFor, type VoteTally } from "@/lib/votes";
 import { announceEntries } from "@/lib/discord";
 
 async function record(
@@ -919,6 +921,53 @@ export async function deleteScore(scoreId: number) {
     accuracy: gone.accuracy,
   });
   await refreshProgress(gone.userId);
+}
+
+/* ------------------------------------------------------------- pack votes */
+
+/**
+ * Sets the signed in player's vote on an entry's pack to a pack, or takes
+ * it back with null, and returns the entry's counts as they now stand.
+ */
+export async function votePack(
+  entryId: number,
+  tierOrder: number | null,
+): Promise<{ tally: VoteTally; error?: string }> {
+  const session = await auth();
+  if (!session?.userId) return { tally: NO_VOTES, error: "Sign in to vote" };
+  if (!Number.isSafeInteger(entryId) || (tierOrder !== null && !Number.isSafeInteger(tierOrder))) {
+    return { tally: NO_VOTES, error: "That isn't a vote" };
+  }
+
+  const [[entry], [me]] = await Promise.all([
+    db
+      .select({ tierOrder: entries.tierOrder })
+      .from(entries)
+      .where(and(eq(entries.id, entryId), eq(entries.isActive, true))),
+    db.select({ bannedAt: users.bannedAt }).from(users).where(eq(users.id, session.userId)),
+  ]);
+  const counts = async () =>
+    (await getPackVotes([entryId], session.userId)).get(entryId) ?? NO_VOTES;
+  if (!entry) return { tally: NO_VOTES, error: "That map isn't in the bank" };
+  if (!me || me.bannedAt) return { tally: await counts(), error: "You can't vote" };
+
+  if (tierOrder === null) {
+    await db
+      .delete(entryVotes)
+      .where(and(eq(entryVotes.entryId, entryId), eq(entryVotes.userId, session.userId)));
+  } else {
+    if (voteFor(entry.tierOrder, tierOrder) === null || !tierByOrder(tierOrder)) {
+      return { tally: await counts(), error: "This map moved packs, reload to vote" };
+    }
+    await db
+      .insert(entryVotes)
+      .values({ entryId, userId: session.userId, tierOrder })
+      .onConflictDoUpdate({
+        target: [entryVotes.entryId, entryVotes.userId],
+        set: { tierOrder, updatedAt: new Date() },
+      });
+  }
+  return { tally: await counts() };
 }
 
 /* ------------------------------------------------------------------- team */
