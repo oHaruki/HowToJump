@@ -48,7 +48,7 @@ export default async function TeamPage() {
 
   return (
     <div className="view">
-      <SectionHead label="Team" title="The team">
+      <SectionHead title="The team">
         The people behind Project Aim. Helpers add and judge the maps, and admins run
         the site as well.
       </SectionHead>

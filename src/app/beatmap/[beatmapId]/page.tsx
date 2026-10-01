@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
-import type { Metadata } from "next";
+import { cache, type CSSProperties } from "react";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -17,29 +17,64 @@ import { Flag, GradeLetter, ModChip, PacingChips, SpecialChip, mapHref } from "@
 import { ScoreDelete } from "@/components/ScoreDelete";
 import { CopyBeatmapId } from "@/components/CopyBeatmapId";
 import { timeAgo } from "@/lib/time";
+import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 
-export async function generateMetadata({
-  params,
-  searchParams,
-}: {
+type Props = {
   params: Promise<{ beatmapId: string }>;
   searchParams: Promise<{ mod?: string }>;
-}): Promise<Metadata> {
-  const [{ beatmapId }, sp] = await Promise.all([params, searchParams]);
-  const id = Number(beatmapId);
-  if (!Number.isSafeInteger(id) || id <= 0) return {};
+};
 
+/** Every entry banked on a beatmap, nomod first, and the one the link asks for. */
+const pickEntry = cache(async (id: number, mod: string | undefined) => {
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
   const banked = await getBeatmapPage(id);
-  if (!banked.length) return {};
+  if (!banked.length) return null;
   const choices = banked.slice().sort((a, b) => Number(b.mod === "NM") - Number(a.mod === "NM"));
-  const wanted = sp.mod ? normalizeMod(sp.mod) : null;
-  const map = choices.find((e) => e.mod === wanted) ?? choices[0];
+  const wanted = mod ? normalizeMod(mod) : null;
+  return { choices, map: choices.find((e) => e.mod === wanted) ?? choices[0] };
+});
 
-  return { title: map.version ? `${map.title} [${map.version}]` : map.title };
+async function entryFor({ params, searchParams }: Props) {
+  const [{ beatmapId }, sp] = await Promise.all([params, searchParams]);
+  return pickEntry(Number(beatmapId), sp.mod);
+}
+
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const picked = await entryFor(props);
+  if (!picked) return {};
+  const { map } = picked;
+  const title = map.version ? `${map.title} [${map.version}]` : map.title;
+  const facts = [
+    tierByOrder(map.tierOrder)?.name,
+    map.mod,
+    map.stars != null ? map.stars.toFixed(2) + "★" : null,
+    map.mapper ? "mapped by " + map.mapper : null,
+  ].filter(Boolean).join(" · ");
+
+  return {
+    title,
+    description: facts,
+    openGraph: {
+      siteName: SITE_NAME,
+      title,
+      description: facts,
+      images: map.osuBeatmapsetId
+        ? [{ url: "https://assets.ppy.sh/beatmaps/" + map.osuBeatmapsetId + "/covers/cover.jpg", width: 900, height: 250 }]
+        : undefined,
+    },
+    twitter: { card: "summary_large_image" },
+  };
+}
+
+/** The pack's colour, which Discord uses for the embed's side stripe. */
+export async function generateViewport(props: Props): Promise<Viewport> {
+  const picked = await entryFor(props);
+  const tier = picked ? tierByOrder(picked.map.tierOrder) : null;
+  return tier ? { themeColor: tier.color } : {};
 }
 
 /*
@@ -69,23 +104,10 @@ function starColour(stars: number): string {
  * top score gets a card of its own, and so does the signed in player's best.
  * One beatmap banked under several mods gets a switch for each.
  */
-export default async function BeatmapPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ beatmapId: string }>;
-  searchParams: Promise<{ mod?: string }>;
-}) {
-  const [{ beatmapId }, sp] = await Promise.all([params, searchParams]);
-  const id = Number(beatmapId);
-  if (!Number.isSafeInteger(id) || id <= 0) notFound();
-
-  const banked = await getBeatmapPage(id);
-  if (!banked.length) notFound();
-  // Nomod first, then by pack, so a bare link opens the plainest entry.
-  const choices = banked.slice().sort((a, b) => Number(b.mod === "NM") - Number(a.mod === "NM"));
-  const wanted = sp.mod ? normalizeMod(sp.mod) : null;
-  const map = choices.find((e) => e.mod === wanted) ?? choices[0];
+export default async function BeatmapPage(props: Props) {
+  const picked = await entryFor(props);
+  if (!picked) notFound();
+  const { map, choices } = picked;
 
   const session = await auth();
   const [board, players, mine] = await Promise.all([

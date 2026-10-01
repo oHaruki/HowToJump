@@ -8,7 +8,8 @@ import { tierByOrder } from "@/lib/tiers";
 
 /**
  * Cycles the hero card through the newest entries. Pauses while the pointer
- * or keyboard focus is on it.
+ * or keyboard focus is on it, stops once a dot is picked, and never starts
+ * under reduced motion.
  */
 export function FeaturedRotator({
   entries,
@@ -19,15 +20,22 @@ export function FeaturedRotator({
 }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [held, setHeld] = useState(false);
+  const [still, setStill] = useState(false);
+  const cycling = entries.length > 1 && !held && !still;
 
   useEffect(() => {
-    if (paused || entries.length < 2) return;
+    setStill(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }, []);
+
+  useEffect(() => {
+    if (paused || !cycling) return;
     const id = window.setInterval(
       () => setIndex((i) => (i + 1) % entries.length),
       intervalMs,
     );
     return () => window.clearInterval(id);
-  }, [paused, entries.length, intervalMs]);
+  }, [paused, cycling, entries.length, intervalMs]);
 
   if (!entries.length) {
     return (
@@ -57,7 +65,7 @@ export function FeaturedRotator({
       onBlurCapture={() => setPaused(false)}
     >
       {/* How long this card has left, on the same interval as the swap. */}
-      {entries.length > 1 ? (
+      {cycling ? (
         <span
           className="rotator-bar"
           key={"bar-" + m.entryId}
@@ -123,7 +131,10 @@ export function FeaturedRotator({
               data-active={String(i === index)}
               aria-label={"Show " + (e.title ?? "entry " + (i + 1))}
               aria-current={i === index}
-              onClick={() => setIndex(i)}
+              onClick={() => {
+                setIndex(i);
+                setHeld(true);
+              }}
             />
           ))}
         </div>

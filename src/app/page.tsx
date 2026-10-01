@@ -7,18 +7,22 @@ import {
 import { Cover } from "@/components/Cover";
 import { CountUp } from "@/components/CountUp";
 import { FeaturedRotator } from "@/components/FeaturedRotator";
-import { tierByOrder } from "@/lib/tiers";
+import { GRADE_RULES } from "@/lib/grading";
+import { TIERS, tierByOrder } from "@/lib/tiers";
 
 export const dynamic = "force-dynamic";
 
+/** How many of the newest entries the hero card cycles through. */
+const FEATURED = 8;
+
 export default async function OverviewPage() {
-  const [counts, stats, newest] = await Promise.all([
+  const [counts, stats, latest] = await Promise.all([
     getTierCounts(),
     getBankStats(),
-    // Enough to be worth cycling, few enough that the dots stay usable.
-    getRecentEntries(8),
+    getRecentEntries(FEATURED + 4),
   ]);
-  const recent = newest.slice(0, 4);
+  const newest = latest.slice(0, FEATURED);
+  const recent = latest.slice(FEATURED);
 
   return (
     // rise-in lands each band of the page a step after the one above it.
@@ -34,13 +38,10 @@ export default async function OverviewPage() {
             width={691}
             height={900}
           />
-          <span className="lbl">Project Aim</span>
           <h1>Ranked osu! Aim</h1>
           <p className="lede">
-            16 packs, filled to the brim with aim maps. Compete in an environment
-            where only your misscount matters. Level up specific aiming skills and
-            conquer the leaderboards. Join the discord and participate in community
-            aim competitions and tourneys.
+            {TIERS.length} packs of aim maps where only your misscount matters. Level
+            up specific aim skills and climb the leaderboards.
           </p>
           <div className="row" style={{ marginTop: 4 }}>
             <Link className="btn btn-primary" href="/ladder">
@@ -56,8 +57,8 @@ export default async function OverviewPage() {
       </div>
 
       <div className="stat-strip">
-        <Stat label="packs" value={<CountUp value={16} />} />
-        <Stat label="grades" value={<CountUp value={18} />} />
+        <Stat label="packs" value={<CountUp value={TIERS.length} />} />
+        <Stat label="grades" value={<CountUp value={GRADE_RULES.length} />} />
         <Stat label="entries in the bank" value={<CountUp value={stats.total} />} />
         <Stat
           label="hardest star rating"
@@ -80,7 +81,7 @@ export default async function OverviewPage() {
       {recent.length ? (
         <div className="stack-lg">
           <div className="section-head">
-            <span className="lbl">Packs</span>
+            <span className="lbl">Map bank</span>
             <h2>Recently judged</h2>
           </div>
           <div className="grid-auto">

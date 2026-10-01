@@ -10,8 +10,8 @@
   --bg-c: #232323;
   --bg-d: #2d2d2d;
 
-  --text: #949494;
-  --text-dark: #777;
+  --text: #a6a6a6;
+  --text-dark: #8c8c8c;
   --text-focus: #d2d2d2;
 
   --border: #ffffff24;
@@ -29,9 +29,12 @@
   --scrim: #00000066;
   --overlay: #000000b3;
 
-  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+  /* --font-geist and --font-geist-mono come from next/font in the root layout. */
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
     "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-mono: "SF Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  --font-body: var(--font-geist, system-ui), var(--font-system);
+  --font-mono: var(--font-geist-mono, ui-monospace), "SF Mono", "SFMono-Regular",
+    ui-monospace, Menlo, Consolas, monospace;
 
   --font-size-body: 17px;
   --font-size-mono: 15px;
@@ -211,13 +214,15 @@ code { font-family: var(--font-mono); font-size: var(--font-size-mono); }
   border: var(--border-width) solid var(--border);
   border-radius: var(--control-radius); corner-shape: var(--corner-shape);
   text-decoration: none;
-  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast),
+    transform var(--dur-fast);
 }
 .btn { min-width: 80px; }
 .btn:hover, .tool:hover {
   background: var(--bg-c);
   border-color: color-mix(in srgb, var(--text-focus) 26%, var(--border));
 }
+.btn:active:not(:disabled), .tool:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-primary {
   background: color-mix(in srgb, var(--accent) 10%, var(--bg-b));
@@ -250,7 +255,6 @@ textarea {
   overflow-x: auto; tab-size: 14;
 }
 input:focus, select:focus, textarea:focus {
-  outline: none;
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 /* A div when the control opens a list of its own checkboxes, which a label cannot wrap. */
@@ -401,7 +405,7 @@ main { padding-block: 34px 64px; }
 .chip-keyed { gap: 0; padding: 0; overflow: hidden; }
 .chip-keyed i {
   font-style: normal; font-family: var(--font-mono);
-  font-size: 11px; color: var(--text-dark);
+  font-size: 11px; color: var(--text);
   text-transform: uppercase; letter-spacing: var(--letter-label);
   align-self: stretch; display: inline-flex; align-items: center;
   padding: 0 7px; background: var(--bg-d);
@@ -827,7 +831,7 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
 /* ------------------------------------------------------------- user menu */
@@ -1227,20 +1231,25 @@ footer {
   to { opacity: 1; transform: none; }
 }
 .rotator-dots {
-  position: absolute; right: 14px; top: 14px; z-index: 2;
-  display: flex; gap: 5px; padding: 5px 7px;
+  position: absolute; right: 10px; top: 10px; z-index: 2;
+  display: flex; padding: 0 2px;
   background: color-mix(in srgb, var(--main-bg) 62%, transparent);
   backdrop-filter: blur(4px);
   border-radius: 99px;
 }
+/* A 24px target around a 6px dot. */
 .rotator-dot {
-  appearance: none; border: 0; cursor: pointer; padding: 0;
-  width: 6px; height: 6px; border-radius: 50%;
+  appearance: none; border: 0; cursor: pointer; padding: 0; background: none;
+  width: 24px; height: 24px; display: grid; place-items: center;
+  border-radius: 50%;
+}
+.rotator-dot::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
   background: color-mix(in srgb, var(--text-focus) 35%, transparent);
   transition: background var(--dur-fast), transform var(--dur-fast);
 }
-.rotator-dot:hover { background: var(--text); }
-.rotator-dot[data-active="true"] { background: var(--text-focus); transform: scale(1.35); }
+.rotator-dot:hover::before { background: var(--text); }
+.rotator-dot[data-active="true"]::before { background: var(--text-focus); transform: scale(1.35); }
 /*
  * How long this card has left: a line filling across the top, on the same
  * interval and the same pause as the swap. Keyed on the entry, so each card
@@ -1297,7 +1306,7 @@ footer {
 .fchip .dot { margin-left: 8px; }
 .fchip i {
   font-style: normal; font-family: var(--font-mono);
-  font-size: 11px; color: var(--text-dark);
+  font-size: 11px; color: var(--text);
   text-transform: uppercase; letter-spacing: var(--letter-label);
   align-self: stretch; display: inline-flex; align-items: center;
   padding: 0 7px; background: var(--bg-d);
@@ -2109,8 +2118,8 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
  */
 .gl {
   display: inline-block; padding-right: 0.08em;
-  /* Pinned, not inherited: these sit inside a mono table head too. */
-  font-family: var(--font-body);
+  /* The system face, for its true italic. */
+  font-family: var(--font-system);
   font-size: 23px; line-height: 1; font-weight: 800; font-style: italic;
   letter-spacing: -0.03em; white-space: nowrap;
   background: var(--gl); -webkit-background-clip: text; background-clip: text; color: transparent;

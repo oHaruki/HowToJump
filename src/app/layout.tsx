@@ -1,16 +1,26 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { auth } from "@/lib/auth";
 import { PLAYER, canUseStaffArea } from "@/lib/roles";
 import { AuthButton } from "@/components/AuthButton";
 import { NavLinks } from "@/components/NavLinks";
+import { SITE_NAME } from "@/lib/site";
+
+const sans = Geist({ subsets: ["latin", "latin-ext"], variable: "--font-geist" });
+const mono = Geist_Mono({ subsets: ["latin", "latin-ext"], variable: "--font-geist-mono" });
+
+const DESCRIPTION =
+  "Ranked osu! aim. Sixteen packs of aim maps from Stone to GOAT, graded on misscount and tracked automatically from your osu! account.";
 
 export const metadata: Metadata = {
-  title: { default: "Project Aim", template: "%s · Project Aim" },
-  description:
-    "Ranked osu! aim. Sixteen packs of aim maps from Stone to GOAT, graded on misscount and tracked automatically from your osu! account.",
+  title: { default: SITE_NAME, template: "%s · " + SITE_NAME },
+  description: DESCRIPTION,
+  openGraph: { siteName: SITE_NAME, title: SITE_NAME, description: DESCRIPTION, type: "website" },
 };
+
+export const viewport: Viewport = { themeColor: "#151515" };
 
 export default async function RootLayout({
   children,
@@ -30,7 +40,7 @@ export default async function RootLayout({
   ];
 
   return (
-    <html lang="en">
+    <html lang="en" className={sans.variable + " " + mono.variable}>
       <body>
         <header className="nav">
           <div className="wrap nav-in">

@@ -51,7 +51,6 @@ export default async function LeaderboardPage({
     <div className="view">
       <LiveRefresh />
       <SectionHead
-        label="Leaderboard"
         title={category ? shortCategory(category) + " Leaderboard" : "Project Aim Leaderboard"}
       />
 

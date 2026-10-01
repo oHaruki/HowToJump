@@ -10,7 +10,7 @@ export default async function LadderPage() {
   const [counts, special] = await Promise.all([getTierCounts(), getSpecialPacks()]);
   return (
     <div className="view">
-      <SectionHead label="Packs" title="Packs" />
+      <SectionHead title="Packs" />
       <LadderGrid counts={counts} />
 
       {special.length ? (

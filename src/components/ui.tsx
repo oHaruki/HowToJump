@@ -257,13 +257,13 @@ export function SectionHead({
   title,
   children,
 }: {
-  label: string;
+  label?: string;
   title: string;
   children?: React.ReactNode;
 }) {
   return (
     <div className="section-head">
-      <span className="lbl">{label}</span>
+      {label ? <span className="lbl">{label}</span> : null}
       <h1>{title}</h1>
       {children ? <p className="lede">{children}</p> : null}
     </div>
