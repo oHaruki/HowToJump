@@ -16,7 +16,8 @@ const DEFAULT_PRESENCE = "the ladder";
 /** Keeps the process up without a connection, so a restart loop cannot start. */
 function park(why: string): Promise<never> {
   console.log("presence: " + why + "; idling");
-  return new Promise(() => {});
+  // The timer keeps the process alive.
+  return new Promise(() => setInterval(() => {}, 1 << 30));
 }
 
 /**
