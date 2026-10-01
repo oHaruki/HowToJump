@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import {
-  GRADE_RULES, MIN_MISS_FACTOR, REFERENCE_NOTES, accuracyCredit, missFactor,
+  GRADE_RULES, LONG_NOTES, MIN_MISS_FACTOR, SHORT_NOTES, accuracyCredit, missFactor,
 } from "@/lib/grading";
-import { BEST_PLAYS, THRESHOLD_GRADE, threshold } from "@/lib/levels";
+import { BEST_PLAYS, THRESHOLD_SHARE, threshold } from "@/lib/levels";
 import { tierByName } from "@/lib/tiers";
 import { GradeLetter, SectionHead, gradeTone } from "@/components/ui";
 import { ModLegend, PackLadder, SkillSlots, SyncFlow } from "@/components/InfoViz";
@@ -13,7 +13,6 @@ const fmt = (n: number) => n.toLocaleString("en");
 /* The curve gives shares from 120 down to hundredths of a percent, so the
    small ones keep a second decimal rather than rounding away to nothing. */
 const share = (n: number) => (n < 1 ? +n.toFixed(2) : +n.toFixed(1));
-const standard = GRADE_RULES.find((g) => g.grade === THRESHOLD_GRADE);
 /** How much of one miss an accuracy wins back, in percent. */
 const wonBack = (accuracy: number) => Math.round(accuracyCredit(accuracy) * 100);
 const packLine = (name: string) => {
@@ -41,22 +40,23 @@ export default function InfoPage() {
               </p>
               <p className="lede">
                 EXP does not step from grade to grade. It falls with every miss on
-                one curve, and each miss costs a little more than the one before,
-                so a map survived is worth nothing like a map cleared. The
-                percentage beside a grade is the most that grade pays before
-                accuracy, on a normal {fmt(REFERENCE_NOTES)} note map.
+                one curve, steepest over the first few, so a map survived is worth
+                nothing like a map cleared. The percentage beside a grade is the
+                most that grade pays before accuracy, on a map of{" "}
+                {fmt(SHORT_NOTES)} to {fmt(LONG_NOTES)} notes.
               </p>
               <p className="lede">
                 Accuracy then wins back part of one miss: {wonBack(90)}% of it at
                 90%, {wonBack(96)}% at 96% and {wonBack(99)}% at 99%. Never a whole
                 one, so one miss fewer always pays more. A full combo climbs the same
-                way toward SSS, and a clean pass that dropped the combo stays where
-                it is.
+                way toward SSS, and a clean pass that dropped the combo climbs toward
+                a full combo.
               </p>
               <p className="lede">
-                Staying clean is easier on a short map, so there each miss costs
-                more: on a 150 note map it counts ×{missFactor(150).toFixed(1)}. A
-                long map forgives, but only so far, never under{" "}
+                Between {fmt(SHORT_NOTES)} and {fmt(LONG_NOTES)} notes a miss counts
+                once. Staying clean is easier on a short map, so there each miss
+                counts more: on a 150 note map ×{missFactor(150).toFixed(1)}. A long
+                map forgives, but only so far, never under{" "}
                 ×{MIN_MISS_FACTOR.toFixed(1)}, so a marathon is not a way around the
                 curve. The grade always shows your real misses.
               </p>
@@ -89,7 +89,7 @@ export default function InfoPage() {
               </p>
               <p className="small">
                 You reach a pack when your best {BEST_PLAYS} add up to {BEST_PLAYS}{" "}
-                plays at {standard?.grade} ({standard?.label}) on it, before accuracy:{" "}
+                plays at {THRESHOLD_SHARE}% of its value, about two misses each:{" "}
                 {packLine("Emerald")},{" "}
                 {packLine("Amethyst")}. Full combos on the pack below never get there on
                 their own, so reaching a pack means playing it. Your main level is the

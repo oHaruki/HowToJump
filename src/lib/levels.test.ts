@@ -7,12 +7,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  BEST_PLAYS, bestExp, byWorth, categoryLevels, countingPlaces, levelFromExp, levelRules,
-  mainLevel, playExp, progressText, threshold, totalExp, type Level, type LevelPlay,
+  BEST_PLAYS, THRESHOLD_SHARE, bestExp, byWorth, categoryLevels, countingPlaces, levelFromExp,
+  levelRules, mainLevel, playExp, progressText, threshold, totalExp, type Level, type LevelPlay,
 } from "./levels";
 import {
-  ACC_EXPONENT, GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE,
-  MISS_SLOPE, REFERENCE_NOTES, THRESHOLD_MISSES, gradeFor,
+  ACC_EXPONENT, CLEAN_SHARE, GRADE_RULES, LONG_NOTES, MIN_MISS_FACTOR, MISS_CURVE, MISS_POWER,
+  MISS_SPREAD, SHORT_NOTES, gradeFor,
 } from "./grading";
 import { CATEGORIES, TIERS, tierByName } from "./tiers";
 
@@ -32,7 +32,7 @@ const play = (pack: string, grade: string, ...categories: string[]): LevelPlay =
 });
 const fcs = (pack: string, n: number) => Array.from({ length: n }, () => play(pack, "SS"));
 
-/* The example in the write-up, under the 1.7x ladder and the miss curve. */
+/* The example in the write-up, under the current ladder and miss curve. */
 const EXAMPLE: LevelPlay[] = [
   ...fcs("Emerald", 6),
   play("Amethyst", "SS"), // FC
@@ -42,53 +42,54 @@ const EXAMPLE: LevelPlay[] = [
 ];
 
 test("a play is worth its pack's EXP times the share its misses earn", () => {
-  assert.equal(playExp(order("Amethyst"), "A", 2), 742_500); // three quarters
-  assert.equal(playExp(order("Emerald"), "SS", 0), 580_000);
-  assert.equal(playExp(order("Amethyst"), "SSS", 0), 1_188_000);
-  assert.equal(Math.round(playExp(order("Bronze"), "Pass", 101)), 2);
+  assert.equal(Math.round(playExp(order("Amethyst"), "A", 2)), 550_118); // about 73%
+  assert.equal(playExp(order("Emerald"), "SS", 0), 460_000);
+  assert.equal(playExp(order("Amethyst"), "SSS", 0), 900_000);
+  assert.equal(Math.round(playExp(order("Bronze"), "Pass", 101)), 20);
   // The grade only names the band; inside it the misscount still tells.
   assert.ok(playExp(order("Emerald"), "B", 6) > playExp(order("Emerald"), "B", 7));
 });
 
-test("a pack is reached at ten 2-miss plays on it", () => {
-  assert.equal(threshold(order("Emerald")), 4_350_000);
-  assert.equal(threshold(order("Amethyst")), 7_425_000);
-  assert.equal(threshold(order("Diamond")), 12_600_000);
+test("a pack is reached at ten plays worth three quarters of it", () => {
+  assert.equal(threshold(order("Emerald")), 3_450_000);
+  assert.equal(threshold(order("Amethyst")), 5_625_000);
+  assert.equal(threshold(order("Diamond")), 9_187_500);
+  for (const t of TIERS) assert.equal(threshold(t.order), (BEST_PLAYS * t.exp * THRESHOLD_SHARE) / 100);
 });
 
 test("the worked example reads Emerald, 59/100 to Amethyst", () => {
-  assert.equal(Math.round(bestExp(EXAMPLE)), 6_193_199);
+  assert.equal(Math.round(bestExp(EXAMPLE)), 4_754_645);
   const level = levelFromExp(bestExp(EXAMPLE));
   assert.equal(level.tierOrder, order("Emerald"));
   assert.equal(level.progress, 59);
 });
 
 test("a sandbagged pass on a hard pack stays under a clean clear well below it", () => {
-  // 150 misses on a Diamond map is worth less than a clean Stone full combo.
+  // 150 misses on a Diamond map is worth less than a clean Copper full combo.
   const pass = playExp(order("Diamond"), "Pass", 150, 1500);
-  assert.equal(Math.round(pass), 62);
+  assert.equal(Math.round(pass), 1_282);
   assert.ok(
-    pass < playExp(order("Stone"), "SS", 0) / 10,
-    pass + " is still worth a tenth of a clean Stone full combo",
+    pass < playExp(order("Copper"), "SS", 0),
+    pass + " is worth a clean Copper full combo or more",
   );
   // A misscount that still says something about the play keeps its worth.
-  assert.equal(Math.round(playExp(order("Diamond"), "C+", 12, 1500)), 571_122);
-  assert.equal(Math.round(playExp(order("Diamond"), "B-", 9, 1500)), 713_698);
-  assert.equal(playExp(order("Diamond"), "SS", 0), 1_680_000);
+  assert.equal(Math.round(playExp(order("Diamond"), "C+", 12, 1500)), 364_212);
+  assert.equal(Math.round(playExp(order("Diamond"), "B-", 9, 1500)), 468_783);
+  assert.equal(playExp(order("Diamond"), "SS", 0), 1_225_000);
 });
 
-test("one more Amethyst FC makes it 80, four reach Amethyst", () => {
+test("one more Amethyst FC makes it 83, four reach Amethyst", () => {
   const one = levelFromExp(bestExp([...EXAMPLE, play("Amethyst", "SS")]));
   assert.equal(one.tierOrder, order("Emerald"));
-  assert.equal(one.progress, 80);
+  assert.equal(one.progress, 83);
 
   const four = levelFromExp(bestExp([...EXAMPLE, ...fcs("Amethyst", 4)]));
   assert.equal(four.tierOrder, order("Amethyst"));
-  assert.equal(Math.round(four.exp), 8_050_617);
+  assert.equal(Math.round(four.exp), 6_140_118);
 });
 
 test("full combos on the pack below never reach a pack, however many", () => {
-  assert.equal(bestExp(fcs("Emerald", 10)), 5_800_000);
+  assert.equal(bestExp(fcs("Emerald", 10)), 4_600_000);
   assert.equal(levelFromExp(bestExp(fcs("Emerald", 25))).tierOrder, order("Emerald"));
   for (const t of TIERS.slice(1)) {
     const below = TIERS.find((x) => x.order === t.order - 1)!;
@@ -98,8 +99,8 @@ test("full combos on the pack below never reach a pack, however many", () => {
 });
 
 test("even ten 100% runs on the pack below stay on that pack", () => {
-  // Ten of them come to 12 times a pack's value against the 7.5 it takes,
-  // and a pack is 1.7 times the one below, so 12 / 1.7 falls short.
+  // Ten of them come to 12 times the pack below. The next pack takes 7.5
+  // times its own value, and every pack is over 1.6 times the one below.
   for (const t of TIERS.slice(1)) {
     const below = TIERS.find((x) => x.order === t.order - 1)!;
     const best = levelFromExp(bestExp(Array.from({ length: 10 }, () => play(below.name, "SSS"))));
@@ -129,10 +130,10 @@ test("adding a play never lowers a level", () => {
 });
 
 test("plays worth the same EXP are ordered and numbered the same way", () => {
-  // Three on a 375 note map and six on a 1,500 note one both count as six,
+  // Three on a 250 note map and six on a 1,500 note one both count as six,
   // so they are worth the same. The cleaner real misscount leads.
   const three: LevelPlay & { id: number } = {
-    id: 40, tierOrder: order("Emerald"), categories: [RAW], grade: "A-", missCount: 3, noteCount: 375,
+    id: 40, tierOrder: order("Emerald"), categories: [RAW], grade: "A-", missCount: 3, noteCount: 250,
     accuracy: null,
   };
   const six: LevelPlay & { id: number } = {
@@ -181,11 +182,11 @@ test("each category counts only its own plays, and a dropped label counts toward
     play("GOAT", "SSS", "Flow Aim"),
   ]);
   assert.deepEqual(Object.keys(levels), CATEGORIES);
-  assert.equal(Math.round(levels[RAW].exp), 6_193_199);
-  assert.equal(levels["Precision"].exp, 580_000);
+  assert.equal(Math.round(levels[RAW].exp), 4_754_645);
+  assert.equal(levels["Precision"].exp, 460_000);
   assert.equal(levels["Anti-aim"].exp, 0);
   const total = Object.values(levels).reduce((sum, l) => sum + l.exp, 0);
-  assert.equal(Math.round(total), 6_193_199 + 580_000);
+  assert.equal(Math.round(total), 4_754_645 + 460_000);
 });
 
 test("an old spelling still in the database counts toward the category it became", () => {
@@ -213,21 +214,21 @@ test("the main level averages the five", () => {
 
 test("a map in two categories counts in full toward both", () => {
   const levels = categoryLevels([play("Emerald", "SS", RAW, CONSISTENCY), play("Emerald", "A")]);
-  assert.equal(levels[RAW].exp, 580_000 + 435_000);
-  assert.equal(levels[CONSISTENCY].exp, 580_000);
+  assert.equal(levels[RAW].exp, 460_000 + playExp(order("Emerald"), "A", 2));
+  assert.equal(levels[CONSISTENCY].exp, 460_000);
   assert.equal(levels["Precision"].exp, 0);
 });
 
 test("the total adds each counting play once, however many categories it fills", () => {
   const both = play("Emerald", "SS", RAW, CONSISTENCY);
-  assert.equal(totalExp([both]), 580_000);
+  assert.equal(totalExp([both]), 460_000);
   assert.equal(
     totalExp([both, play("Emerald", "A"), play("Stone", "SS", "Precision")]),
-    580_000 + 435_000 + 1_000,
+    460_000 + playExp(order("Emerald"), "A", 2) + 1_000,
   );
   // Only plays inside some category's best ten add to it.
   const eleven = [...fcs("Emerald", 10), play("Stone", "SS")];
-  assert.equal(totalExp(eleven), 5_800_000);
+  assert.equal(totalExp(eleven), 4_600_000);
   // A dropped label earns nothing anywhere.
   assert.equal(totalExp([play("GOAT", "SSS", "Flow Aim")]), 0);
 });
@@ -237,36 +238,36 @@ test("a play pushed out of one category still counts toward the total through an
   // Consistency's best, so it is still added once.
   const shared = play("Stone", "SS", RAW, CONSISTENCY);
   const plays = [...fcs("Emerald", 10), shared];
-  assert.equal(categoryLevels(plays)[RAW].exp, 5_800_000);
+  assert.equal(categoryLevels(plays)[RAW].exp, 4_600_000);
   assert.equal(categoryLevels(plays)[CONSISTENCY].exp, 1_000);
-  assert.equal(totalExp(plays), 5_801_000);
+  assert.equal(totalExp(plays), 4_601_000);
 });
 
 test("misses cost EXP by map size, while the pack's bar stays put", () => {
-  // Amethyst, one miss: a 30 second map counts it about three times.
-  assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 150)), 664_423); // counts as 3.16
-  assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 1500)), 833_927);
-  assert.equal(Math.round(playExp(order("Amethyst"), "A", 2, 3000)), 775_232); // counts as 1.6
+  // Amethyst, one miss: a 30 second map counts it about 2.6 times.
+  assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 150)), 519_209); // counts as 2.58
+  assert.equal(Math.round(playExp(order("Amethyst"), "A+", 1, 1500)), 608_660);
+  assert.equal(Math.round(playExp(order("Amethyst"), "A", 2, 3000)), 572_671); // counts as 1.6
   // Full combos and 100% runs are never scaled.
-  assert.equal(playExp(order("Amethyst"), "SS", 0, 150), 990_000);
-  assert.equal(playExp(order("Amethyst"), "SSS", 0, 150), 1_188_000);
-  // Reaching a pack is still ten 2-miss plays on it.
-  assert.equal(threshold(order("Amethyst")), 7_425_000);
+  assert.equal(playExp(order("Amethyst"), "SS", 0, 150), 750_000);
+  assert.equal(playExp(order("Amethyst"), "SSS", 0, 150), 900_000);
+  // Reaching a pack does not move with map size.
+  assert.equal(threshold(order("Amethyst")), 5_625_000);
 
   const short: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 150 };
   const long: LevelPlay = { ...play("Emerald", "A"), missCount: 2, noteCount: 1500 };
-  // 2 misses on 150 notes count as 6.3, which earns 51.9% of a pack.
-  assert.equal(Math.round(categoryLevels([short])[RAW].exp), 301_141);
-  assert.equal(categoryLevels([long])[RAW].exp, 435_000);
+  // 2 misses on 150 notes count as 5.2, which earns 54% of a pack.
+  assert.equal(Math.round(categoryLevels([short])[RAW].exp), 248_518);
+  assert.equal(categoryLevels([long])[RAW].exp, playExp(order("Emerald"), "A", 2, 1500));
 });
 
 test("accuracy lifts a play, while the pack thresholds stay where they are", () => {
   const emerald = order("Emerald");
-  assert.equal(playExp(emerald, "SS", 0, 1500), 580_000);
-  assert.equal(Math.round(playExp(emerald, "SS", 0, 1500, 97)), 633_209);
+  assert.equal(playExp(emerald, "SS", 0, 1500), 460_000);
+  assert.equal(Math.round(playExp(emerald, "SS", 0, 1500, 97)), 502_200);
   assert.equal(playExp(emerald, "SS", 0, 1500, 100), playExp(emerald, "SSS", 0));
   assert.ok(playExp(emerald, "A", 2, 1500, 97) > playExp(emerald, "A", 2, 1500));
-  assert.equal(threshold(emerald), 4_350_000);
+  assert.equal(threshold(emerald), 3_450_000);
 
   // The same play is counted the same way in a level as on its own.
   const accurate: LevelPlay = { ...play("Emerald", "A"), noteCount: 1500, accuracy: 97 };
@@ -339,9 +340,9 @@ const listed = (plays: Array<LevelPlay & { id: number }>) =>
   plays.map((p) => ({ ...p, exp: expOf(p) })).sort(byWorth);
 
 test("the screenshot case: tied EXP, and the cleaner run leads and is #1", () => {
-  // A tie is two plays whose misses count the same: three on a 375 note
+  // A tie is two plays whose misses count the same: three on a 250 note
   // map, six on a 1,500 note one. The six is the older score.
-  const three = graded(40, "Emerald", 3, 375);
+  const three = graded(40, "Emerald", 3, 250);
   const six = graded(12, "Emerald", 6, 1500);
   assert.equal(expOf(three), expOf(six));
   // The grade letters differ, because a grade always reads the real misses.
@@ -391,8 +392,8 @@ test("however the plays fall, the list order and the printed places agree", () =
 
 test("on a tie for the last counting place, the cleaner play takes it", () => {
   // Eleven plays whose misses all count as six: five that really are three
-  // on a 375 note map, six that are six on a 1,500 note one.
-  const three = [1, 2, 3, 4, 5].map((i) => graded(i, "Emerald", 3, 375));
+  // on a 250 note map, six that are six on a 1,500 note one.
+  const three = [1, 2, 3, 4, 5].map((i) => graded(i, "Emerald", 3, 250));
   const six = [6, 7, 8, 9, 10, 11].map((i) => graded(i, "Emerald", 6, 1500));
   const all = [...three, ...six];
   assert.equal(new Set(all.map(expOf)).size, 1, "they have to all be worth the same");
@@ -435,10 +436,10 @@ test("a 100+ miss pass never outranks a clean full combo three packs below", () 
       "a 150 miss pass on " + t.name + " is worth a clean " + below.name + " FC or more",
     );
   }
-  // A 150 miss Diamond pass, against a clean Titanium full combo.
+  // A 150 miss Diamond pass, against a clean Copper full combo.
   const diamond = playExp(order("Diamond"), "Pass", 150, 1500);
-  assert.equal(Math.round(diamond), 62);
-  assert.ok(diamond < playExp(order("Stone"), "SS", 0));
+  assert.equal(Math.round(diamond), 1_282);
+  assert.ok(diamond < playExp(order("Copper"), "SS", 0));
   assert.ok(diamond > 0, "a pass should still be worth something, however little");
 });
 
@@ -449,27 +450,25 @@ test("a clean clear outranks a sloppy one well above it", () => {
   const clean = playExp(order("Ruby"), "B-", 9, 1500);
   assert.ok(clean > sandbagged, "a 5 miss Ruby clear is still under a 70 miss GOAT one");
 
-  // Twelve misses costs about two packs: a twelve miss Diamond clear is
-  // level with a clean Emerald full combo and above a Sapphire one.
+  // Twelve misses costs about two and a half packs: a twelve miss Diamond
+  // clear sits between a clean Sapphire and a clean Emerald full combo.
   const twelve = playExp(order("Diamond"), "C+", 12, 1500);
-  const emerald = playExp(order("Emerald"), "SS", 0);
-  assert.ok(
-    twelve > emerald * 0.9 && twelve < emerald * 1.1,
-    "a 12 miss Diamond clear is " + (twelve / emerald).toFixed(2) + " of an Emerald FC",
-  );
   assert.ok(twelve > playExp(order("Sapphire"), "SS", 0));
+  assert.ok(twelve < playExp(order("Emerald"), "SS", 0));
 });
 
-test("the ladder rises about 1.7 a pack, and thresholds follow it", () => {
+test("the ladder rises about 1.7 a pack to Platinum and 1.63 above, and thresholds follow it", () => {
+  assert.equal(tierByName("Platinum")!.exp, 24_500);
+  assert.equal(tierByName("GOAT")!.exp, 2_000_000);
   assert.equal(threshold(order("Stone")), 7_500);
   assert.equal(threshold(order("Silver")), 63_750);
-  assert.equal(threshold(order("Emerald")), 4_350_000);
-  assert.equal(threshold(order("Amethyst")), 7_425_000);
-  assert.equal(threshold(order("GOAT")), 21_450_000);
+  assert.equal(threshold(order("Emerald")), 3_450_000);
+  assert.equal(threshold(order("Amethyst")), 5_625_000);
+  assert.equal(threshold(order("GOAT")), 15_000_000);
   for (const t of TIERS) assert.equal(threshold(t.order), BEST_PLAYS * t.exp * 0.75);
 
   // Every step has to clear 1.6, or ten 100% runs on the pack below would
-  // reach the next one, and stay near 1.7 so the miss curve outweighs it.
+  // reach the next one.
   for (let i = 1; i < TIERS.length; i++) {
     const ratio = TIERS[i].exp / TIERS[i - 1].exp;
     assert.ok(ratio > 1.6 && ratio < 1.8, TIERS[i].name + " is " + ratio.toFixed(3) + " of " + TIERS[i - 1].name);
@@ -482,6 +481,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
     grades: Array<[string, number]>;
     packs: Array<[number, number]>;
     bestPlays: number;
+    thresholdShare: number;
     missShape: number[];
     missScaling: number[];
     accuracy: number;
@@ -491,17 +491,18 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
     assert.deepEqual(rules.grades.find(([name]) => name === g.grade), [g.grade, g.expPercent]);
   }
   assert.equal(rules.packs.length, TIERS.length);
-  assert.deepEqual(rules.packs.find(([o]) => o === order("GOAT")), [order("GOAT"), 2_860_000]);
+  assert.deepEqual(rules.packs.find(([o]) => o === order("GOAT")), [order("GOAT"), 2_000_000]);
   assert.equal(rules.bestPlays, BEST_PLAYS);
+  assert.equal(rules.thresholdShare, THRESHOLD_SHARE);
   // Every number a stored level is worked out from belongs in here, or a
   // deploy that retunes one leaves everyone on the old figure.
-  assert.deepEqual(rules.missShape, [MISS_KNEE, MISS_SLOPE, MISS_ACCEL, MISS_ACCEL_CAP, THRESHOLD_MISSES]);
-  assert.deepEqual(rules.missScaling, [REFERENCE_NOTES, MISS_CURVE, MIN_MISS_FACTOR]);
+  assert.deepEqual(rules.missShape, [CLEAN_SHARE, MISS_SPREAD, MISS_POWER]);
+  assert.deepEqual(rules.missScaling, [SHORT_NOTES, LONG_NOTES, MISS_CURVE, MIN_MISS_FACTOR]);
   assert.equal(rules.accuracy, ACC_EXPONENT);
 });
 
 test("sandbagging a pack is worth far less than playing the one you are on", () => {
-  // Ten 150 miss passes on GOAT, against ten clean full combos on Titanium.
+  // Ten 150 miss passes on GOAT, against ten clean passes on Titanium.
   const sandbag = bestExp(
     Array.from({ length: BEST_PLAYS }, () => graded(1, "GOAT", 150, 1500)),
   );
@@ -509,9 +510,8 @@ test("sandbagging a pack is worth far less than playing the one you are on", () 
     Array.from({ length: BEST_PLAYS }, () => graded(1, "Titanium", 0, 1500)),
   );
   assert.ok(sandbag < honest, sandbag + " beats ten clean Titanium full combos");
-  // Ten of them do not even reach Stone, where they once reached Topaz.
-  assert.equal(Math.round(sandbag), 1_057);
-  assert.equal(levelFromExp(sandbag).tierOrder, null, "ten of them do not even reach Stone");
+  assert.equal(Math.round(sandbag), 20_935);
+  assert.equal(levelFromExp(sandbag).tierOrder, order("Copper"), "ten of them should stop at Copper");
   assert.equal(levelFromExp(honest).tierOrder, order("Titanium"));
 });
 

@@ -744,16 +744,12 @@ function stepTiles(s: ShareSteps, p: EarnedPlay): Tile[] {
       { label: "Share", value: pct(s.share), note: "the most a map pays", kind: "share" },
     ];
   }
-  if (s.kind === "fc") {
+  if (s.kind === "fc" || s.kind === "clean") {
     return [
-      { label: "Result", value: "FC", note: "full combo" },
-      { label: "Accuracy", value: "+" + pct(s.share - 100), note: acc, kind: "gain" },
-      { label: "Share", value: pct(s.share), note: "of the pack", kind: "share" },
-    ];
-  }
-  if (s.counted === 0) {
-    return [
-      { label: "Misses", value: "0", note: "combo broke" },
+      s.kind === "fc"
+        ? { label: "Result", value: "FC", note: "full combo" }
+        : { label: "Misses", value: "0", note: "combo broke" },
+      { label: "Accuracy", value: "+" + pct(s.share - s.base), note: acc, kind: "gain" },
       { label: "Share", value: pct(s.share), note: "of the pack", kind: "share" },
     ];
   }

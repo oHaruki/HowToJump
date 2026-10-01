@@ -327,8 +327,8 @@ function Player({ s, avatar }: { s: BoardScore; avatar?: boolean }) {
 }
 
 /**
- * What a miss costs here. Misses count for more on short maps and less on
- * long ones, against a 1,500 note map; the grade itself stays the real count.
+ * What a miss costs here: more on short maps, less on long ones, once in
+ * between. The grade itself stays the real count.
  */
 function MissNote({ notes }: { notes: number }) {
   const f = missFactor(notes);

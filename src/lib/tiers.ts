@@ -7,7 +7,7 @@ export type Tier = {
   gradient?: string;
   /** Former names, so older spreadsheet rows still resolve. */
   aliases?: string[];
-  /** EXP for a full combo on one of this pack's maps, about 1.7x the pack below. */
+  /** EXP for a full combo on this pack: ~1.7x the pack below to Platinum, ~1.63x above. */
   exp: number;
 };
 
@@ -19,27 +19,27 @@ export const TIERS: Tier[] = [
   { order: 5, name: "Silver", slug: "silver", color: "#c0c0c0", exp: 8500 },
   { order: 6, name: "Gold", slug: "gold", color: "#f0d959", exp: 14500 },
   { order: 7, name: "Platinum", slug: "platinum", color: "#E5E4E2", exp: 24500 },
-  { order: 8, name: "Titanium", slug: "titanium", color: "#708a99", exp: 41500 },
+  { order: 8, name: "Titanium", slug: "titanium", color: "#708a99", exp: 40000 },
   {
     order: 9,
     name: "Rhodonite",
     slug: "rhodonite",
     color: "#f19bc2",
     aliases: ["Opal"],
-    exp: 70000,
+    exp: 65000,
   },
-  { order: 10, name: "Topaz", slug: "topaz", color: "#ffb84d", exp: 120000 },
-  { order: 11, name: "Ruby", slug: "ruby", color: "#d21f3c", exp: 200000 },
-  { order: 12, name: "Sapphire", slug: "sapphire", color: "#5fa6ff", exp: 340000 },
-  { order: 13, name: "Emerald", slug: "emerald", color: "#4ef399", exp: 580000 },
-  { order: 14, name: "Amethyst", slug: "amethyst", color: "#8e44ad", exp: 990000 },
-  { order: 15, name: "Diamond", slug: "diamond", color: "#a2f0ff", exp: 1680000 },
+  { order: 10, name: "Topaz", slug: "topaz", color: "#ffb84d", exp: 106000 },
+  { order: 11, name: "Ruby", slug: "ruby", color: "#d21f3c", exp: 173000 },
+  { order: 12, name: "Sapphire", slug: "sapphire", color: "#5fa6ff", exp: 282000 },
+  { order: 13, name: "Emerald", slug: "emerald", color: "#4ef399", exp: 460000 },
+  { order: 14, name: "Amethyst", slug: "amethyst", color: "#8e44ad", exp: 750000 },
+  { order: 15, name: "Diamond", slug: "diamond", color: "#a2f0ff", exp: 1225000 },
   {
     order: 16,
     name: "GOAT",
     slug: "goat",
     color: "#c7e9e4",
-    exp: 2860000,
+    exp: 2000000,
     gradient:
       "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",
   },

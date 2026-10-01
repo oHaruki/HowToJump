@@ -12,7 +12,7 @@ import {
   snapshotOf, type LevelSnapshot,
 } from "./progress";
 import { MAIN_LEVEL, countingPlaces, levelValue } from "./levels";
-import { gradeFor } from "./grading";
+import { CLEAN_SHARE, gradeFor } from "./grading";
 import { tierByName } from "./tiers";
 
 const RAW = "Aim - raw mechanic";
@@ -156,11 +156,11 @@ test("the history keeps the order it was given, whatever the plays are worth", (
 });
 
 test("the screenshot case: the cleaner of two tied plays leads and is #1", () => {
-  // Misses count by map length, so three on a 375 note map and six on a
+  // Misses count by map length, so three on a 250 note map and six on a
   // 1,500 note one are worth the same. The six was set first.
   const plays = newestFirst([
     play(12, 6, { at: "2026-09-01T00:00:00Z" }),
-    play(40, 3, { at: "2026-09-20T00:00:00Z", noteCount: 375 }),
+    play(40, 3, { at: "2026-09-20T00:00:00Z", noteCount: 250 }),
   ]);
   const { recent, top } = profileLists(plays, null);
   assert.equal(recent[0].exp, recent[1].exp, "the two have to be worth the same");
@@ -217,8 +217,8 @@ test("each list says what is worth what, and what landed since the last look", (
   const { recent } = profileLists(plays, seenAt);
   assert.equal(recent.find((p) => p.scoreId === 1)!.fresh, "new");
   assert.equal(recent.find((p) => p.scoreId === 2)!.fresh, null);
-  // A clean clear of an Emerald map is that pack's value.
-  assert.equal(recent[0].exp, tierByName("Emerald")!.exp);
+  // A clean pass of an Emerald map, combo broken, is CLEAN_SHARE of that pack's value.
+  assert.equal(recent[0].exp, (tierByName("Emerald")!.exp * CLEAN_SHARE) / 100);
   // Nothing is new on a first visit, or every score would be.
   assert.equal(profileLists(plays, null).recent.every((p) => p.fresh === null), true);
 });

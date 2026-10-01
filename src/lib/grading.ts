@@ -17,37 +17,17 @@ export type GradeRule = {
 /* ------------------------------------------------ what a misscount costs */
 
 /**
- * The miss curve, in halvings of the map's pack EXP.
- *
- * MISS_KNEE sets how sharply the first few misses bite, MISS_SLOPE the
- * steady fall after that, and MISS_ACCEL what each miss adds on top of the
- * last. The acceleration stops at MISS_ACCEL_CAP.
+ * The miss curve: CLEAN_SHARE * (1 + misses / MISS_SPREAD) ^ -MISS_POWER.
+ * CLEAN_SHARE is what a pass with no misses earns before accuracy.
  */
-export const MISS_KNEE = 0.8;
-export const MISS_SLOPE = 0.0664;
-export const MISS_ACCEL = 0.001;
-export const MISS_ACCEL_CAP = 60;
-
-/** A pack is reached at BEST_PLAYS plays of this misscount on it. */
-export const THRESHOLD_MISSES = 2;
-export const THRESHOLD_SHARE = 75;
-
-/** What the acceleration has cost by this misscount, flat after the cap. */
-const accelerated = (misses: number) => MISS_ACCEL * Math.pow(Math.min(misses, MISS_ACCEL_CAP), 2);
-
-/* Pins the curve so THRESHOLD_MISSES pays THRESHOLD_SHARE exactly. */
-const MISS_KNEE_WEIGHT =
-  (Math.log2(100 / THRESHOLD_SHARE) - MISS_SLOPE * THRESHOLD_MISSES - accelerated(THRESHOLD_MISSES)) /
-  Math.log2(1 + THRESHOLD_MISSES / MISS_KNEE);
+export const CLEAN_SHARE = 90;
+export const MISS_SPREAD = 43;
+export const MISS_POWER = 4.5;
 
 /** The share of a map's pack EXP a misscount earns, as a percentage. */
 export function shareForMisses(misses: number): number {
-  if (!Number.isFinite(misses) || misses <= 0) return 100;
-  const halvings =
-    MISS_KNEE_WEIGHT * Math.log2(1 + misses / MISS_KNEE) +
-    MISS_SLOPE * misses +
-    accelerated(misses);
-  return 100 * Math.pow(2, -halvings);
+  if (!Number.isFinite(misses) || misses <= 0) return CLEAN_SHARE;
+  return CLEAN_SHARE * Math.pow(1 + misses / MISS_SPREAD, -MISS_POWER);
 }
 
 /** Rounded to the precision grade_rules.exp_percent keeps. */
@@ -151,19 +131,21 @@ export function compareResults(a: ResultShape, b: ResultShape): number {
 /* ---------------------------------------------------- misses by map size */
 
 /**
- * How map length scales a miss. A map of REFERENCE_NOTES counts as it is;
- * elsewhere each miss counts (REFERENCE_NOTES / notes) ^ MISS_CURVE times,
- * floored at MIN_MISS_FACTOR. Only the EXP moves — the grade letter always
- * reads the real misses.
+ * How map length scales a miss. On SHORT_NOTES to LONG_NOTES notes a miss
+ * counts once; outside that each counts (nearest edge / notes) ^ MISS_CURVE
+ * times, floored at MIN_MISS_FACTOR. Only the EXP moves; the grade letter
+ * always reads the real misses.
  */
-export const REFERENCE_NOTES = 1500;
+export const SHORT_NOTES = 1000;
+export const LONG_NOTES = 1600;
 export const MISS_CURVE = 0.5;
 export const MIN_MISS_FACTOR = 0.8;
 
 /** How many misses one miss counts as on a map this size; 1 when unknown. */
 export function missFactor(noteCount: number | null | undefined): number {
   if (!noteCount || noteCount <= 0) return 1;
-  return Math.max(MIN_MISS_FACTOR, Math.pow(REFERENCE_NOTES / noteCount, MISS_CURVE));
+  const edge = Math.min(LONG_NOTES, Math.max(SHORT_NOTES, noteCount));
+  return Math.max(MIN_MISS_FACTOR, Math.pow(edge / noteCount, MISS_CURVE));
 }
 
 /** Misses as they count on a map this size, never below one. */
@@ -184,14 +166,20 @@ export function accuracyCredit(accuracy: number | null | undefined): number {
 }
 
 /** Every step expShare takes, so a player can be shown where their EXP came from. */
+/** A share accuracy lifts toward the one above it. */
+type Climb = {
+  /** The share of one miss the accuracy won back, 0 to 1. */
+  credit: number;
+  /** The share before accuracy. */
+  base: number;
+  share: number;
+};
+
 export type ShareSteps =
   | { kind: "perfect"; share: number }
-  | {
-      kind: "fc";
-      /** The share of one miss the accuracy won back, 0 to 1. */
-      credit: number;
-      share: number;
-    }
+  /* A full combo, and a pass with no misses that broke the combo. */
+  | ({ kind: "fc" } & Climb)
+  | ({ kind: "clean" } & Climb)
   | {
       kind: "misses";
       misses: number;
@@ -204,11 +192,16 @@ export type ShareSteps =
       share: number;
     };
 
+/** A share accuracy lifts from `base` toward `top`. */
+const climb = <K extends "fc" | "clean">(kind: K, base: number, top: number, credit: number) =>
+  ({ kind, credit, base, share: base * Math.pow(top / base, credit) }) as { kind: K } & Climb;
+
 /**
  * The share of a map's pack EXP a play earns, with the steps to it. A 100%
- * run keeps its own share and a full combo climbs toward it with accuracy.
- * Any other play reads the curve at its scaled misses, less the part of one
- * miss its accuracy wins back, at most its last real miss.
+ * run keeps its own share. A full combo climbs toward it with accuracy, and
+ * a pass with no misses climbs toward a full combo. Any other play reads the
+ * curve at its scaled misses, less the part of one miss its accuracy wins
+ * back, at most its last real miss.
  */
 export function explainShare(
   grade: string,
@@ -221,19 +214,18 @@ export function explainShare(
   if (perfect && grade === perfect.grade) return { kind: "perfect", share: perfect.expPercent };
   const credit = accuracyCredit(accuracy);
   const fc = rules.find((r) => r.requiresFc);
-  if (fc && grade === fc.grade) {
-    const top = perfect?.expPercent ?? fc.expPercent;
-    return { kind: "fc", credit, share: fc.expPercent * Math.pow(top / fc.expPercent, credit) };
-  }
+  const full = fc?.expPercent ?? 100;
+  if (fc && grade === fc.grade) return climb("fc", full, perfect?.expPercent ?? full, credit);
   const counted = scaledMisses(missCount, noteCount);
-  const room = counted === 0 ? 0 : Math.min(1, counted - scaledMisses(missCount - 1, noteCount));
+  if (counted === 0) return climb("clean", shareForMisses(0), full, credit);
+  const room = Math.min(1, counted - scaledMisses(missCount - 1, noteCount));
   return {
     kind: "misses",
     misses: missCount,
     factor: missFactor(noteCount),
     counted,
     wonBack: room * credit,
-    share: counted === 0 ? shareForMisses(0) : shareForMisses(counted - room * credit),
+    share: shareForMisses(counted - room * credit),
   };
 }
 

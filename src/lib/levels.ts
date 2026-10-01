@@ -1,7 +1,7 @@
 import { CATEGORIES, TIERS, normalizeCategory, tierByOrder } from "@/lib/tiers";
 import {
-  ACC_EXPONENT, GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_CURVE, MISS_KNEE,
-  MISS_SLOPE, REFERENCE_NOTES, THRESHOLD_MISSES, expShare,
+  ACC_EXPONENT, CLEAN_SHARE, GRADE_RULES, LONG_NOTES, MIN_MISS_FACTOR, MISS_CURVE, MISS_POWER,
+  MISS_SPREAD, SHORT_NOTES, expShare,
 } from "@/lib/grading";
 
 /**
@@ -20,7 +20,10 @@ export const BEST_PLAYS = 10;
 export const MAIN_LEVEL = "main";
 
 /** Bump when the shape of the formula changes. Changed numbers are noticed without it. */
-export const LEVEL_RULES_VERSION = 5;
+export const LEVEL_RULES_VERSION = 6;
+
+/** A pack is reached at BEST_PLAYS plays worth this share of it each. */
+export const THRESHOLD_SHARE = 75;
 
 /**
  * Everything a stored level depends on, as one string. Each deploy compares
@@ -31,18 +34,15 @@ export function levelRules(): string {
   return JSON.stringify({
     version: LEVEL_RULES_VERSION,
     bestPlays: BEST_PLAYS,
-    thresholdGrade: THRESHOLD_GRADE,
+    thresholdShare: THRESHOLD_SHARE,
     categories: CATEGORIES,
     packs: TIERS.map((t) => [t.order, t.exp]),
     grades: GRADE_RULES.map((g) => [g.grade, g.expPercent]),
-    missScaling: [REFERENCE_NOTES, MISS_CURVE, MIN_MISS_FACTOR],
-    missShape: [MISS_KNEE, MISS_SLOPE, MISS_ACCEL, MISS_ACCEL_CAP, THRESHOLD_MISSES],
+    missScaling: [SHORT_NOTES, LONG_NOTES, MISS_CURVE, MIN_MISS_FACTOR],
+    missShape: [CLEAN_SHARE, MISS_SPREAD, MISS_POWER],
     accuracy: ACC_EXPONENT,
   });
 }
-
-/** The grade at THRESHOLD_MISSES misses, which a pack's threshold is priced in. */
-export const THRESHOLD_GRADE = "A";
 
 export type Level = {
   /** EXP of the plays that count. */
@@ -88,9 +88,10 @@ export function playExp(
 const expOf = (p: Omit<LevelPlay, "categories">) =>
   playExp(p.tierOrder, p.grade, p.missCount, p.noteCount, p.accuracy);
 
-/** EXP needed to reach a pack: BEST_PLAYS two-miss plays on it, before accuracy. */
+/** EXP needed to reach a pack: BEST_PLAYS plays at THRESHOLD_SHARE of it. */
 export function threshold(tierOrder: number): number {
-  return BEST_PLAYS * playExp(tierOrder, THRESHOLD_GRADE, THRESHOLD_MISSES, null);
+  const tier = tierByOrder(tierOrder);
+  return tier ? (BEST_PLAYS * tier.exp * THRESHOLD_SHARE) / 100 : 0;
 }
 
 /** Where an EXP total sits: the pack it reached and the way to the next. */

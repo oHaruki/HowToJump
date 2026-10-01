@@ -1,39 +1,40 @@
 /**
  * Run with: node --import tsx --test src/lib/grading.test.ts
  *
- * Misses by map size: a 1,500 note map counts as it is, shorter maps make
- * each miss count more, and only the EXP moves.
+ * Misses by map size: a map of 1,000 to 1,600 notes counts as it is,
+ * shorter maps make each miss count more, and only the EXP moves.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  GRADE_RULES, MIN_MISS_FACTOR, MISS_ACCEL, MISS_ACCEL_CAP, MISS_KNEE, MISS_SLOPE,
-  THRESHOLD_MISSES, THRESHOLD_SHARE, accuracyCredit, compareResults, expPercentFor, expShare,
-  explainShare, gradeFor, gradeRank, missFactor, scaledMisses, shareForMisses,
+  CLEAN_SHARE, GRADE_RULES, LONG_NOTES, MIN_MISS_FACTOR, SHORT_NOTES, accuracyCredit,
+  compareResults, expPercentFor, expShare, explainShare, gradeFor, gradeRank, missFactor,
+  scaledMisses, shareForMisses,
 } from "./grading";
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.01, a + " is not " + b);
 
-test("a 1,500 note map counts ×1, a 150 note map about ×3", () => {
-  assert.equal(missFactor(1500), 1);
-  near(missFactor(150), 3.16);
-  near(missFactor(500), 1.73);
+test("a map of 1,000 to 1,600 notes counts ×1, a 150 note map about ×2.6", () => {
+  assert.equal(missFactor(SHORT_NOTES), 1);
+  assert.equal(missFactor(1300), 1);
+  assert.equal(missFactor(LONG_NOTES), 1);
+  near(missFactor(150), 2.58);
+  near(missFactor(500), 1.41);
+  near(missFactor(2000), 0.89);
   // A map osu! has not given a count for yet counts as it always did.
   assert.equal(missFactor(null), 1);
   assert.equal(missFactor(0), 1);
 });
 
 test("a long map forgives a miss by a fifth at most, however long it runs", () => {
-  // Unbounded, this swallowed the whole miss curve: thirty misses on a
-  // 6,000 note map counted as fifteen and paid like a clean clear.
   assert.equal(missFactor(3000), MIN_MISS_FACTOR);
   assert.equal(missFactor(6000), MIN_MISS_FACTOR);
   assert.equal(missFactor(100_000), MIN_MISS_FACTOR);
   assert.ok(MIN_MISS_FACTOR < 1, "a long map should still forgive something");
 
-  // Short maps are untouched, which is the half of the rule that was meant.
-  assert.ok(missFactor(150) > 3);
-  assert.ok(missFactor(500) > 1.7);
+  // Short maps are untouched by the floor.
+  assert.ok(missFactor(150) > 2.5);
+  assert.ok(missFactor(500) > 1.4);
 
   // Nothing between the two ends jumps: the factor only ever eases off.
   let last = Number.POSITIVE_INFINITY;
@@ -46,9 +47,9 @@ test("a long map forgives a miss by a fifth at most, however long it runs", () =
 
 test("scaled misses keep their fraction, and a miss never counts as less than one", () => {
   assert.equal(scaledMisses(0, 150), 0);
-  near(scaledMisses(1, 150), 3.16);
-  near(scaledMisses(2, 150), 6.32);
-  assert.equal(scaledMisses(3, 375), 6);
+  near(scaledMisses(1, 150), 2.58);
+  near(scaledMisses(2, 150), 5.16);
+  assert.equal(scaledMisses(3, 250), 6);
   assert.equal(scaledMisses(2, 1500), 2);
   assert.equal(scaledMisses(1, 3000), 1);
   near(scaledMisses(2, 3000), 1.6);
@@ -60,20 +61,18 @@ test("scaled misses keep their fraction, and a miss never counts as less than on
 
 test("misses earn the share of what they count as", () => {
   const at = (m: number) => shareForMisses(m);
-  assert.equal(expShare("A+", 1, 150), at(Math.sqrt(10))); // counts as 3.16
-  assert.equal(expShare("A-", 3, 375), at(6)); // counts as 6
-  assert.equal(expShare("A+", 1, 500), at(Math.sqrt(3))); // counts as 1.73
+  near(expShare("A+", 1, 150), at(Math.sqrt(1000 / 150))); // counts as 2.58
+  assert.equal(expShare("A-", 3, 250), at(6)); // counts as 6
+  near(expShare("A+", 1, 500), at(Math.SQRT2)); // counts as 1.41
   assert.equal(expShare("A+", 1, 1500), at(1)); // as it is
   near(expShare("A", 2, 3000), at(1.6)); // a long map forgives a fifth
   assert.equal(expShare("A", 2, null), at(2)); // no count yet
-  // Two misses on a 1,500 note map is the anchor every threshold reads.
-  assert.equal(expShare("A", THRESHOLD_MISSES, 1500), THRESHOLD_SHARE);
 });
 
 test("full combos, 100% runs and clean passes are never scaled", () => {
   assert.equal(expShare("SSS", 0, 150), 120);
   assert.equal(expShare("SS", 0, 150), 100);
-  assert.equal(expShare("S", 0, 150), 100);
+  assert.equal(expShare("S", 0, 150), CLEAN_SHARE);
 });
 
 test("the grade itself reads the real misses on any map", () => {
@@ -136,9 +135,9 @@ test("a worse grade is never worth more, and every share fits the column", () =>
       byOrder[i].grade + " is worth more than " + byOrder[i - 1].grade,
     );
   }
-  // A full combo and a clean pass are deliberately level: holding the combo
-  // is the nicer badge, not the better payout.
-  assert.equal(expPercentFor("SS"), expPercentFor("S"));
+  // A clean pass that broke the combo starts below a full combo.
+  assert.equal(expPercentFor("S"), CLEAN_SHARE);
+  assert.ok(expPercentFor("S") < expPercentFor("SS"));
   // Every band of misses is strictly worse than the band above it, or two
   // misscounts would be worth the same and the tail would flatten out.
   for (let i = 1; i < bands.length; i++) {
@@ -164,7 +163,7 @@ test("a misscount osu! would never send still grades sensibly", () => {
   assert.equal(plain(-5), "S", "a negative count must not fall through to Pass");
   assert.equal(plain(Number.POSITIVE_INFINITY), "S", "not finite, so read as clean");
   assert.equal(scaledMisses(-5, 150), 0);
-  assert.equal(expShare("S", -5, 150), 100);
+  assert.equal(expShare("S", -5, 150), CLEAN_SHARE);
 });
 
 /* -------------------------------------------------- what a play is worth */
@@ -194,9 +193,11 @@ test("the same misses on a longer map never earn less", () => {
   }
 });
 
-test("a 1,500 note map is the one that pays the misscount as it stands", () => {
+test("a map of 1,000 to 1,600 notes pays the misscount as it stands", () => {
   for (let m = 0; m <= 200; m++) {
-    assert.equal(expShare(plain(m), m, 1500), shareForMisses(m));
+    for (const notes of [SHORT_NOTES, 1500, LONG_NOTES]) {
+      assert.equal(expShare(plain(m), m, notes), shareForMisses(m));
+    }
     // A map osu! has not given a count for is read the same way.
     assert.equal(expShare(plain(m), m, null), shareForMisses(m));
   }
@@ -209,57 +210,41 @@ test("EXP falls on a curve, not in the grade's steps", () => {
   assert.equal(new Set(inside).size, 25, "a band still pays one flat number");
   for (let i = 1; i < inside.length; i++) assert.ok(inside[i] < inside[i - 1]);
 
-  // No cliff anywhere, at a band edge or inside one. Nothing like the old
-  // table, where one more miss at the wrong moment halved a play.
+  // No cliff anywhere, at a band edge or inside one.
   const drop = (m: number) => 1 - shareForMisses(m) / shareForMisses(m - 1);
   for (let m = 1; m <= 400; m++) {
     assert.ok(drop(m) < 0.17, "miss " + m + " costs " + (drop(m) * 100).toFixed(1) + "%");
   }
-  assert.ok(drop(400) > 0.04, "the tail should keep falling, not flatten out");
+  // It keeps falling, so two hopeless passes never tie.
+  assert.ok(shareForMisses(400) < shareForMisses(399));
 });
 
-test("each miss costs more than the last, until there is nothing left", () => {
-  // Each miss costs more of what is left than the last, so a map survived
-  // pays nothing like a map cleared.
+test("the first misses cost the most, and the tail forgives", () => {
   const drop = (m: number) => 1 - shareForMisses(m) / shareForMisses(m - 1);
-  assert.ok(drop(40) > drop(20), "a fortieth miss should cost more than a twentieth");
-  assert.ok(drop(20) > drop(10), "a twentieth miss should cost more than a tenth");
-  // Past the cap it levels off: the share is already near nothing, and it
-  // still has to keep falling so two hopeless passes never tie.
-  assert.ok(drop(MISS_ACCEL_CAP + 1) < drop(MISS_ACCEL_CAP));
-  assert.ok(shareForMisses(MISS_ACCEL_CAP) < 0.5, "the cap should sit where nothing is left");
-  assert.ok(MISS_ACCEL > 0, "without this the fall is flat again");
-
-  // Thirty misses against fifty: an order of magnitude apart, not a third.
-  assert.ok(shareForMisses(30) / shareForMisses(50) > 8);
+  assert.ok(drop(1) > drop(10), "a first miss should cost more than a tenth");
+  assert.ok(drop(10) > drop(40), "a tenth miss should cost more than a fortieth");
 });
 
-test("the curve is anchored where the pack thresholds read it", () => {
-  assert.equal(shareForMisses(0), 100);
-  assert.equal(shareForMisses(THRESHOLD_MISSES), THRESHOLD_SHARE);
-  // Nonsense in, a clean clear out, rather than something off the bottom.
-  assert.equal(shareForMisses(-4), 100);
-  assert.equal(shareForMisses(Number.NaN), 100);
-  // The knee and the slope are the two numbers Kayrem retunes.
-  assert.ok(MISS_KNEE > 0 && MISS_SLOPE > 0);
+test("the curve starts at a clean pass and pays the agreed table", () => {
+  assert.equal(shareForMisses(0), CLEAN_SHARE);
+  // Nonsense in, a clean pass out.
+  assert.equal(shareForMisses(-4), CLEAN_SHARE);
+  assert.equal(shareForMisses(Number.NaN), CLEAN_SHARE);
 
-  // Clean play is where Kayrem drew the line, so the first dozen misses are
-  // still worth about what the hand written table paid them.
-  const was: Array<[number, number]> = [[1, 85], [2, 75], [3, 65], [6, 50], [9, 44], [13, 36]];
-  for (const [m, before] of was) {
+  const table: Array<[number, number]> = [[1, 81.2], [2, 73.3], [10, 35.1], [30, 8.3]];
+  for (const [m, share] of table) {
     const now = shareForMisses(m);
-    assert.ok(Math.abs(now - before) < 6, m + " misses moved from " + before + " to " + now);
+    assert.ok(Math.abs(now - share) < 0.05, m + " misses pays " + now + ", not " + share);
   }
-  // Past that it collapses: a map survived pays nothing like a clear.
-  assert.ok(shareForMisses(36) < 5, "36 misses still earns " + shareForMisses(36) + "%");
-  assert.ok(shareForMisses(52) < 1, "52 misses still earns " + shareForMisses(52) + "%");
-  assert.ok(shareForMisses(150) < 0.01, "150 misses still earns " + shareForMisses(150) + "%");
+  // Under 1% from 74 misses.
+  assert.ok(shareForMisses(73) >= 1, "73 misses already pays under 1%");
+  assert.ok(shareForMisses(74) < 1, "74 misses still pays " + shareForMisses(74) + "%");
 });
 
 test("the share beside a grade is the most that grade pays before accuracy", () => {
   assert.equal(expPercentFor("SSS"), 120);
   assert.equal(expPercentFor("SS"), 100);
-  assert.equal(expPercentFor("S"), 100);
+  assert.equal(expPercentFor("S"), CLEAN_SHARE);
   for (const g of bands) {
     assert.equal(g.expPercent, Math.round(shareForMisses(g.minMiss!) * 1000) / 1000);
     // Where a band covers more than one misscount, the rest of it pays less.
@@ -296,7 +281,7 @@ test("accuracy wins back almost nothing below 90%, and most of a miss past 96%",
   }
 });
 
-test("a full combo climbs to the 100% run's share, and only reaches it at 100%", () => {
+test("a full combo climbs to the 100% run's share, and a clean pass to a full combo's", () => {
   assert.equal(expShare("SS", 0, 1500), 100);
   assert.equal(expShare("SS", 0, 1500, null), 100);
   near(expShare("SS", 0, 1500, 97), 109.17);
@@ -304,8 +289,13 @@ test("a full combo climbs to the 100% run's share, and only reaches it at 100%",
   assert.ok(expShare("SS", 0, 1500, 99.99) < 120);
   // Map length never touches a full combo.
   assert.equal(expShare("SS", 0, 150, 97), expShare("SS", 0, 3000, 97));
-  // A clean pass that dropped the combo has nothing to win back.
-  assert.equal(expShare("S", 0, 1500, 99.5), 100);
+
+  // A clean pass that dropped the combo climbs from CLEAN_SHARE toward 100.
+  assert.equal(expShare("S", 0, 1500), CLEAN_SHARE);
+  near(expShare("S", 0, 1500, 97), CLEAN_SHARE * Math.pow(100 / CLEAN_SHARE, accuracyCredit(97)));
+  assert.ok(expShare("S", 0, 1500, 99.5) > CLEAN_SHARE);
+  assert.ok(expShare("S", 0, 1500, 99.5) < expShare("SS", 0, 1500, 80));
+  assert.equal(expShare("S", 0, 150, 97), expShare("S", 0, 3000, 97));
 });
 
 test("accuracy lifts a play with misses, by at most one counted miss", () => {
@@ -313,8 +303,8 @@ test("accuracy lifts a play with misses, by at most one counted miss", () => {
     expShare(plain(m), m, notes, acc);
   assert.ok(plainAt(2, 1500, 97) > plainAt(2, 1500, null));
   near(plainAt(2, 1500, 97), shareForMisses(2 - accuracyCredit(97)));
-  // On a short map a miss counts as three, and accuracy still wins back only one.
-  near(plainAt(1, 150, 99), shareForMisses(Math.sqrt(10) - accuracyCredit(99)));
+  // On a short map a miss counts as 2.58, and accuracy still wins back only one.
+  near(plainAt(1, 150, 99), shareForMisses(Math.sqrt(1000 / 150) - accuracyCredit(99)));
   // On a long map it wins back at most the real miss, which counts for less.
   near(plainAt(3, 3000, 99), shareForMisses(2.4 - 0.8 * accuracyCredit(99)));
 });
@@ -434,8 +424,8 @@ test("a personal best is only taken by something actually better", () => {
 });
 
 test("the steps behind a share are the ones the share is worked from", () => {
-  // Two misses on a 375 note map count as four; 99% wins back most of one.
-  const short = explainShare("A", 2, 375, 99);
+  // Two misses on a 250 note map count as four; 99% wins back most of one.
+  const short = explainShare("A", 2, 250, 99);
   assert.equal(short.kind, "misses");
   if (short.kind !== "misses") return;
   assert.equal(short.factor, 2);
@@ -447,16 +437,16 @@ test("the steps behind a share are the ones the share is worked from", () => {
   const long = explainShare("A+", 1, 6000, 98);
   assert.ok(long.kind === "misses" && long.counted === 1 && long.factor === MIN_MISS_FACTOR);
 
-  // No accuracy wins nothing back, and no misses has nothing to win back.
+  // No accuracy wins nothing back.
   const unknown = explainShare("A", 2, 1500, null);
   assert.ok(unknown.kind === "misses" && unknown.wonBack === 0);
-  const clean = explainShare("S", 0, 1500, 97);
-  assert.ok(clean.kind === "misses" && clean.counted === 0 && clean.wonBack === 0);
-  assert.equal(clean.share, 100);
 
+  // No misses climbs from a clean pass, a full combo from 100.
+  const clean = explainShare("S", 0, 1500, 97);
+  assert.ok(clean.kind === "clean" && clean.base === CLEAN_SHARE && clean.credit === accuracyCredit(97));
   assert.deepEqual(explainShare("SSS", 0, 800, 100), { kind: "perfect", share: 120 });
   const fc = explainShare("SS", 0, 800, 99);
-  assert.ok(fc.kind === "fc" && fc.credit === accuracyCredit(99));
+  assert.ok(fc.kind === "fc" && fc.base === 100 && fc.credit === accuracyCredit(99));
 });
 
 test("every explained share is the share the levels are paid", () => {
