@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getBank, getSpecialPack } from "@/lib/queries";
+import { getBank, getSpecialPacks } from "@/lib/queries";
 import { isAdmin } from "@/lib/roles";
 import { SectionHead } from "@/components/ui";
 import { Importer } from "@/components/Importer";
@@ -23,9 +23,11 @@ export default async function SpecialPackAdminPage({
 }) {
   if (!isAdmin(await auth())) redirect("/staff");
   const id = Number((await params).id);
-  const pack = Number.isSafeInteger(id) && id > 0 ? await getSpecialPack(id) : null;
+  const all = await getSpecialPacks();
+  const pack = all.find((p) => p.id === id);
   if (!pack) notFound();
   const maps = await getBank({ specialPack: pack.id });
+  const special = all.map(({ id, name, color }) => ({ id, name, color }));
 
   return (
     <>
@@ -46,7 +48,7 @@ export default async function SpecialPackAdminPage({
         <span className="lbl">
           In {pack.name} ({maps.length})
         </span>
-        <BankAdminTable rows={maps} />
+        <BankAdminTable rows={maps} special={special} />
       </div>
     </>
   );

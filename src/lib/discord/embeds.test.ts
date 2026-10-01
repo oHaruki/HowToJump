@@ -61,6 +61,7 @@ const row =(over: Partial<BankRow> = {}): BankRow => ({
   od: 9,
   judgedByName: "Kayrem",
   isActive: true,
+  createdAt: new Date("2026-09-01T00:00:00Z"),
   ...over,
 });
 

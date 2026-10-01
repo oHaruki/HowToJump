@@ -9,6 +9,7 @@ import {
 } from "@/lib/tiers";
 import { MODS, modsText } from "@/lib/mods";
 import type { SpecialPack } from "@/lib/packs";
+import { timeAgo } from "@/lib/time";
 import { CategoryChips, ModChip, PacingChips, PickSelect, SpecialChip } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
@@ -39,17 +40,30 @@ export type BankAdminRow = {
   od: number | null;
   judgedByName: string | null;
   isActive: boolean;
+  createdAt: Date;
 };
 
 type Draft = {
   tier: string;
+  /** A special pack's ID, or "" for the ladder. */
+  pack: string;
   categories: string[];
   mod: string;
   length: string;
   speed: string;
 };
 
-export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
+export function BankAdminTable({
+  rows,
+  special = [],
+  showAdded,
+}: {
+  rows: BankAdminRow[];
+  /** Special packs an entry can be moved into. */
+  special?: readonly SpecialPack[];
+  /** Adds when each entry was added. */
+  showAdded?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -111,15 +125,24 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
               }
               pack={
                 isEditing ? (
-                  <PackPicker
-                    value={tierByName(draft.tier)?.slug ?? ""}
-                    placeholder="Pick a pack"
-                    allowClear={false}
-                    onChange={(slug) => {
-                      const t = tierBySlug(slug);
-                      if (t) setDraft({ ...draft, tier: t.name });
-                    }}
-                  />
+                  <>
+                    <PackPicker
+                      value={tierByName(draft.tier)?.slug ?? ""}
+                      placeholder="Pick a pack"
+                      allowClear={false}
+                      onChange={(slug) => {
+                        const t = tierBySlug(slug);
+                        if (t) setDraft({ ...draft, tier: t.name });
+                      }}
+                    />
+                    <SpecialSelect
+                      value={draft.pack}
+                      special={special}
+                      current={r.pack}
+                      disabled={pending}
+                      onChange={(v) => setDraft({ ...draft, pack: v })}
+                    />
+                  </>
                 ) : (
                   <>
                     <PackTile tierOrder={r.tierOrder} />
@@ -173,8 +196,13 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                     <ModChip mod={r.mod} />
                     <CategoryChips categories={r.categories} />
                     <PacingChips length={r.lengthBucket} speed={r.speedBucket} />
-                    {r.judgedByName ? (
-                      <span className="small">by {r.judgedByName}</span>
+                    {r.judgedByName || showAdded ? (
+                      <span className="small">
+                        {[
+                          r.judgedByName ? "by " + r.judgedByName : "",
+                          showAdded ? "added " + timeAgo(r.createdAt) : "",
+                        ].filter(Boolean).join(" · ")}
+                      </span>
                     ) : null}
                   </>
                 )
@@ -186,7 +214,16 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                       className="btn btn-sm btn-primary"
                       type="button"
                       disabled={pending}
-                      onClick={() => run(() => updateEntry(r.entryId, draft), closeEdit)}
+                      onClick={() =>
+                        run(
+                          () =>
+                            updateEntry(r.entryId, {
+                              ...draft,
+                              pack: draft.pack ? Number(draft.pack) : null,
+                            }),
+                          closeEdit,
+                        )
+                      }
                     >
                       {pending ? "Saving" : "Save"}
                     </button>
@@ -231,6 +268,7 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
                         setEditing(r.entryId);
                         setDraft({
                           tier: tierByOrder(r.tierOrder)?.name ?? "",
+                          pack: r.pack ? String(r.pack.id) : "",
                           categories: r.categories,
                           mod: r.mod,
                           length: r.lengthBucket ?? "",
@@ -270,5 +308,44 @@ export function BankAdminTable({ rows }: { rows: BankAdminRow[] }) {
         ) : null}
       </div>
     </>
+  );
+}
+
+/**
+ * Where an entry sits: on the ladder, or in a special pack. A special
+ * pack's map keeps its ladder pack, which sets what it pays.
+ */
+function SpecialSelect({
+  value,
+  special,
+  current,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  special: readonly SpecialPack[];
+  /** The entry's special pack now, offered even when the list leaves it out. */
+  current: SpecialPack | null;
+  disabled: boolean;
+  onChange: (v: string) => void;
+}) {
+  const options = current && !special.some((p) => p.id === current.id) ? [...special, current] : special;
+  if (!options.length) return null;
+  return (
+    <select
+      className="mini"
+      value={value}
+      disabled={disabled}
+      aria-label="Special pack"
+      title="A special pack's maps count toward its own board, not toward levels"
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">On the ladder</option>
+      {options.map((p) => (
+        <option key={p.id} value={String(p.id)}>
+          {p.name}
+        </option>
+      ))}
+    </select>
   );
 }

@@ -742,6 +742,9 @@ tbody tr:hover { background: var(--bg-c); }
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
   background: var(--text-focus); border-radius: 2px;
 }
+/* A larger row above another, with no rule of its own. */
+.tabs-lg { gap: 28px; box-shadow: none; font-size: 21px; font-weight: 600; }
+.tabs-lg a { padding: 0 0 8px; }
 
 .drop {
   border: 1px dashed var(--border);
@@ -2135,6 +2138,19 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
 .b-bar { width: 64px; height: 5px; background: var(--bg-d); border-radius: 99px; overflow: hidden; }
 .b-bar i { display: block; height: 100%; border-radius: 99px; background: var(--fill); }
 .b-exp { color: var(--text-focus); font-size: 17px; }
+/* A play on the scores board: the player over the map they played. */
+.b-play { display: flex; align-items: center; gap: 12px; }
+.b-play .av { width: 34px; height: 34px; }
+.b-play-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 560px; }
+.b-play-who, .b-play-map {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  text-decoration: none; white-space: nowrap;
+}
+.b-play-who { color: var(--text-focus); font-weight: 600; }
+.b-play-map { color: var(--text); font-size: var(--font-size-small); }
+.b-play-who span, .b-play-map span:not(.dot) { overflow: hidden; text-overflow: ellipsis; }
+.b-play-who:hover span, .b-play-map:hover span:not(.dot) { text-decoration: underline; }
+.b-play-map b { flex: none; font-family: var(--font-mono); font-weight: 400; color: var(--text-focus); }
 /* On a phone the table has to fit without scrolling sideways, or the ranked
    figure ends up off screen: the extras go, and the level keeps its dot. */
 @media (max-width: 760px) {
@@ -2144,6 +2160,9 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
   .b-player { gap: 8px; }
   .b-player .av, .b-level-name, .b-bar { display: none; }
   .b-player span { max-width: 25vw; overflow: hidden; text-overflow: ellipsis; }
+  .b-play .av { display: none; }
+  .b-play-text { max-width: 42vw; }
+  .tabs-lg { font-size: 18px; gap: 22px; }
 }
 
 /*

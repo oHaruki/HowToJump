@@ -11,9 +11,9 @@ import assert from "node:assert/strict";
 
 process.env.DATABASE_URL ??= "postgres://unused:unused@127.0.0.1:5432/unused";
 
-const { boardOrder, boardRank, BOARD_ORDER_TEXT } = await import("./queries");
+const { boardOrder, boardRank, BOARD_ORDER_TEXT, bankOrderFor } = await import("./queries");
 const { db } = await import("./db");
-const { scores } = await import("./schema");
+const { entries, scores } = await import("./schema");
 
 /** The columns an order by names, in the order it names them. */
 function ordering(sql: string): string[] {
@@ -70,4 +70,19 @@ test("the list and the placing are built from one fragment, not two copies", () 
   const clause = (sql: string) => sql.slice(sql.lastIndexOf("order by") + "order by".length);
   // Rendered from the same SQL object, so a change to one is a change to both.
   assert.equal(clause(listed).trim(), clause(ranked).replace(/\)\)::int.*$/s, "").trim());
+});
+
+const bankSql = (sort?: "pack" | "newest" | "oldest") => {
+  const sql = db.select().from(entries).orderBy(...bankOrderFor(sort)).toSQL().sql;
+  return sql.slice(sql.lastIndexOf("order by"));
+};
+
+test("the bank sorts by pack unless asked for a date", () => {
+  assert.equal(bankSql(), bankSql("pack"));
+  assert.deepEqual(ordering(bankSql()), ["pack_id", "tier_order", "stars", "id"]);
+});
+
+test("sorting by date orders by when an entry was added, the entry ID breaking ties", () => {
+  assert.match(bankSql("newest"), /"created_at" desc, "entries"\."id" desc/);
+  assert.match(bankSql("oldest"), /"created_at" asc, "entries"\."id" asc/);
 });

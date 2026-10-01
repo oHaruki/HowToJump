@@ -18,6 +18,8 @@ type Current = {
   /** Staff only, empty on the public bank. */
   status?: string;
   stale?: string;
+  /** An order, not a filter, so it gets no chip. */
+  sort?: string;
 };
 
 /** The order the chips read in, and the wording each filter gets. */
@@ -110,6 +112,7 @@ export function BankFilters({
   };
 
   const applied = FIELDS.filter((f) => current[f.key]);
+  const cleared = current.sort ? basePath + "?" + new URLSearchParams({ sort: current.sort }) : basePath;
 
   return (
     <div className="bankbar box box-tight box-open">
@@ -165,6 +168,13 @@ export function BankFilters({
               onChange={(v) => setParam("stale", v)} flex="0 0 148px" />
           </>
         ) : null}
+
+        <Select label="Sort" value={current.sort ?? ""} placeholder="By pack"
+          options={[
+            { value: "newest", label: "Newest first" },
+            { value: "oldest", label: "Oldest first" },
+          ]}
+          onChange={(v) => setParam("sort", v)} flex="0 0 148px" />
       </div>
 
       <div className="bankbar-state">
@@ -184,7 +194,7 @@ export function BankFilters({
             <button
               className="fchip-clear"
               type="button"
-              onClick={() => startTransition(() => router.replace(basePath))}
+              onClick={() => startTransition(() => router.replace(cleared))}
             >
               Clear all
             </button>

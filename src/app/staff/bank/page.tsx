@@ -9,6 +9,7 @@ import {
 import {
   bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
 } from "@/lib/bank-params";
+import type { SpecialPack } from "@/lib/packs";
 import { TIERS } from "@/lib/tiers";
 import { Loading, SectionHead } from "@/components/ui";
 import { BankAdminTable } from "@/components/BankAdminTable";
@@ -57,7 +58,8 @@ export default async function StaffBankPage({
         Move an entry between packs, or pull it out of the bank. Removing keeps the
         row and its scores, it just stops showing. Search to find one entry, or
         filter to Stale label for the rows still carrying wording the grading
-        scale has dropped. Special packs&apos; maps are listed after the ladder&apos;s.
+        scale has dropped. Edit an entry to move it into a special pack or back onto
+        the ladder. Sorted by pack, special packs&apos; maps come after the ladder&apos;s.
       </SectionHead>
 
       <BankFilters
@@ -74,17 +76,32 @@ export default async function StaffBankPage({
       />
 
       <Suspense key={query + "#" + page} fallback={<Loading label="Loading entries" />}>
-        <Entries bank={bank} query={query} />
+        <Entries
+          bank={bank}
+          query={query}
+          special={special}
+          showAdded={filters.sort !== "pack"}
+        />
       </Suspense>
     </>
   );
 }
 
-async function Entries({ bank, query }: { bank: Promise<BankPage>; query: string }) {
+async function Entries({
+  bank,
+  query,
+  special,
+  showAdded,
+}: {
+  bank: Promise<BankPage>;
+  query: string;
+  special: SpecialPack[];
+  showAdded: boolean;
+}) {
   const b = await bank;
   return (
     <>
-      <BankAdminTable rows={b.rows} />
+      <BankAdminTable rows={b.rows} special={special} showAdded={showAdded} />
       <BankPager
         basePath={BASE}
         page={b.page}

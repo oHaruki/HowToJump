@@ -32,7 +32,8 @@ export default async function MapsPage({
    * child, so the heading and the filter bar are sent and usable while the
    * rows are still being fetched.
    */
-  const bank = getBankPage(bankFiltersFrom(sp), page);
+  const filters = bankFiltersFrom(sp);
+  const bank = getBankPage(filters, page);
 
   // These two are aggregates over one table, and the bar cannot be drawn
   // without them, so they are worth waiting for.
@@ -59,19 +60,27 @@ export default async function MapsPage({
       {/* Keyed on the filters, so changing one shows the wait again rather
           than leaving the previous page's maps sitting there. */}
       <Suspense key={query + "#" + page} fallback={<Loading label="Loading maps" />}>
-        <Maps bank={bank} query={query} />
+        <Maps bank={bank} query={query} showAdded={filters.sort !== "pack"} />
       </Suspense>
     </div>
   );
 }
 
-async function Maps({ bank, query }: { bank: Promise<BankPage>; query: string }) {
+async function Maps({
+  bank,
+  query,
+  showAdded,
+}: {
+  bank: Promise<BankPage>;
+  query: string;
+  showAdded: boolean;
+}) {
   const [b, session] = await Promise.all([bank, auth()]);
   const userId = session?.userId ?? null;
   const votes = await getPackVotes(b.rows.map((r) => r.entryId), userId);
   return (
     <>
-      <MapList rows={b.rows} votes={votes} signedIn={userId != null} />
+      <MapList rows={b.rows} votes={votes} signedIn={userId != null} showAdded={showAdded} />
       <BankPager
         page={b.page}
         pageCount={b.pageCount}

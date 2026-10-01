@@ -11,6 +11,7 @@ import { secondsToDrain } from "@/lib/import/parse";
 import {
   BUILT_IN_ROLES, PLAYER, customRoleId, customRoleKey, isPermission, orderRoles, type RoleView,
 } from "@/lib/roles";
+import { byWorth, playExp } from "@/lib/levels";
 import { packStandings, type PackStanding, type SpecialPack } from "@/lib/packs";
 import { CATEGORIES, LENGTHS, SPEEDS, normalizeCategory, orderByScale } from "@/lib/tiers";
 import type { PackVote, VoteTally } from "@/lib/votes";
@@ -49,10 +50,14 @@ export type BankRow = {
   judgedByName: string | null;
   /** False once staff take an entry off the ladder. Staff surfaces only. */
   isActive: boolean;
+  createdAt: Date;
 };
 
 /** Which side of `isActive` to read. Public pages only see "listed". */
 export type BankStatus = "listed" | "removed" | "all";
+
+/** How the bank is ordered: by pack, or by when an entry was added. */
+export type BankSort = "pack" | "newest" | "oldest";
 
 export type BankFilters = {
   q?: string;
@@ -70,6 +75,8 @@ export type BankFilters = {
   status?: BankStatus;
   /** Staff only: entries carrying a dropped category, or none at all. */
   staleLabels?: boolean;
+  /** Defaults to "pack". */
+  sort?: BankSort;
 };
 
 /** One screen of the bank. Enough to scroll, few enough to stay cheap. */
@@ -108,6 +115,7 @@ const bankSelection = {
   od: entries.od,
   judgedByName: entries.judgedByName,
   isActive: entries.isActive,
+  createdAt: entries.createdAt,
 };
 
 /** Entries with their beatmap and special pack, which is what bankSelection reads. */
@@ -174,11 +182,18 @@ const bankOrder = [
   desc(entries.id),
 ];
 
+/** The bank's order under a sort. By date, ladder and special packs mix. */
+export function bankOrderFor(sort: BankSort = "pack") {
+  if (sort === "newest") return [desc(entries.createdAt), desc(entries.id)];
+  if (sort === "oldest") return [asc(entries.createdAt), asc(entries.id)];
+  return bankOrder;
+}
+
 /** The whole filtered bank, for staff screens and one pack's page. The bank itself takes a page. */
 export async function getBank(filters: BankFilters = {}): Promise<BankRow[]> {
   const rows = await bankFrom()
     .where(bankWhere(filters))
-    .orderBy(...bankOrder)
+    .orderBy(...bankOrderFor(filters.sort))
     .limit(1000);
 
   return shape(rows);
@@ -208,7 +223,7 @@ export async function getBankPage(
   const rows = total
     ? await bankFrom()
         .where(where)
-        .orderBy(...bankOrder)
+        .orderBy(...bankOrderFor(filters.sort))
         .limit(BANK_PAGE_SIZE)
         .offset((current - 1) * BANK_PAGE_SIZE)
     : [];
@@ -875,6 +890,122 @@ export async function getPlayerTallies(
     )
     .groupBy(scores.userId);
   return new Map(rows.map(({ userId, ...t }) => [userId, t]));
+}
+
+/* -------------------------------------------------------------- top plays */
+
+export type TopPlay = {
+  rank: number;
+  scoreId: number;
+  userId: number;
+  osuUserId: number;
+  username: string;
+  avatarUrl: string | null;
+  countryCode: string | null;
+  osuBeatmapId: number;
+  title: string;
+  version: string | null;
+  mod: string;
+  tierOrder: number;
+  grade: string;
+  missCount: number;
+  accuracy: number | null;
+  exp: number;
+};
+
+/** Visible plays on listed ladder maps by players not banned. Needs users joined. */
+const onTopPlays = (category?: string[]) =>
+  and(
+    eq(scores.isHidden, false),
+    eq(entries.isActive, true),
+    onLadder,
+    isNull(users.bannedAt),
+    category ? arrayOverlaps(entries.categories, category) : undefined,
+  );
+
+/**
+ * One page of the top plays board, most EXP first under byWorth. With a
+ * category, only plays on its maps. `userId` also returns that player's
+ * best play and its place. EXP is worked out on each read, so every play
+ * is read to order them.
+ */
+export async function getTopPlays(category: string | null, page = 1, userId: number | null = null) {
+  const where = onTopPlays(category ? await categorySpellings(category) : undefined);
+  const plays = await db
+    .select({
+      id: scores.id,
+      userId: scores.userId,
+      tierOrder: entries.tierOrder,
+      grade: scores.grade,
+      missCount: scores.missCount,
+      accuracy: scores.accuracy,
+      noteCount: beatmaps.noteCount,
+    })
+    .from(scores)
+    .innerJoin(entries, eq(scores.entryId, entries.id))
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .innerJoin(users, eq(scores.userId, users.id))
+    .where(where);
+
+  const ranked = plays
+    .map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      missCount: p.missCount,
+      exp: playExp(p.tierOrder, p.grade, p.missCount, p.noteCount, p.accuracy),
+    }))
+    .filter((p) => p.exp > 0)
+    .sort(byWorth);
+
+  const total = ranked.length;
+  const pageCount = Math.max(1, Math.ceil(total / RANKING_PAGE_SIZE));
+  const current = Math.min(Math.max(1, Math.trunc(page) || 1), pageCount);
+  const offset = (current - 1) * RANKING_PAGE_SIZE;
+  const shown = ranked.slice(offset, offset + RANKING_PAGE_SIZE);
+  const mineAt = userId == null ? -1 : ranked.findIndex((p) => p.userId === userId);
+
+  const ids = shown.map((p) => p.id);
+  if (mineAt >= 0) ids.push(ranked[mineAt].id);
+  const details = ids.length
+    ? await db
+        .select({
+          scoreId: scores.id,
+          userId: users.id,
+          osuUserId: users.osuUserId,
+          username: users.username,
+          avatarUrl: users.avatarUrl,
+          countryCode: users.countryCode,
+          osuBeatmapId: beatmaps.osuBeatmapId,
+          title: beatmaps.title,
+          version: beatmaps.version,
+          mod: entries.mod,
+          tierOrder: entries.tierOrder,
+          grade: scores.grade,
+          missCount: scores.missCount,
+          accuracy: scores.accuracy,
+        })
+        .from(scores)
+        .innerJoin(entries, eq(scores.entryId, entries.id))
+        .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+        .innerJoin(users, eq(scores.userId, users.id))
+        .where(inArray(scores.id, ids))
+    : [];
+  const byId = new Map(details.map((d) => [d.scoreId, d]));
+
+  // A play deleted between the two reads is left out.
+  const view = (p: (typeof ranked)[number], rank: number): TopPlay[] => {
+    const d = byId.get(p.id);
+    return d ? [{ ...d, exp: p.exp, rank }] : [];
+  };
+
+  return {
+    rows: shown.flatMap((p, i) => view(p, offset + i + 1)),
+    mine: mineAt >= 0 ? (view(ranked[mineAt], mineAt + 1)[0] ?? null) : null,
+    total,
+    page: current,
+    pageCount,
+    pageSize: RANKING_PAGE_SIZE,
+  };
 }
 
 /* ----------------------------------------------------------- pack boards */

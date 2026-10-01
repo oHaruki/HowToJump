@@ -435,11 +435,14 @@ export async function setSuggestionTier(id: number, tierName: string) {
  * recalculates the figures from the beatmap's nomod values, re-fetches the
  * star rating and takes off the scores set under the old mod; beatmap and
  * mod are unique, so a collision is checked before anything is written.
+ * `pack` moves the entry into a special pack by its ID, or onto the ladder
+ * with null.
  */
 export async function updateEntry(
   entryId: number,
   patch: {
     tier?: string;
+    pack?: number | null;
     categories?: string[];
     mod?: string;
     length?: string;
@@ -453,6 +456,7 @@ export async function updateEntry(
       id: entries.id,
       beatmapId: entries.beatmapId,
       mod: entries.mod,
+      packId: entries.packId,
       osuBeatmapId: beatmaps.osuBeatmapId,
       baseCs: beatmaps.cs,
       baseAr: beatmaps.ar,
@@ -472,6 +476,13 @@ export async function updateEntry(
     if (!t) throw new Error("Unknown pack: " + patch.tier);
     set.tierOrder = t.order;
   }
+  const movesPack = patch.pack !== undefined && patch.pack !== current.packId;
+  if (movesPack && patch.pack != null) {
+    if (!Number.isSafeInteger(patch.pack)) throw new Error("That isn't a special pack");
+    const [pack] = await db.select({ id: packs.id }).from(packs).where(eq(packs.id, patch.pack));
+    if (!pack) throw new Error("That special pack no longer exists");
+  }
+  if (movesPack) set.packId = patch.pack;
   if (patch.categories) {
     const categories = normalizeCategories(patch.categories);
     if (!categories.length) throw new Error("Pick at least one category");
@@ -526,13 +537,14 @@ export async function updateEntry(
     cleared.length ? { ...patch, cleared } : patch,
   );
   // A new pack or category changes what every play on the map is worth.
-  if (patch.tier || patch.categories) await refreshEntryPlayers(entryId);
+  if (patch.tier || patch.categories || movesPack) await refreshEntryPlayers(entryId);
   for (const userId of new Set(cleared.map((s) => s.userId))) await refreshProgress(userId);
 
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
   revalidatePath("/packs/[id]", "page");
+  if (movesPack) revalidatePath("/staff/packs", "layout");
   revalidatePath("/");
 }
 

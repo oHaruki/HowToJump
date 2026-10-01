@@ -4,7 +4,7 @@
  */
 import { tierBySlug } from "@/lib/tiers";
 import { specialPackId } from "@/lib/packs";
-import type { BankFilters, BankStatus } from "@/lib/queries";
+import type { BankFilters, BankSort, BankStatus } from "@/lib/queries";
 
 export type Search = Record<string, string | string[] | undefined>;
 
@@ -14,7 +14,7 @@ export const one = (v: string | string[] | undefined) =>
 
 /** Every filter that belongs in a paging link, in the order the bar reads. */
 export const FILTER_KEYS = [
-  "q", "pack", "category", "mod", "length", "speed", "status", "stale",
+  "q", "pack", "category", "mod", "length", "speed", "status", "stale", "sort",
 ] as const;
 
 /**
@@ -37,12 +37,17 @@ export function bankFiltersFrom(sp: Search, staff = false): BankFilters {
     speed: one(sp.speed) || undefined,
     status: staff ? asStatus(status) : "listed",
     staleLabels: staff && one(sp.stale) === "labels",
+    sort: asSort(one(sp.sort)),
   };
 }
 
 /** Anything unrecognised reads as the default rather than as an error. */
 function asStatus(v: string): BankStatus {
   return v === "removed" || v === "all" ? v : "listed";
+}
+
+function asSort(v: string): BankSort {
+  return v === "newest" || v === "oldest" ? v : "pack";
 }
 
 /** The filters as the bar shows them, with every key present as a string. */
@@ -56,6 +61,7 @@ export function bankCurrentFrom(sp: Search) {
     speed: one(sp.speed),
     status: one(sp.status),
     stale: one(sp.stale),
+    sort: one(sp.sort),
   };
 }
 
