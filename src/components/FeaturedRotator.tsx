@@ -85,18 +85,13 @@ export function FeaturedRotator({
           className="feat-art"
           label={false}
         />
+        <span className="feat-badge">Newest in the bank</span>
         <div className="feat-body">
-          <span className="lbl">Newest in the bank</span>
-          <h3>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: "none" }}
-            >
+          <h2 className="feat-title">
+            <a href={url} target="_blank" rel="noopener noreferrer">
               {m.title}
             </a>
-          </h3>
+          </h2>
           <span className="t-diff">
             {[m.version ? "[" + m.version + "]" : "", m.mapper]
               .filter(Boolean)

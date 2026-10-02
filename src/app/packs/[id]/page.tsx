@@ -70,8 +70,8 @@ export default async function SpecialPackPage({
           <div className="pk-top">
             <span className="pk-gem" style={{ background: pack.color }} />
             <div className="pk-who">
-              <span className="lbl">Special pack</span>
               <h1>{pack.name}</h1>
+              <span className="pk-kind">Special pack</span>
             </div>
           </div>
           {pack.description ? <p className="lede">{pack.description}</p> : null}

@@ -112,12 +112,18 @@ export function BankFilters({
   };
 
   const applied = FIELDS.filter((f) => current[f.key]);
+  /* On a phone the dropdowns fold away behind a button. */
+  const [open, setOpen] = useState(false);
+  const narrowing = applied.filter((f) => f.key !== "q").length;
   const cleared = current.sort ? basePath + "?" + new URLSearchParams({ sort: current.sort }) : basePath;
 
   return (
-    <div className="bankbar box box-tight box-open">
-      <div className="row" style={{ alignItems: "flex-end", opacity: pending ? 0.6 : 1 }}>
-        <label className="field" style={{ flex: "3 1 200px" }}>
+    <div className="bankbar box box-tight box-open" data-open={open || undefined}>
+      <div
+        className="row bankbar-controls"
+        style={{ alignItems: "flex-end", opacity: pending ? 0.6 : 1 }}
+      >
+        <label className="field field-search" style={{ flex: "3 1 200px" }}>
           <span className="lbl">Search</span>
           <input
             type="search"
@@ -127,6 +133,15 @@ export function BankFilters({
             onChange={(e) => search(e.target.value)}
           />
         </label>
+
+        <button
+          type="button"
+          className="btn bankbar-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          Filters{narrowing ? " (" + narrowing + ")" : ""}
+        </button>
 
         <label className="field" style={{ flex: "0 0 176px" }}>
           <span className="lbl">Pack</span>

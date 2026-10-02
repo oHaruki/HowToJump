@@ -22,9 +22,8 @@ const packLine = (name: string) => {
 
 export default function InfoPage() {
   return (
-    // rise-in lands each band of the page a step after the one above it.
-    <div className="view rise-in">
-      <SectionHead label="Info" title="How all of this works">
+    <div className="view">
+      <SectionHead title="How all of this works">
         The grading scale, the mods, the rules, and what the site does on its own.
       </SectionHead>
 
@@ -77,7 +76,7 @@ export default function InfoPage() {
       <section className="iband">
         <span className="lbl">Levels</span>
         <div className="iband-main">
-          <h3>Your best {BEST_PLAYS} plays in each skill</h3>
+          <h2>Your best {BEST_PLAYS} plays in each skill</h2>
           <div className="iband-cols">
             <div className="stack">
               <p>
@@ -105,7 +104,7 @@ export default function InfoPage() {
       <section className="iband">
         <span className="lbl">Pack values</span>
         <div className="iband-main">
-          <h3>EXP for a full combo</h3>
+          <h2>EXP for a full combo</h2>
           <div className="iband-cols">
             <PackLadder />
           </div>
@@ -115,7 +114,7 @@ export default function InfoPage() {
       <section className="iband">
         <span className="lbl">Special packs</span>
         <div className="iband-main">
-          <h3>Packs off the ladder</h3>
+          <h2>Packs off the ladder</h2>
           <div className="iband-cols">
             <p>
               Admins can make packs beside the sixteen, for events and the like. Each
@@ -130,7 +129,7 @@ export default function InfoPage() {
       <section className="iband">
         <span className="lbl">Purpose</span>
         <div className="iband-main">
-          <h3>What this is for</h3>
+          <h2>What this is for</h2>
           <div className="iband-cols">
             <p>
               This project is not a thorough guide about aim progression, but moreso a
@@ -144,7 +143,7 @@ export default function InfoPage() {
       <section className="iband">
         <span className="lbl">Mods</span>
         <div className="iband-main">
-          <h3>Each mod is its own entry</h3>
+          <h2>Each mod is its own entry</h2>
           <div className="iband-cols">
             <p>
               A map is banked together with the mod it is judged under. The same
@@ -164,7 +163,7 @@ export default function InfoPage() {
       <section className="iband">
         <span className="lbl">Tracking</span>
         <div className="iband-main">
-          <h3>Scores arrive on their own</h3>
+          <h2>Scores arrive on their own</h2>
           <div className="iband-cols">
             <div className="stack">
               <p>
@@ -194,7 +193,7 @@ export default function InfoPage() {
       <section className="iband">
         <span className="lbl">Rules</span>
         <div className="iband-main">
-          <h3>Getting a score counted</h3>
+          <h2>Getting a score counted</h2>
           <div className="iband-cols">
             <p>
               Play a map from the bank with the right mods. That is the whole rule.

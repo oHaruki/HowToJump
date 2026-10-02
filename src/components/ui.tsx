@@ -335,11 +335,14 @@ export function LadderGrid({
             style={{ "--tier": t.color } as CSSProperties}
           >
             <span className="gem-swatch" style={{ background: tierFill(t) }} />
-            <span>
+            <span className="gem-text">
               <span className="gem-name">{t.name}</span>
               <span className="gem-meta">
-                #{t.order} {NONE} {n} {n === 1 ? "entry" : "entries"}
+                {n} {n === 1 ? "entry" : "entries"}
               </span>
+            </span>
+            <span className="gem-order" aria-label={"Pack " + t.order}>
+              #{t.order}
             </span>
           </Link>
         );
@@ -360,7 +363,7 @@ export function SpecialPackGrid({ packs }: { packs: Array<SpecialPack & { maps: 
           style={{ "--tier": p.color } as CSSProperties}
         >
           <span className="gem-swatch" style={{ background: p.color }} />
-          <span>
+          <span className="gem-text">
             <span className="gem-name">{p.name}</span>
             <span className="gem-meta">
               {p.maps} {p.maps === 1 ? "entry" : "entries"}

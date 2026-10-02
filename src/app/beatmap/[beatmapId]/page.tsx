@@ -137,11 +137,11 @@ export default async function BeatmapPage(props: Props) {
 
       <section className="sb">
         <div className="sb-head">
-          <div className="section-head">
-            <span className="lbl">Scoreboard</span>
-            <h2>
+          <div className="sb-title">
+            <h2>Scoreboard</h2>
+            <span className="sb-count">
               {fmt(players)} {players === 1 ? "player" : "players"}
-            </h2>
+            </span>
           </div>
           <p className="small">{BOARD_ORDER_TEXT}</p>
         </div>

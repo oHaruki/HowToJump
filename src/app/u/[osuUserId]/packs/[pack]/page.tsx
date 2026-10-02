@@ -99,8 +99,8 @@ export default async function PackPage({ params }: { params: Params }) {
           <div className="pk-top">
             <span className="pk-gem" style={{ background: tierFill(tier) }} />
             <div className="pk-who">
-              <span className="lbl">{player.username}</span>
               <h1>{tier.name}</h1>
+              <span className="pk-kind">{player.username}</span>
             </div>
             {best ? <GradeLetter grade={best} /> : null}
           </div>

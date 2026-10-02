@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tierByOrder } from "@/lib/tiers";
 
 /**
@@ -22,6 +22,13 @@ export function Cover({
   label?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const img = useRef<HTMLImageElement>(null);
+
+  // Catches an image that failed before hydration, when onError never fires.
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0) setFailed(true);
+  }, [setId]);
   const tier = tierByOrder(tierOrder ?? null);
   const tint = "color-mix(in srgb, " + (tier ? tier.color : "#777") + " 22%, var(--bg-d))";
 
@@ -40,6 +47,7 @@ export function Cover({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      ref={img}
       className={className}
       src={"https://assets.ppy.sh/beatmaps/" + setId + "/covers/" + kind + ".jpg"}
       alt=""

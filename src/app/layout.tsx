@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { auth } from "@/lib/auth";
 import { PLAYER, canUseStaffArea } from "@/lib/roles";
@@ -10,6 +10,12 @@ import { SITE_NAME } from "@/lib/site";
 
 const sans = Geist({ subsets: ["latin", "latin-ext"], variable: "--font-geist" });
 const mono = Geist_Mono({ subsets: ["latin", "latin-ext"], variable: "--font-geist-mono" });
+const display = Archivo({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-archivo",
+  axes: ["wdth"],
+  style: ["normal", "italic"],
+});
 
 const DESCRIPTION =
   "Ranked osu! aim. Sixteen packs of aim maps from Stone to GOAT, graded on misscount and tracked automatically from your osu! account.";
@@ -40,7 +46,7 @@ export default async function RootLayout({
   ];
 
   return (
-    <html lang="en" className={sans.variable + " " + mono.variable}>
+    <html lang="en" className={sans.variable + " " + mono.variable + " " + display.variable}>
       <body>
         <header className="nav">
           <div className="wrap nav-in">

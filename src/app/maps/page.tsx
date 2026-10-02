@@ -45,7 +45,7 @@ export default async function MapsPage({
 
   return (
     <div className="view">
-      <SectionHead label="Map bank" title="Every judged entry" />
+      <SectionHead title="Every judged entry" />
 
       <BankFilters
         packCounts={packCounts}

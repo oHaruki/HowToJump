@@ -16,7 +16,6 @@ export default async function LadderPage() {
       {special.length ? (
         <div className="stack-lg">
           <div className="section-head">
-            <span className="lbl">Special packs</span>
             <h2>Off the ladder</h2>
             <p className="lede">
               Their maps pay EXP like any other, but it counts on each pack&apos;s own

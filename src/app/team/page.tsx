@@ -56,7 +56,7 @@ export default async function TeamPage() {
       {tiers.length ? (
         tiers.map((t) => (
           <section className="stack" key={t.role.key}>
-            <span className="lbl">{t.role.name}</span>
+            <h2 className="team-role">{t.role.name}</h2>
             <div className="team-grid">
               {t.members.map((m) => (
                 <article className="box team-card" key={m.id}>

@@ -43,7 +43,7 @@ export default async function OverviewPage() {
             {TIERS.length} packs of aim maps where only your misscount matters. Level
             up specific aim skills and climb the leaderboards.
           </p>
-          <div className="row" style={{ marginTop: 4 }}>
+          <div className="row hero-cta">
             <Link className="btn btn-primary" href="/ladder">
               See the packs
             </Link>
@@ -51,24 +51,22 @@ export default async function OverviewPage() {
               Browse the bank
             </Link>
           </div>
+          <div className="stat-strip hero-facts">
+            <Stat label="packs" value={<CountUp value={TIERS.length} />} />
+            <Stat label="grades" value={<CountUp value={GRADE_RULES.length} />} />
+            <Stat label="entries in the bank" value={<CountUp value={stats.total} />} />
+            <Stat
+              label="hardest star rating"
+              value={<CountUp value={stats.hardest ?? 0} decimals={2} />}
+            />
+          </div>
         </div>
 
         <FeaturedRotator entries={newest} />
       </div>
 
-      <div className="stat-strip">
-        <Stat label="packs" value={<CountUp value={TIERS.length} />} />
-        <Stat label="grades" value={<CountUp value={GRADE_RULES.length} />} />
-        <Stat label="entries in the bank" value={<CountUp value={stats.total} />} />
-        <Stat
-          label="hardest star rating"
-          value={<CountUp value={stats.hardest ?? 0} decimals={2} />}
-        />
-      </div>
-
       <div className="stack-lg">
         <div className="section-head">
-          <span className="lbl">Packs</span>
           <h2>Difficulty you can actually feel</h2>
           <p className="lede">
             Each pack is one step up, placed by hand rather than by star rating
@@ -81,7 +79,6 @@ export default async function OverviewPage() {
       {recent.length ? (
         <div className="stack-lg">
           <div className="section-head">
-            <span className="lbl">Map bank</span>
             <h2>Recently judged</h2>
           </div>
           <div className="grid-auto">
@@ -101,6 +98,7 @@ export default async function OverviewPage() {
                   kind="card"
                   tierOrder={m.tierOrder}
                   className="feat-art"
+                  label={false}
                 />
                 <div className="feat-body">
                   <div>

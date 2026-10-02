@@ -122,7 +122,6 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
                 <span className="pf-avatar" />
               )}
               <div className="pf-who">
-                <span className="lbl">{owner ? "Your progression" : "Player"}</span>
                 <h1 className="pf-name">{me?.username}</h1>
                 <div className="pf-meta">
                   {standing ? (
@@ -229,7 +228,6 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
 
       <section className="stack-lg">
         <div className="section-head">
-          <span className="lbl">Skills</span>
           <h2>Five ways to aim</h2>
           <p className="small">
             Each category adds up the best {BEST_PLAYS} plays in it, and a map in two
@@ -256,7 +254,6 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
       <div className="pf-lists">
         <section className="stack">
           <div className="section-head">
-            <span className="lbl">Best plays</span>
             <h2>Top plays</h2>
             <p className="small">
               Ranked by EXP. The ones counting toward a level show their place in it.
@@ -271,7 +268,6 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
         </section>
         <section className="stack">
           <div className="section-head">
-            <span className="lbl">History</span>
             <h2>Recent plays</h2>
             <p className="small">Picked up from osu! within a minute of being set.</p>
           </div>
@@ -286,7 +282,6 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
 
       <section className="stack-lg">
         <div className="section-head">
-          <span className="lbl">Packs</span>
           <h2>Through the packs</h2>
           <p className="small">Open a pack to see every map in it and the score on each.</p>
         </div>
