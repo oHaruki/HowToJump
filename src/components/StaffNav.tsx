@@ -6,10 +6,13 @@ import { usePathname } from "next/navigation";
 /** The staff area's sections, each shown only to those it lets do something. */
 export function StaffNav({
   pending,
+  waiting,
   show,
 }: {
   pending: number;
-  show: { add: boolean; queue: boolean; bank: boolean; admin: boolean };
+  /** Open or pinned map votes the viewer hasn't cast. */
+  waiting: number;
+  show: { add: boolean; queue: boolean; bank: boolean; votes: boolean; admin: boolean };
 }) {
   const path = usePathname();
   const items: Array<{ href: string; label: string; exact?: boolean; badge?: number }> = [
@@ -18,6 +21,7 @@ export function StaffNav({
   if (show.add) items.push({ href: "/staff/add", label: "Add maps" });
   if (show.queue) items.push({ href: "/staff/queue", label: "Queue", badge: pending });
   if (show.bank) items.push({ href: "/staff/bank", label: "Map bank" });
+  if (show.votes) items.push({ href: "/staff/votes", label: "Map votes", badge: waiting });
   if (show.admin) {
     items.push({ href: "/staff/packs", label: "Special packs" });
     items.push({ href: "/staff/members", label: "Members" });

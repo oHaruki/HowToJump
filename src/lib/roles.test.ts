@@ -17,9 +17,12 @@ const holding = (key: string) => {
 const admin = holding("admin");
 const helper = holding("helper");
 
-test("admins may do everything, helpers what they always could", () => {
+test("admins may do everything, helpers add, review, edit the bank and vote", () => {
   for (const p of PERMISSIONS) assert.ok(can(admin, p.key), p.key);
-  assert.deepEqual([...helper.permissions].sort(), ["bank.edit", "maps.add", "queue.review"]);
+  assert.deepEqual(
+    [...helper.permissions].sort(),
+    ["bank.edit", "maps.add", "maps.vote", "queue.review"],
+  );
   assert.equal(can(helper, "queue.approve"), false);
   assert.equal(can(helper, "scores.delete"), false);
 });

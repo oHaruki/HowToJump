@@ -4,8 +4,8 @@ import {
 } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  beatmaps, deletedScores, entries, entryVotes, packs, roles, scores, siteConfig, suggestions,
-  userLevels, users,
+  beatmaps, deletedScores, entries, entryVotes, packs, roles, scores, siteConfig, spotlights,
+  stayVotes, suggestions, userLevels, users,
 } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
 import {
@@ -14,7 +14,7 @@ import {
 import { byWorth, playExp } from "@/lib/levels";
 import { packStandings, type PackStanding, type SpecialPack } from "@/lib/packs";
 import { CATEGORIES, LENGTHS, SPEEDS, normalizeCategory, orderByScale } from "@/lib/tiers";
-import type { PackVote, VoteTally } from "@/lib/votes";
+import type { PackVote, StayTally, VoteTally } from "@/lib/votes";
 
 /** On the ladder rather than in a special pack. */
 export const onLadder = isNull(entries.packId);
@@ -747,6 +747,138 @@ export async function getPackVotes(
 
   for (const r of rows) out.set(r.entryId, { down: r.down, par: r.par, up: r.up, mine: r.mine });
   return out;
+}
+
+/* ------------------------------------------------------------ stay votes */
+
+/** A stay vote counts while its caster is on staff and not banned. */
+const countedVoter = and(isNull(users.bannedAt), raw`cardinality(${users.roles}) > 0`);
+
+/** Staff stay votes on each entry asked for, with names, and `userId`'s own. */
+export async function getStayVotes(
+  entryIds: number[],
+  userId: number | null,
+): Promise<Map<number, StayTally>> {
+  const out = new Map<number, StayTally>();
+  if (!entryIds.length) return out;
+
+  const names = (side: boolean) =>
+    raw<string[]>`coalesce(array_agg(${users.username} order by ${stayVotes.createdAt}) filter (where ${stayVotes.stay} = ${side}), '{}')`;
+  const rows = await db
+    .select({
+      entryId: stayVotes.entryId,
+      stay: names(true),
+      drop: names(false),
+      mine: raw<boolean | null>`bool_or(${stayVotes.stay}) filter (where ${stayVotes.userId} = ${userId ?? 0})`,
+    })
+    .from(stayVotes)
+    .innerJoin(users, eq(stayVotes.userId, users.id))
+    .where(and(inArray(stayVotes.entryId, entryIds), countedVoter))
+    .groupBy(stayVotes.entryId);
+
+  for (const r of rows) out.set(r.entryId, { stay: r.stay, drop: r.drop, mine: r.mine });
+  return out;
+}
+
+/** Leaves out entries `userId` already voted on. */
+const notVotedBy = (userId: number) =>
+  raw`not exists (select 1 from ${stayVotes} where ${stayVotes.entryId} = ${entries.id} and ${stayVotes.userId} = ${userId})`;
+
+/**
+ * The votes page's list. With a pack, every listed ladder entry in it,
+ * hardest first. Without, every listed entry staff have voted on, latest
+ * vote first. `unvotedBy` drops the ones that user already voted on.
+ */
+export async function getVoteBoard(
+  { pack, unvotedBy }: { pack?: number; unvotedBy?: number },
+): Promise<BankRow[]> {
+  const where = [eq(entries.isActive, true)];
+  if (unvotedBy) where.push(notVotedBy(unvotedBy));
+
+  if (pack) {
+    const rows = await bankFrom()
+      .where(and(...where, onLadder, eq(entries.tierOrder, pack)))
+      .orderBy(desc(entries.stars), desc(entries.id));
+    return shape(rows);
+  }
+
+  const voted = db
+    .select({
+      entryId: stayVotes.entryId,
+      last: raw<Date>`max(${stayVotes.updatedAt})`.as("last"),
+    })
+    .from(stayVotes)
+    .innerJoin(users, eq(stayVotes.userId, users.id))
+    .where(countedVoter)
+    .groupBy(stayVotes.entryId)
+    .as("voted");
+  const rows = await bankFrom()
+    .innerJoin(voted, eq(voted.entryId, entries.id))
+    .where(and(...where))
+    .orderBy(desc(voted.last), desc(entries.id));
+  return shape(rows);
+}
+
+/** Why an admin pinned an entry, who did, and when. */
+export type Spotlight = { note: string | null; by: string | null; at: Date };
+
+/** Pinned entries still listed, newest pin first. */
+export async function getSpotlights(): Promise<Array<BankRow & { spotlight: Spotlight }>> {
+  const rows = await db
+    .select({
+      ...bankSelection,
+      note: spotlights.note,
+      by: users.username,
+      at: spotlights.createdAt,
+    })
+    .from(spotlights)
+    .innerJoin(entries, eq(spotlights.entryId, entries.id))
+    .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .leftJoin(packs, eq(entries.packId, packs.id))
+    .leftJoin(users, eq(spotlights.byId, users.id))
+    .where(eq(entries.isActive, true))
+    .orderBy(desc(spotlights.createdAt));
+
+  return rows.map(({ note, by, at, ...r }) => ({
+    ...shape([r])[0],
+    spotlight: { note, by, at },
+  }));
+}
+
+/**
+ * The votes page's figures: entries with a vote open, those leaning to go,
+ * those pinned, and how many of the open or pinned ones `userId` hasn't
+ * voted on.
+ */
+export async function getVoteStats(userId: number) {
+  const [open, pinned] = await Promise.all([
+    db
+      .select({
+        entryId: stayVotes.entryId,
+        stay: raw<number>`(count(*) filter (where ${stayVotes.stay}))::int`,
+        drop: raw<number>`(count(*) filter (where not ${stayVotes.stay}))::int`,
+        mine: raw<boolean>`bool_or(${stayVotes.userId} = ${userId})`,
+      })
+      .from(stayVotes)
+      .innerJoin(entries, eq(stayVotes.entryId, entries.id))
+      .innerJoin(users, eq(stayVotes.userId, users.id))
+      .where(and(eq(entries.isActive, true), countedVoter))
+      .groupBy(stayVotes.entryId),
+    db
+      .select({ entryId: spotlights.entryId })
+      .from(spotlights)
+      .innerJoin(entries, eq(spotlights.entryId, entries.id))
+      .where(eq(entries.isActive, true)),
+  ]);
+
+  const mine = new Set(open.filter((r) => r.mine).map((r) => r.entryId));
+  const asked = new Set([...open.map((r) => r.entryId), ...pinned.map((r) => r.entryId)]);
+  return {
+    open: open.length,
+    leaningDrop: open.filter((r) => r.drop > r.stay).length,
+    spotlit: pinned.length,
+    waiting: [...asked].filter((id) => !mine.has(id)).length,
+  };
 }
 
 /* -------------------------------------------------------------- rankings */

@@ -14,7 +14,9 @@ import {
 import { NO_VOTES, type VoteTally } from "@/lib/votes";
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
-import { Flag, GradeLetter, ModChip, PacingChips, SpecialChip, mapHref } from "@/components/ui";
+import {
+  Flag, GradeLetter, ModChip, PacingChips, SpecialChip, StaffVoteLink, mapHref,
+} from "@/components/ui";
 import { ScoreDelete } from "@/components/ScoreDelete";
 import { CopyBeatmapId } from "@/components/CopyBeatmapId";
 import { PackVote } from "@/components/PackVote";
@@ -133,6 +135,7 @@ export default async function BeatmapPage(props: Props) {
         colour={colour}
         votes={votes.get(map.entryId) ?? NO_VOTES}
         signedIn={userId != null}
+        staff={can(session, "maps.vote")}
       />
 
       <section className="sb">
@@ -176,12 +179,15 @@ function Header({
   colour,
   votes,
   signedIn,
+  staff,
 }: {
   map: BeatmapEntry;
   choices: BeatmapEntry[];
   colour: string;
   votes: VoteTally;
   signedIn: boolean;
+  /** Adds a link to the map's staff vote. */
+  staff: boolean;
 }) {
   const tier = tierByOrder(map.tierOrder);
   const osuUrl = map.osuBeatmapsetId
@@ -285,6 +291,7 @@ function Header({
                 signedIn={signedIn}
                 named
               />
+              {staff ? <StaffVoteLink entryId={map.entryId} /> : null}
             </div>
           </div>
 

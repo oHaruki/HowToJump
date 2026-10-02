@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import {
   auditLog, beatmaps, deletedScores, entries, entryVotes, packs, roles, scores, siteConfig,
-  suggestionBatches, suggestions, users, type Suggestion,
+  spotlights, stayVotes, suggestionBatches, suggestions, users, type Suggestion,
 } from "@/lib/schema";
 import { auth, requireAdmin, requirePermission, requireTeamMember } from "@/lib/auth";
 import {
@@ -31,9 +31,9 @@ import {
 } from "@/lib/import/parse";
 import {
   ROLE_ORDER_KEY, describeScores, entryName, getExistingEntryKeys, getPackVotes, getRole, getRoles,
-  gradeText,
+  getStayVotes, gradeText,
 } from "@/lib/queries";
-import { NO_VOTES, voteFor, type VoteTally } from "@/lib/votes";
+import { NO_STAY, NO_VOTES, voteFor, type StayTally, type VoteTally } from "@/lib/votes";
 import { announceEntries } from "@/lib/discord";
 
 async function record(
@@ -550,11 +550,20 @@ export async function updateEntry(
 
 export async function removeEntry(entryId: number) {
   const staff = await requirePermission("bank.edit");
+  await takeOffBank(staff, entryId);
+}
+
+/** Clears an entry's listed flag, logged with `detail`, and refreshes the pages showing it. */
+async function takeOffBank(
+  staff: { id: number; name: string | null },
+  entryId: number,
+  detail?: unknown,
+) {
   await db
     .update(entries)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(entries.id, entryId));
-  await record(staff.id, staff.name ?? undefined, "entry.remove", "entry", entryId);
+  await record(staff.id, staff.name ?? undefined, "entry.remove", "entry", entryId, detail);
   await refreshEntryPlayers(entryId);
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
@@ -980,6 +989,95 @@ export async function votePack(
       });
   }
   return { tally: await counts() };
+}
+
+/* ------------------------------------------------------------- stay votes */
+
+const SPOTLIGHT_NOTE_MAX = 140;
+
+/** Whether an entry is listed in the bank. */
+async function isListed(entryId: number): Promise<boolean> {
+  if (!Number.isSafeInteger(entryId)) return false;
+  const [row] = await db
+    .select({ id: entries.id })
+    .from(entries)
+    .where(and(eq(entries.id, entryId), eq(entries.isActive, true)));
+  return !!row;
+}
+
+/**
+ * The signed in staff member's call on whether an entry stays in its pack:
+ * true to stay, false to go, null to take the vote back.
+ */
+export async function voteStay(
+  entryId: number,
+  stay: boolean | null,
+): Promise<{ tally: StayTally; error?: string }> {
+  const staff = await requirePermission("maps.vote");
+  if (stay !== null && typeof stay !== "boolean") return { tally: NO_STAY, error: "That isn't a vote" };
+  if (!(await isListed(entryId))) return { tally: NO_STAY, error: "That map isn't in the bank" };
+
+  if (stay === null) {
+    await db
+      .delete(stayVotes)
+      .where(and(eq(stayVotes.entryId, entryId), eq(stayVotes.userId, staff.id)));
+  } else {
+    await db
+      .insert(stayVotes)
+      .values({ entryId, userId: staff.id, stay })
+      .onConflictDoUpdate({
+        target: [stayVotes.entryId, stayVotes.userId],
+        set: { stay, updatedAt: new Date() },
+      });
+  }
+  return { tally: (await getStayVotes([entryId], staff.id)).get(entryId) ?? NO_STAY };
+}
+
+/** Pins an entry to the top of the votes page, with a line on why. */
+export async function spotlightEntry(entryId: number, note: string): Promise<{ error?: string }> {
+  const admin = await requireAdmin();
+  const text = String(note ?? "").replace(/\s+/g, " ").trim();
+  if (text.length > SPOTLIGHT_NOTE_MAX) {
+    return { error: "Keep it to " + SPOTLIGHT_NOTE_MAX + " characters." };
+  }
+  if (!(await isListed(entryId))) return { error: "That map isn't in the bank" };
+
+  await db
+    .insert(spotlights)
+    .values({ entryId, note: text || null, byId: admin.id })
+    .onConflictDoUpdate({ target: spotlights.entryId, set: { note: text || null, byId: admin.id } });
+  await record(
+    admin.id, admin.name ?? undefined, "entry.spotlight", "entry", entryId,
+    text ? { note: text } : undefined,
+  );
+  revalidatePath("/staff", "layout");
+  return {};
+}
+
+export async function unspotlightEntry(entryId: number) {
+  const admin = await requireAdmin();
+  await db.delete(spotlights).where(eq(spotlights.entryId, entryId));
+  await record(admin.id, admin.name ?? undefined, "entry.unspotlight", "entry", entryId);
+  revalidatePath("/staff", "layout");
+}
+
+/**
+ * Closes the vote on an entry: "stay" leaves it where it is, "remove" takes
+ * it out of the bank. Either way its votes and pin are cleared, and the log
+ * keeps who voted which way.
+ */
+export async function settleStay(entryId: number, outcome: "stay" | "remove") {
+  const staff = await requirePermission("bank.edit");
+  if (outcome !== "stay" && outcome !== "remove") throw new Error("That isn't an outcome");
+  if (!(await isListed(entryId))) throw new Error("That map isn't in the bank");
+
+  const tally = (await getStayVotes([entryId], null)).get(entryId) ?? NO_STAY;
+  const detail = { stay: tally.stay, delete: tally.drop };
+  await db.delete(stayVotes).where(eq(stayVotes.entryId, entryId));
+  await db.delete(spotlights).where(eq(spotlights.entryId, entryId));
+  if (outcome === "remove") await takeOffBank(staff, entryId, detail);
+  else await record(staff.id, staff.name ?? undefined, "entry.keep", "entry", entryId, detail);
+  revalidatePath("/staff", "layout");
 }
 
 /* ------------------------------------------------------------------- team */

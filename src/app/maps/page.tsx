@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import {
   getBankPage, getFacets, getPackVotes, getTierCounts, type BankPage,
 } from "@/lib/queries";
@@ -80,7 +81,13 @@ async function Maps({
   const votes = await getPackVotes(b.rows.map((r) => r.entryId), userId);
   return (
     <>
-      <MapList rows={b.rows} votes={votes} signedIn={userId != null} showAdded={showAdded} />
+      <MapList
+        rows={b.rows}
+        votes={votes}
+        signedIn={userId != null}
+        staff={can(session, "maps.vote")}
+        showAdded={showAdded}
+      />
       <BankPager
         page={b.page}
         pageCount={b.pageCount}

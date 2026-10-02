@@ -30,3 +30,24 @@ export function withVote(t: VoteTally, vote: PackVote | null): VoteTally {
   if (vote !== null) next[keyOf(vote)] += 1;
   return next;
 }
+
+/** Staff calls on whether an entry stays: who voted each way, and the viewer's own. */
+export type StayTally = { stay: string[]; drop: string[]; mine: boolean | null };
+
+export const NO_STAY: StayTally = { stay: [], drop: [], mine: null };
+
+/** The tally once the viewer, named `me`, votes to stay, to go, or takes it back with null. */
+export function withStay(t: StayTally, vote: boolean | null, me: string): StayTally {
+  const stay = t.stay.filter((n) => n !== me);
+  const drop = t.drop.filter((n) => n !== me);
+  if (vote === true) stay.push(me);
+  if (vote === false) drop.push(me);
+  return { stay, drop, mine: vote };
+}
+
+/** Which way the staff lean, "split" on a tie, null before anyone votes. */
+export function stayLean(t: StayTally): "stay" | "drop" | "split" | null {
+  if (!t.stay.length && !t.drop.length) return null;
+  if (t.stay.length === t.drop.length) return "split";
+  return t.stay.length > t.drop.length ? "stay" : "drop";
+}

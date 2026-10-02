@@ -7,7 +7,8 @@ import { tierByOrder, tierFill } from "@/lib/tiers";
 /**
  * One card, used by every surface that shows a map: art behind, the pack
  * left, the map and its chips next, the figures right. The bank shows the
- * pack as a tile; staff screens put a control there and add actions.
+ * pack as a tile; staff screens put a control there and add actions or a
+ * footer.
  */
 export function MapCard({
   osuBeatmapId,
@@ -33,6 +34,7 @@ export function MapCard({
   linkTitle = true,
   href,
   copyId,
+  footer,
 }: {
   osuBeatmapId: number;
   osuBeatmapsetId: number | null;
@@ -62,6 +64,8 @@ export function MapCard({
   href?: string;
   /** Adds a line under the map that copies its beatmap ID. */
   copyId?: boolean;
+  /** A full width strip along the bottom of the card. */
+  footer?: ReactNode;
 }) {
   const url = osuBeatmapsetId
     ? "https://osu.ppy.sh/beatmapsets/" + osuBeatmapsetId + "#osu/" + osuBeatmapId
@@ -130,6 +134,8 @@ export function MapCard({
         {status ? <div className="mapcard-status">{status}</div> : null}
         {actions ? <div className="mapcard-actions">{actions}</div> : null}
       </div>
+
+      {footer ? <div className="mapcard-foot">{footer}</div> : null}
     </article>
   );
 }

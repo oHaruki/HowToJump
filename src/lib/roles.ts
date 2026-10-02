@@ -15,6 +15,7 @@ export const PERMISSIONS = [
     name: "Edit the bank",
     hint: "Change an entry's pack, categories or mod, or take it off the ladder.",
   },
+  { key: "maps.vote", name: "Vote on maps", hint: "Vote on whether a map stays in its pack." },
   { key: "scores.delete", name: "Delete scores", hint: "Delete a score from a map's scoreboard." },
 ] as const;
 
@@ -32,7 +33,7 @@ export const BUILT_IN_ROLES: RoleView[] = [
   {
     key: "helper",
     name: "Helper",
-    permissions: ["maps.add", "queue.review", "bank.edit"],
+    permissions: ["maps.add", "queue.review", "bank.edit", "maps.vote"],
     builtIn: true,
   },
 ];

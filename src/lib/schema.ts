@@ -179,6 +179,33 @@ export const entryVotes = pgTable(
   (t) => [primaryKey({ columns: [t.entryId, t.userId] })],
 );
 
+/* ------------------------------------------------------------- stay votes */
+
+/** Staff calls on whether an entry stays in its pack or leaves the bank. */
+export const stayVotes = pgTable(
+  "stay_votes",
+  {
+    entryId: integer("entry_id").notNull().references(() => entries.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** True to keep the entry where it is, false to take it out. */
+    stay: boolean("stay").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.entryId, t.userId] })],
+);
+
+/** Entries an admin pinned to the top of the staff votes page. */
+export const spotlights = pgTable("spotlights", {
+  entryId: integer("entry_id")
+    .primaryKey()
+    .references(() => entries.id, { onDelete: "cascade" }),
+  /** Why it is pinned, in a line. */
+  note: text("note"),
+  byId: integer("by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* -------------------------------------------------------------- suggestions */
 
 export const suggestionBatches = pgTable("suggestion_batches", {

@@ -213,6 +213,19 @@ export function mapHref(osuBeatmapId: number, mod?: string | null) {
   return "/beatmap/" + osuBeatmapId + (mod && mod !== "NM" ? "?mod=" + mod : "");
 }
 
+/** Staff only: opens the map on the votes page. */
+export function StaffVoteLink({ entryId }: { entryId: number }) {
+  return (
+    <Link
+      className="staff-link"
+      href={"/staff/votes?entry=" + entryId}
+      title="Vote on whether this map stays in its pack"
+    >
+      Staff vote <span aria-hidden="true">→</span>
+    </Link>
+  );
+}
+
 /** A player's maps and scores in one pack. */
 export function packHref(osuUserId: number | undefined, slug: string) {
   return "/u/" + osuUserId + "/packs/" + slug;
