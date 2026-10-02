@@ -8,7 +8,7 @@ import {
   tierByName, tierByOrder, tierBySlug,
 } from "@/lib/tiers";
 import { MODS, modsText } from "@/lib/mods";
-import type { SpecialPack } from "@/lib/packs";
+import { specialPackId, type SpecialPack } from "@/lib/packs";
 import { timeAgo } from "@/lib/time";
 import { CategoryChips, ModChip, PacingChips, PickSelect, SpecialChip } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
@@ -101,6 +101,9 @@ export function BankAdminTable({
       <div className="review-list">
         {rows.map((r) => {
           const isEditing = editing === r.entryId && draft !== null;
+          const ladderSlug = isEditing ? (tierByName(draft.tier)?.slug ?? "") : "";
+          // The entry's special pack now, offered even when the list leaves it out.
+          const options = r.pack && !special.some((p) => p.id === r.pack?.id) ? [...special, r.pack] : special;
 
           return (
             <MapCard
@@ -127,21 +130,29 @@ export function BankAdminTable({
                 isEditing ? (
                   <>
                     <PackPicker
-                      value={tierByName(draft.tier)?.slug ?? ""}
+                      value={draft.pack || ladderSlug}
                       placeholder="Pick a pack"
                       allowClear={false}
-                      onChange={(slug) => {
-                        const t = tierBySlug(slug);
-                        if (t) setDraft({ ...draft, tier: t.name });
+                      special={options}
+                      emptySpecial="An admin can make a special pack to take maps off the ladder."
+                      onChange={(key) => {
+                        const t = tierBySlug(key);
+                        if (t) setDraft({ ...draft, tier: t.name, pack: "" });
+                        else if (specialPackId(key) != null) setDraft({ ...draft, pack: key });
                       }}
                     />
-                    <SpecialSelect
-                      value={draft.pack}
-                      special={special}
-                      current={r.pack}
-                      disabled={pending}
-                      onChange={(v) => setDraft({ ...draft, pack: v })}
-                    />
+                    {draft.pack ? (
+                      <PackPicker
+                        value={ladderSlug}
+                        placeholder="Pick a pack"
+                        prefix="Pays as"
+                        allowClear={false}
+                        onChange={(slug) => {
+                          const t = tierBySlug(slug);
+                          if (t) setDraft({ ...draft, tier: t.name });
+                        }}
+                      />
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -308,44 +319,5 @@ export function BankAdminTable({
         ) : null}
       </div>
     </>
-  );
-}
-
-/**
- * Where an entry sits: on the ladder, or in a special pack. A special
- * pack's map keeps its ladder pack, which sets what it pays.
- */
-function SpecialSelect({
-  value,
-  special,
-  current,
-  disabled,
-  onChange,
-}: {
-  value: string;
-  special: readonly SpecialPack[];
-  /** The entry's special pack now, offered even when the list leaves it out. */
-  current: SpecialPack | null;
-  disabled: boolean;
-  onChange: (v: string) => void;
-}) {
-  const options = current && !special.some((p) => p.id === current.id) ? [...special, current] : special;
-  if (!options.length) return null;
-  return (
-    <select
-      className="mini"
-      value={value}
-      disabled={disabled}
-      aria-label="Special pack"
-      title="A special pack's maps count toward its own board, not toward levels"
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="">On the ladder</option>
-      {options.map((p) => (
-        <option key={p.id} value={String(p.id)}>
-          {p.name}
-        </option>
-      ))}
-    </select>
   );
 }

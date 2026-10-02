@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { auth } from "@/lib/auth";
 import { getSpecialPacks, getTierCounts } from "@/lib/queries";
 import { LadderGrid, SectionHead, SpecialPackGrid } from "@/components/ui";
 
@@ -7,11 +8,11 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Packs" };
 
 export default async function LadderPage() {
-  const [counts, special] = await Promise.all([getTierCounts(), getSpecialPacks()]);
+  const [session, counts, special] = await Promise.all([auth(), getTierCounts(), getSpecialPacks()]);
   return (
     <div className="view">
       <SectionHead title="Packs" />
-      <LadderGrid counts={counts} />
+      <LadderGrid counts={counts} osuUserId={session?.osuUserId} />
 
       {special.length ? (
         <div className="stack-lg">

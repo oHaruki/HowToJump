@@ -421,7 +421,7 @@ test("filters read along their list, not the alphabet", () => {
 
 test("every category has a board URL that reads back to it", () => {
   const slugs = CATEGORIES.map(categorySlug);
-  assert.deepEqual(slugs, ["consistency", "raw-mechanic", "anti-aim", "control", "precision"]);
+  assert.deepEqual(slugs, ["consistency", "raw-mechanic", "anti-aim", "control", "precision", "gimmick"]);
   for (const c of CATEGORIES) assert.equal(categoryBySlug(categorySlug(c)), c);
   assert.equal(categoryBySlug("main"), null);
   assert.equal(categoryBySlug(undefined), null);

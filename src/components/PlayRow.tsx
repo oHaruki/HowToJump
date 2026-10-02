@@ -36,7 +36,8 @@ export type PlayView = {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 
-export function PlayRow({ play: p }: { play: PlayView }) {
+/** `rank` is the play's place in its list, shown before the pack. */
+export function PlayRow({ play: p, rank }: { play: PlayView; rank?: number }) {
   const tier = tierByOrder(p.tierOrder);
   const colour = tier ? tier.color : "#777";
   const misses = p.missCount === 1 ? "1 miss" : p.missCount + " misses";
@@ -67,7 +68,10 @@ export function PlayRow({ play: p }: { play: PlayView }) {
         ) : null}
       </div>
       <div className="play-in">
-        <span className="play-gem" style={{ background: tierFill(tier) }} title={tier?.name} />
+        <span className="play-lead">
+          {rank != null ? <span className="play-rank">#{rank}</span> : null}
+          <span className="play-gem" style={{ background: tierFill(tier) }} title={tier?.name} />
+        </span>
         <div className="play-info">
           <Link className="play-title" href={mapHref(p.osuBeatmapId, p.mod)}>
             {p.title}

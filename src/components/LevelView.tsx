@@ -91,7 +91,7 @@ function spoke(i: number, count: number, radius: number): [number, number] {
 }
 
 /**
- * The five categories as one shape. Each ring is a band of the ladder, and
+ * The categories as one shape. Each ring is a band of the ladder, and
  * each corner wears the colour of the pack that category has reached.
  */
 export function SkillRadar({ axes }: { axes: Array<{ label: string; value: number }> }) {

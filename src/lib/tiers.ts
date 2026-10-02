@@ -78,6 +78,7 @@ export const CATEGORIES = [
   "Anti-aim",
   "Aim control",
   "Precision",
+  "Gimmick",
 ];
 
 /* ------------------------------------------------------------ pacing scales */
@@ -193,6 +194,7 @@ const CATEGORY_SHORT: Record<string, string> = {
   "Anti-aim": "Anti-aim",
   "Aim control": "Control",
   Precision: "Precision",
+  Gimmick: "Gimmick",
 };
 
 export function shortCategory(input: string | null | undefined): string {

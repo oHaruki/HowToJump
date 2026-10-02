@@ -22,6 +22,8 @@ export function PackPicker({
   placeholder = "All packs",
   allowClear = true,
   special = [],
+  emptySpecial,
+  prefix,
 }: {
   value: string;
   /** Maps per pack, keyed like `value`. */
@@ -33,6 +35,10 @@ export function PackPicker({
   allowClear?: boolean;
   /** Special packs, offered under the ladder's. */
   special?: readonly SpecialPack[];
+  /** A line shown in their place while there are none. */
+  emptySpecial?: string;
+  /** A word or two before the pick on the button. */
+  prefix?: string;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -70,6 +76,7 @@ export function PackPicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
+        {prefix ? <span className="packpick-pre">{prefix}</span> : null}
         {fill ? <span className="dot" style={{ background: fill }} /> : null}
         <span className="packpick-label">{tier?.name ?? pack?.name ?? placeholder}</span>
         <span className="caret" aria-hidden="true" />
@@ -128,6 +135,8 @@ export function PackPicker({
                 })}
               </div>
             </>
+          ) : emptySpecial ? (
+            <span className="small packgrid-head">{emptySpecial}</span>
           ) : null}
         </div>
       ) : null}

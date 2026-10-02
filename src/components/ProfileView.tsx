@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { userLevels, userTierProgress, users } from "@/lib/schema";
 import { RANKING_PAGE_SIZE, getProfilePlays, getRankOf, getTierCounts } from "@/lib/queries";
 import { GRADE_RULES } from "@/lib/grading";
-import { BEST_PLAYS, MAIN_LEVEL, levelValue } from "@/lib/levels";
+import { BEST_PLAYS, MAIN_BEST, MAIN_LEVEL, levelValue } from "@/lib/levels";
 import { PROFILE_SCOPES, profileLists, readSnapshot, snapshotOf } from "@/lib/progress";
 import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, packHref } from "@/components/ui";
@@ -228,10 +228,11 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
 
       <section className="stack-lg">
         <div className="section-head">
-          <h2>Five ways to aim</h2>
+          <h2>Six ways to aim</h2>
           <p className="small">
             Each category adds up the best {BEST_PLAYS} plays in it, and a map in two
-            categories counts toward both. The main level is the average of the five.
+            categories counts toward both. The main level is the average of your best{" "}
+            {MAIN_BEST}.
           </p>
         </div>
         <div className="pf-skills">

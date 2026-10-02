@@ -7,7 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  BEST_PLAYS, THRESHOLD_SHARE, bestExp, byWorth, categoryLevels, countingPlaces, levelFromExp,
+  BEST_PLAYS, MAIN_BEST, THRESHOLD_SHARE, bestExp, byWorth, categoryLevels, countingPlaces, levelFromExp,
   levelRules, mainLevel, playExp, progressText, threshold, totalExp, type Level, type LevelPlay,
 } from "./levels";
 import {
@@ -198,7 +198,7 @@ test("an old spelling still in the database counts toward the category it became
   assert.equal(levels["Aim - consistency"].exp, 1_700);
 });
 
-test("the main level averages the five", () => {
+test("the main level averages the best five", () => {
   const at = (tierOrder: number | null, progress: number | null): Level => ({
     exp: 0, tierOrder, progress,
   });
@@ -210,6 +210,15 @@ test("the main level averages the five", () => {
   assert.deepEqual(mainLevel([at(order("Emerald"), 0), at(null, 0)], 0), at(6, 50));
   const goat = at(order("GOAT"), null);
   assert.deepEqual(mainLevel([goat, goat], 0), goat);
+
+  // A sixth category left at nothing changes nothing.
+  const five = [
+    at(order("Titanium"), 50), at(order("Titanium"), 20), at(order("Platinum"), 80),
+    at(order("Platinum"), 40), at(order("Gold"), 90),
+  ];
+  assert.deepEqual(mainLevel([...five, at(null, 0)], 0), at(order("Platinum"), 76));
+  // One above the weakest replaces it: Gold 90 drops out for Platinum 90.
+  assert.deepEqual(mainLevel([...five, at(order("Platinum"), 90)], 0), at(order("Platinum"), 96));
 });
 
 test("a map in two categories counts in full toward both", () => {
@@ -481,6 +490,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
     grades: Array<[string, number]>;
     packs: Array<[number, number]>;
     bestPlays: number;
+    mainBest: number;
     thresholdShare: number;
     missShape: number[];
     missScaling: number[];
@@ -493,6 +503,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
   assert.equal(rules.packs.length, TIERS.length);
   assert.deepEqual(rules.packs.find(([o]) => o === order("GOAT")), [order("GOAT"), 2_000_000]);
   assert.equal(rules.bestPlays, BEST_PLAYS);
+  assert.equal(rules.mainBest, MAIN_BEST);
   assert.equal(rules.thresholdShare, THRESHOLD_SHARE);
   // Every number a stored level is worked out from belongs in here, or a
   // deploy that retunes one leaves everyone on the old figure.

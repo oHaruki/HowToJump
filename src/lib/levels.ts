@@ -19,8 +19,11 @@ export const BEST_PLAYS = 10;
 /** The combined level's scope in user_levels, beside the category labels. */
 export const MAIN_LEVEL = "main";
 
+/** How many category levels, best first, the main level averages. */
+export const MAIN_BEST = 5;
+
 /** Bump when the shape of the formula changes. Changed numbers are noticed without it. */
-export const LEVEL_RULES_VERSION = 6;
+export const LEVEL_RULES_VERSION = 7;
 
 /** A pack is reached at BEST_PLAYS plays worth this share of it each. */
 export const THRESHOLD_SHARE = 75;
@@ -36,6 +39,7 @@ export function levelRules(): string {
     bestPlays: BEST_PLAYS,
     thresholdShare: THRESHOLD_SHARE,
     categories: CATEGORIES,
+    mainBest: MAIN_BEST,
     packs: TIERS.map((t) => [t.order, t.exp]),
     grades: GRADE_RULES.map((g) => [g.grade, g.expPercent]),
     missScaling: [SHORT_NOTES, LONG_NOTES, MISS_CURVE, MIN_MISS_FACTOR],
@@ -216,15 +220,19 @@ export function progressText(progress: number | null | undefined): string {
 }
 
 /**
- * The main level: the average of the category levels, each read as a pack
- * number plus its progress. Its EXP is the total from totalExp. Worked in
- * hundredths, so floating point never turns a 68 into a 67.
+ * The main level: the average of the best MAIN_BEST category levels, each
+ * read as a pack number plus its progress. Its EXP is the total from
+ * totalExp. Worked in hundredths, so floating point never turns a 68 into
+ * a 67.
  */
 export function mainLevel(levels: Level[], exp: number): Level {
   if (!levels.length) return { exp, tierOrder: null, progress: 0 };
 
-  const hundredths = levels.map((l) => (l.tierOrder ?? 0) * 100 + (l.progress ?? 0));
-  const average = Math.floor(hundredths.reduce((sum, h) => sum + h, 0) / levels.length);
+  const hundredths = levels
+    .map((l) => (l.tierOrder ?? 0) * 100 + (l.progress ?? 0))
+    .sort((a, b) => b - a)
+    .slice(0, MAIN_BEST);
+  const average = Math.floor(hundredths.reduce((sum, h) => sum + h, 0) / hundredths.length);
   const whole = Math.floor(average / 100);
   const tierOrder = whole >= 1 ? whole : null;
   const top = tierOrder != null && !tierByOrder(tierOrder + 1);

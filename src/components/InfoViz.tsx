@@ -21,7 +21,7 @@ export function PackLadder() {
   );
 }
 
-/** Five skills, ten slots each: what a category's level is added up from. */
+/** Every skill, ten slots each: what a category's level is added up from. */
 export function SkillSlots() {
   return (
     <div className="iv-list">

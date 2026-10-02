@@ -365,8 +365,8 @@ main { padding-block: 40px 72px; min-height: calc(100vh - var(--nav-height) - 80
 .hero .lede { font-size: 19px; line-height: 1.55; max-width: 46ch; color: var(--text); }
 .hero-cta { margin-top: 6px; }
 .hero-cta .btn { height: 46px; padding-inline: 22px; }
-.hero-facts { margin-top: 18px; max-width: 600px; border-bottom: 0; }
-.hero-facts .stat { padding-block: 12px 0; flex-basis: 110px; }
+.hero-facts { margin-top: 18px; max-width: 600px; }
+.hero-facts .stat { padding-block: 12px; flex-basis: 110px; }
 .hero-facts .stat b { font-size: 26px; }
 .hero-facts .stat span { display: block; font-size: 12px; line-height: 1.35; margin-top: 4px; }
 @media (max-width: 640px) {
@@ -391,13 +391,11 @@ main { padding-block: 40px 72px; min-height: calc(100vh - var(--nav-height) - 80
   border-left: var(--border-width) solid var(--border-soft);
   margin-left: calc(-1 * var(--border-width));
 }
-/* The first figure lines up with everything else down the page. */
-.stat:first-child { padding-left: 0; }
 /* Two to a row on a phone, a hairline between the pair. */
 @media (max-width: 640px) {
   .stat-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .stat { min-width: 0; margin-left: 0; border-left: 0; padding: 12px 0; }
-  .stat:nth-child(even) { border-left: var(--border-width) solid var(--border-soft); padding-left: 14px; }
+  .stat { min-width: 0; margin-left: 0; border-left: 0; padding: 12px 14px; }
+  .stat:nth-child(even) { border-left: var(--border-width) solid var(--border-soft); }
   .stat:nth-child(n+3) { border-top: var(--border-width) solid var(--border-soft); }
   .stat b { font-size: clamp(20px, 6vw, 26px); }
 }
@@ -737,7 +735,7 @@ tbody tr:hover { background: var(--bg-c); }
 }
 
 /*
- * A named row with something on the end: the five skills and their ten
+ * A named row with something on the end: the skills and their ten
  * slots, and the mods with their full names. The slots are the rule, not a
  * picture of anyone's plays, so they are empty.
  */
@@ -1368,6 +1366,7 @@ footer {
 }
 .packpick-btn:hover { border-color: color-mix(in srgb, var(--text-focus) 26%, var(--border)); }
 .packpick-label { flex: 1 1 auto; text-align: left; }
+.packpick-pre { flex: none; font-size: var(--font-size-small); color: var(--text-dark); }
 
 .packgrid-pop {
   position: absolute; left: 0; top: calc(100% + 7px); z-index: 60;
@@ -1887,8 +1886,13 @@ a.pager-page:hover, a.pager-step:hover {
   grid-template-areas: "gem info score exp";
   padding: 11px 16px; min-height: 66px;
 }
+.play-lead { grid-area: gem; display: flex; align-items: center; gap: 8px; }
+.play-rank {
+  min-width: 3ch; text-align: right;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-dark);
+}
 .play-gem {
-  grid-area: gem; width: 20px; height: 20px;
+  width: 20px; height: 20px;
   border-radius: 6px; corner-shape: var(--corner-shape);
   outline: var(--border-width) solid var(--scrim);
   box-shadow: 0 0 12px color-mix(in srgb, var(--pack) 45%, transparent);
@@ -1942,13 +1946,17 @@ a.pager-page:hover, a.pager-step:hover {
   }
   .play-score { justify-content: flex-start; }
 }
-.more > summary {
-  cursor: pointer; list-style: none; padding: 6px 2px;
-  font-size: var(--font-size-small); color: var(--text);
+.more {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px;
+  padding: 6px 2px; font-size: var(--font-size-small);
 }
-.more > summary::-webkit-details-marker { display: none; }
-.more > summary:hover { color: var(--text-focus); }
-.more[open] > summary { margin-bottom: 8px; }
+.more-btn {
+  appearance: none; cursor: pointer; font: inherit;
+  padding: 0; border: 0; background: none; color: var(--text);
+}
+.more-btn:hover { color: var(--text-focus); }
+.more-btn:disabled { cursor: default; color: var(--text-dark); }
+.more-count { margin-left: auto; font-family: var(--font-mono); color: var(--text-dark); }
 
 /* Every pack as a tile, each in its own colour. */
 .pf-packs { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }

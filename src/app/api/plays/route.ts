@@ -10,7 +10,7 @@ import type { PlayView } from "@/components/PlayRow";
 export const dynamic = "force-dynamic";
 
 /**
- * The rest of a profile's plays, past the handful its lists draw up front.
+ * A page of a profile's plays, past the handful its lists draw up front.
  * Both orders come from the same functions the page uses; `list` picks
  * which one is sliced. Public, like profiles: banned players 404, and
  * freshness is worked out only for the owner. Sends only the fields a row
@@ -18,6 +18,9 @@ export const dynamic = "force-dynamic";
  */
 
 const LISTS = new Set(["top", "recent"]);
+
+/** Most rows one request sends. */
+const MAX_LIMIT = 50;
 
 function bad() {
   return new NextResponse(null, { status: 400 });
@@ -28,10 +31,12 @@ export async function GET(req: Request) {
   const userId = Number(q.get("user"));
   const list = q.get("list") ?? "";
   const offset = Number(q.get("offset") ?? "0");
+  const limit = Number(q.get("limit") ?? String(MAX_LIMIT));
 
   if (!Number.isSafeInteger(userId) || userId <= 0) return bad();
   if (!LISTS.has(list)) return bad();
   if (!Number.isSafeInteger(offset) || offset < 0) return bad();
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_LIMIT) return bad();
 
   const [player] = await db
     .select({ id: users.id, progressSeenAt: users.progressSeenAt })
@@ -44,7 +49,7 @@ export async function GET(req: Request) {
 
   const plays = await getProfilePlays(userId);
   const lists = profileLists(plays, seenAt);
-  const rows = (list === "top" ? lists.top : lists.recent).slice(offset);
+  const rows = (list === "top" ? lists.top : lists.recent).slice(offset, offset + limit);
 
   return NextResponse.json({
     plays: rows.map(

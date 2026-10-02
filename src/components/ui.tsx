@@ -327,12 +327,13 @@ export function Loading({ label = "Loading" }: { label?: string }) {
   );
 }
 
+/** The sixteen packs as tiles. Signed in, each opens the player's own pack page; otherwise the bank. */
 export function LadderGrid({
   counts,
-  hrefFor,
+  osuUserId,
 }: {
   counts: Map<number, number>;
-  hrefFor?: (t: Tier) => string;
+  osuUserId?: number | null;
 }) {
   return (
     <div className="ladder">
@@ -342,7 +343,7 @@ export function LadderGrid({
           <Link
             key={t.slug}
             className="gem"
-            href={hrefFor ? hrefFor(t) : "/maps?pack=" + t.slug}
+            href={osuUserId ? packHref(osuUserId, t.slug) : "/maps?pack=" + t.slug}
             // The flat colour. The swatch keeps the fill, since GOAT's
             // is a gradient and a gradient cannot go in a color-mix.
             style={{ "--tier": t.color } as CSSProperties}

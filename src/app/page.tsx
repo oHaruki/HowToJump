@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { auth } from "@/lib/auth";
 import { getBankStats, getRecentEntries, getTierCounts } from "@/lib/queries";
 import {
   CategoryChips, LadderGrid, ModChip, NONE, Stat, TierChip, beatmapUrl,
@@ -16,7 +17,8 @@ export const dynamic = "force-dynamic";
 const FEATURED = 8;
 
 export default async function OverviewPage() {
-  const [counts, stats, latest] = await Promise.all([
+  const [session, counts, stats, latest] = await Promise.all([
+    auth(),
     getTierCounts(),
     getBankStats(),
     getRecentEntries(FEATURED + 4),
@@ -73,7 +75,7 @@ export default async function OverviewPage() {
             alone.
           </p>
         </div>
-        <LadderGrid counts={counts} />
+        <LadderGrid counts={counts} osuUserId={session?.osuUserId} />
       </div>
 
       {recent.length ? (

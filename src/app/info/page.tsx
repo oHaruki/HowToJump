@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import {
   GRADE_RULES, LONG_NOTES, MIN_MISS_FACTOR, SHORT_NOTES, accuracyCredit, missFactor,
 } from "@/lib/grading";
-import { BEST_PLAYS, THRESHOLD_SHARE, threshold } from "@/lib/levels";
-import { tierByName } from "@/lib/tiers";
+import { BEST_PLAYS, MAIN_BEST, THRESHOLD_SHARE, threshold } from "@/lib/levels";
+import { CATEGORIES, tierByName } from "@/lib/tiers";
 import { GradeLetter, SectionHead, gradeTone } from "@/components/ui";
 import { ModLegend, PackLadder, SkillSlots, SyncFlow } from "@/components/InfoViz";
 
@@ -92,7 +92,8 @@ export default function InfoPage() {
                 {packLine("Emerald")},{" "}
                 {packLine("Amethyst")}. Full combos on the pack below never get there on
                 their own, so reaching a pack means playing it. Your main level is the
-                average of the five categories. The leaderboard ranks the main level,
+                average of your best {MAIN_BEST} of the {CATEGORIES.length} categories,
+                so your weakest one never holds it back. The leaderboard ranks the main level,
                 and each category has a board of its own beside it.
               </p>
             </div>
