@@ -477,6 +477,31 @@ main { padding-block: 40px 72px; min-height: calc(100vh - var(--nav-height) - 80
 .chip-tier { color: var(--text-focus); }
 .chip-mod { font-family: var(--font-mono); letter-spacing: 0.03em; color: var(--text-focus); background: var(--bg-d); }
 .chip-mod[data-nm="true"] { color: var(--text-dark); background: var(--bg-c); }
+/* Mods as osu! draws them: a hexagon in the mod type's colour, the mark on it in dark. */
+.mods { display: inline-flex; gap: 3px; vertical-align: middle; }
+.mod {
+  --mod: var(--text-dark);
+  position: relative; isolation: isolate; flex: none;
+  display: inline-grid; place-items: center;
+  height: 20px; aspect-ratio: 10 / 7;
+  font-family: var(--font-display); font-size: 9px; font-weight: 800; line-height: 1;
+  color: color-mix(in srgb-linear, black, var(--mod) 10%);
+}
+.mod::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: var(--mod);
+  mask: url(/mods/badge.svg) center / contain no-repeat;
+}
+.mod[data-mark]::after {
+  content: ""; position: absolute; inset: 0;
+  background: currentColor;
+  mask: var(--mark) center / contain no-repeat;
+}
+.mod[data-type="increase"] { --mod: #ff6666; }
+.mod[data-type="reduction"] { --mod: #b3ff66; }
+.mod[data-type="conversion"] { --mod: #8c66ff; }
+.mod[data-type="automation"] { --mod: #66ccff; }
+.mod[data-type="system"] { --mod: #ffcc22; }
 /* Length and speed read as words, not numbers, so each has to say which one
    it is. The key sits in a recessed cell with a rule between: the site is
    monochrome, so the split has to be structural rather than another shade. */
@@ -841,14 +866,15 @@ tbody tr:hover { background: var(--bg-c); }
   box-shadow: inset 0 calc(-1 * var(--border-width)) 0 var(--border);
 }
 .tabs::-webkit-scrollbar { display: none; }
-.tabs a {
+.tabs button { appearance: none; border: 0; background: none; font: inherit; cursor: pointer; }
+.tabs a, .tabs button {
   flex: none; position: relative; padding: 4px 0 12px;
   color: var(--text); text-decoration: none; white-space: nowrap;
   transition: color var(--dur-fast);
 }
-.tabs a:hover { color: var(--text-focus); }
-.tabs a[aria-current="page"] { color: var(--text-focus); }
-.tabs a[aria-current="page"]::after {
+.tabs a:hover, .tabs button:hover { color: var(--text-focus); }
+.tabs a[aria-current="page"], .tabs button[aria-selected="true"] { color: var(--text-focus); }
+.tabs a[aria-current="page"]::after, .tabs button[aria-selected="true"]::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
   background: var(--text-focus); border-radius: 2px;
 }
@@ -857,7 +883,7 @@ tbody tr:hover { background: var(--bg-c); }
   gap: 28px; box-shadow: none; font-size: 22px; font-weight: 680;
   font-family: var(--font-display); font-stretch: 112%; letter-spacing: -0.01em;
 }
-.tabs-lg a { padding: 0 0 8px; }
+.tabs-lg a, .tabs-lg button { padding: 0 0 8px; }
 
 .drop {
   border: 1px dashed var(--border);
@@ -1845,12 +1871,6 @@ a.pager-page:hover, a.pager-step:hover {
 }
 .radar-tier { font-size: 14px; font-weight: 600; fill: var(--text-focus); }
 
-/* Top plays and recent plays side by side where there is room. */
-.pf-lists {
-  display: grid; gap: 28px; align-items: start;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 620px), 1fr));
-}
-
 /* The score link box on the owner's profile. */
 .backfill { display: flex; flex-direction: column; gap: 8px; max-width: 680px; }
 .backfill-row { display: flex; gap: 8px; }
@@ -1860,69 +1880,94 @@ a.pager-page:hover, a.pager-step:hover {
 .backfill-msg[data-ok="true"] { color: var(--success); }
 @media (max-width: 560px) { .backfill-row { flex-direction: column; } }
 
-.plays { display: flex; flex-direction: column; gap: 8px; }
-.play {
-  position: relative; overflow: hidden;
-  background: var(--bg-b);
-  border: var(--border-width) solid var(--border);
-  border-radius: 14px; corner-shape: var(--corner-shape);
-  transition: border-color var(--dur-fast);
+/*
+ * A profile's plays, a slim row each under a row of column heads, as on
+ * osu!. Grade, mods, accuracy, misses and EXP keep one width down the list
+ * so they line up row to row. Top plays add their place in front.
+ */
+.tabs.plays-tabs { font-size: var(--h2-size); }
+.plays-tabs button { display: inline-flex; align-items: center; gap: 10px; }
+.plays-tabs .chip.fresh { --pack: var(--text-dark); font-weight: 400; font-stretch: normal; }
+.plays {
+  --play-cols: 56px minmax(0, 1fr) 64px 84px 64px 150px;
+  display: flex; flex-direction: column; gap: 4px;
 }
-.play:hover { border-color: color-mix(in srgb, var(--pack) 45%, var(--border)); }
-.play-art { position: absolute; inset: 0; opacity: 0.42; background: var(--art-fill); }
-.play-art img { position: relative; width: 100%; height: 100%; object-fit: cover; }
-.play-art img::after { content: ""; position: absolute; inset: 0; background: var(--art-fill); }
-.play::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--bg-b) 45%, transparent) 0%,
-    color-mix(in srgb, var(--bg-b) 82%, transparent) 42%,
-    var(--bg-b) 72%);
+.plays[data-ranked] { --play-cols: 36px 56px minmax(0, 1fr) 64px 84px 64px 150px; }
+.play, .play-cols {
+  display: grid; align-items: center; column-gap: 14px;
+  grid-template-columns: var(--play-cols);
+  padding-inline: 16px;
 }
-.play-in {
-  position: relative; z-index: 1;
-  display: grid; align-items: center; gap: 16px;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  grid-template-areas: "gem info score exp";
-  padding: 11px 16px; min-height: 66px;
-}
-.play-lead { grid-area: gem; display: flex; align-items: center; gap: 8px; }
-.play-rank {
-  min-width: 3ch; text-align: right;
+.play-cols {
+  padding-block: 2px;
   font-family: var(--font-mono); font-size: 12px; color: var(--text-dark);
+  text-transform: uppercase; letter-spacing: var(--letter-label);
 }
-.play-gem {
-  width: 20px; height: 20px;
-  border-radius: 6px; corner-shape: var(--corner-shape);
-  outline: var(--border-width) solid var(--scrim);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--pack) 45%, transparent);
+.play-cols .c { text-align: center; }
+.play-cols .r { text-align: right; }
+.play {
+  position: relative; isolation: isolate; overflow: hidden;
+  min-height: 52px; padding-block: 6px;
+  background: var(--bg-b);
+  border: var(--border-width) solid var(--border-soft);
+  border-radius: 12px; corner-shape: var(--corner-shape);
+  transition: background var(--dur-fast), border-color var(--dur-fast);
 }
-.play-info { grid-area: info; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.play:hover { background: var(--bg-c); border-color: color-mix(in srgb, var(--pack) 45%, var(--border)); }
+/* The cover, or the pack's colour without one, fading out to the right. */
+.play-art {
+  position: absolute; inset: 0 auto 0 0; z-index: -1;
+  width: min(340px, 55%); opacity: 0.32; background: var(--art-fill);
+  mask-image: linear-gradient(90deg, #000, transparent 90%);
+}
+.play-art img { width: 100%; height: 100%; object-fit: cover; }
+.play-rank {
+  font-family: var(--font-mono); font-size: 13px; color: var(--text-focus);
+  text-shadow: 0 1px 3px var(--main-bg);
+}
+.play-grade { text-align: center; }
+.play-grade .gl {
+  filter: drop-shadow(0 1px 2px var(--main-bg))
+    drop-shadow(0 0 6px color-mix(in srgb, var(--glow) 40%, transparent));
+}
+.play-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .play-title {
-  color: var(--text-focus); text-decoration: none; font-weight: 600;
+  font-size: 16px; font-weight: 600; color: var(--text-focus); text-decoration: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 0 1px 3px var(--main-bg);
 }
 .play-title span { font-weight: 400; color: var(--text); }
 .play-title:hover { text-decoration: underline; }
 .play-sub {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
   font-size: var(--font-size-small); color: var(--text);
 }
-.play-sub .chip-mod { padding: 0 7px; font-size: 12px; }
-.play-score { grid-area: score; display: flex; align-items: center; gap: 12px; }
-.play-score .gl { min-width: 80px; text-align: center; font-size: 33px; }
-.play-acc {
-  font-family: var(--font-mono); font-size: var(--font-size-small);
-  color: var(--text); text-align: right; line-height: 1.35; white-space: nowrap;
+.play-gem {
+  width: 10px; height: 10px; flex: none;
+  border-radius: 3px; corner-shape: var(--corner-shape);
+  outline: 1px solid var(--scrim);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pack) 50%, transparent);
 }
-.play-exp { grid-area: exp; display: flex; flex-direction: column; align-items: flex-end; min-width: 92px; }
+.play-stats { display: contents; }
+.play-mods { text-align: center; }
+.play-acc, .play-miss {
+  text-align: center; white-space: nowrap;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-focus);
+}
+.play-miss[data-zero] { color: var(--text-dark); }
+/* The word after the miss count: read out everywhere, shown on a phone. */
+.play-miss i {
+  font-style: normal;
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.play-exp { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .play-exp b {
-  font-family: var(--font-mono); font-weight: 400; font-size: 21px;
+  font-family: var(--font-mono); font-weight: 400; font-size: 18px; line-height: 1.2;
   font-variant-numeric: tabular-nums; color: var(--text-focus);
 }
 .play-exp span {
-  font-family: var(--font-mono); font-size: 11.5px; white-space: nowrap;
+  font-family: var(--font-mono); font-size: 11px; white-space: nowrap;
   text-transform: uppercase; letter-spacing: var(--letter-label); color: var(--text-dark);
 }
 .play-exp span[data-counts] { color: color-mix(in srgb, var(--pack) 55%, var(--text-focus)); }
@@ -1938,25 +1983,38 @@ a.pager-page:hover, a.pager-step:hover {
   border-color: color-mix(in srgb, var(--pack) 55%, var(--border));
   box-shadow: 0 0 22px color-mix(in srgb, var(--pack) 16%, transparent);
 }
-@media (max-width: 640px) {
-  .play-in {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: "gem info exp" "gem score exp";
-    row-gap: 8px;
+/* On a phone the heads go, the map takes the row's full width, and mods,
+   accuracy, misses and EXP share the line under it. */
+@media (max-width: 760px) {
+  .plays { --play-cols: 34px minmax(0, 1fr) auto; }
+  .plays[data-ranked] { --play-cols: 22px 34px minmax(0, 1fr) auto; }
+  .play-cols { display: none; }
+  .play {
+    column-gap: 10px; row-gap: 6px; padding: 8px 12px;
+    grid-template-areas: "grade info info" "grade stats exp";
   }
-  .play-score { justify-content: flex-start; }
+  .plays[data-ranked] .play { grid-template-areas: "rank grade info info" "rank grade stats exp"; }
+  .play-rank { grid-area: rank; font-size: 12px; }
+  .play-grade { grid-area: grade; }
+  .play-info { grid-area: info; }
+  .play-title { font-size: 15px; }
+  .play-stats {
+    grid-area: stats; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+    font-size: var(--font-size-small);
+  }
+  .play-mods:empty { display: none; }
+  .play-miss i { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .play-exp { grid-area: exp; }
+  .play-exp b { font-size: 16px; }
+  .play-exp span { font-size: 10.5px; }
 }
 .more {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px;
-  padding: 6px 2px; font-size: var(--font-size-small);
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px 12px;
+  padding-top: 6px; font-size: var(--font-size-small);
 }
-.more-btn {
-  appearance: none; cursor: pointer; font: inherit;
-  padding: 0; border: 0; background: none; color: var(--text);
-}
-.more-btn:hover { color: var(--text-focus); }
-.more-btn:disabled { cursor: default; color: var(--text-dark); }
-.more-count { margin-left: auto; font-family: var(--font-mono); color: var(--text-dark); }
+.more-btns { grid-column: 2; display: flex; gap: 8px; }
+.more-count { grid-column: 3; justify-self: end; font-family: var(--font-mono); color: var(--text-dark); }
+.more-fail { grid-column: 1 / -1; text-align: center; }
 
 /* Every pack as a tile, each in its own colour. */
 .pf-packs { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -2662,7 +2720,7 @@ table.board tbody tr[data-me] td:first-child { box-shadow: inset 2px 0 0 var(--s
   display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px;
   margin-left: auto; padding-left: 10px;
 }
-.sb-row .chip-mod { padding: 1px 8px; font-size: 12px; }
+.sb-card-stats .mod { height: 24px; }
 .sb-empty {
   display: flex; align-items: center; gap: 20px; padding: 24px 28px;
   background: var(--bg-b); border: var(--border-width) dashed var(--border);

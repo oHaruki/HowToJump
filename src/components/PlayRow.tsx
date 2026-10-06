@@ -2,15 +2,16 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { GradeLetter, ModChip, mapHref } from "@/components/ui";
+import { GradeLetter, ModIcons, mapHref } from "@/components/ui";
 import type { Place } from "@/lib/levels";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { timeAgo } from "@/lib/time";
 
 /**
- * One play: cover art behind the row, the map and when, the grade, and what
- * it is worth. A client component, since the fold below a list draws these
- * in the browser too.
+ * One play as a slim row: place, grade, the map, then mods, accuracy,
+ * misses and EXP in columns of one width, with the cover art fading in from
+ * the left. A client component, since the fold below a list draws these in
+ * the browser too.
  */
 
 export type PlayView = {
@@ -36,11 +37,10 @@ export type PlayView = {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 
-/** `rank` is the play's place in its list, shown before the pack. */
+/** `rank` is the play's place in its list, shown first. */
 export function PlayRow({ play: p, rank }: { play: PlayView; rank?: number }) {
   const tier = tierByOrder(p.tierOrder);
   const colour = tier ? tier.color : "#777";
-  const misses = p.missCount === 1 ? "1 miss" : p.missCount + " misses";
   const best = p.places[0];
 
   return (
@@ -51,7 +51,7 @@ export function PlayRow({ play: p, rank }: { play: PlayView; rank?: number }) {
         {
           "--pack": colour,
           "--art-fill":
-            "linear-gradient(120deg, color-mix(in srgb, " + colour + " 30%, var(--bg-d)), var(--bg-d))",
+            "linear-gradient(120deg, color-mix(in srgb, " + colour + " 45%, var(--bg-d)), var(--bg-d))",
         } as CSSProperties
       }
     >
@@ -59,7 +59,6 @@ export function PlayRow({ play: p, rank }: { play: PlayView; rank?: number }) {
         {p.osuBeatmapsetId ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            // card, not cover: the strip is 620px at its widest and dimmed.
             src={"https://assets.ppy.sh/beatmaps/" + p.osuBeatmapsetId + "/covers/card.jpg"}
             alt=""
             loading="lazy"
@@ -67,44 +66,42 @@ export function PlayRow({ play: p, rank }: { play: PlayView; rank?: number }) {
           />
         ) : null}
       </div>
-      <div className="play-in">
-        <span className="play-lead">
-          {rank != null ? <span className="play-rank">#{rank}</span> : null}
-          <span className="play-gem" style={{ background: tierFill(tier) }} title={tier?.name} />
+      {rank != null ? <span className="play-rank">#{rank}</span> : null}
+      <span className="play-grade">
+        <GradeLetter grade={p.grade} />
+      </span>
+      <div className="play-info">
+        <Link className="play-title" href={mapHref(p.osuBeatmapId, p.mod)}>
+          {p.title}
+          {p.version ? <span> [{p.version}]</span> : null}
+        </Link>
+        <div className="play-sub">
+          <span className="play-gem" style={{ background: tierFill(tier) }} />
+          <span>{tier?.name}</span>
+          <span aria-hidden>·</span>
+          <span>{p.categories.map((c) => shortCategory(c)).join(" + ")}</span>
+          <span aria-hidden>·</span>
+          <span>{timeAgo(p.playedAt)}</span>
+          {p.fresh ? <span className="chip fresh">{p.fresh}</span> : null}
+        </div>
+      </div>
+      <div className="play-stats">
+        <span className="play-mods">{p.mod !== "NM" ? <ModIcons mod={p.mod} /> : null}</span>
+        <span className="play-acc">{p.accuracy != null ? p.accuracy.toFixed(2) + "%" : "·"}</span>
+        <span className="play-miss" data-zero={p.missCount === 0 || undefined}>
+          {p.missCount}
+          <i>{p.missCount === 1 ? " miss" : " misses"}</i>
         </span>
-        <div className="play-info">
-          <Link className="play-title" href={mapHref(p.osuBeatmapId, p.mod)}>
-            {p.title}
-            {p.version ? <span> [{p.version}]</span> : null}
-          </Link>
-          <div className="play-sub">
-            {p.mod !== "NM" ? <ModChip mod={p.mod} /> : null}
-            <span>{tier?.name}</span>
-            <span aria-hidden>·</span>
-            <span>{p.categories.map((c) => shortCategory(c)).join(" + ")}</span>
-            <span aria-hidden>·</span>
-            <span>{timeAgo(p.playedAt)}</span>
-            {p.fresh ? <span className="chip fresh">{p.fresh}</span> : null}
-          </div>
-        </div>
-        <div className="play-score">
-          <GradeLetter grade={p.grade} />
-          <span className="play-acc">
-            {p.accuracy != null ? p.accuracy.toFixed(2) + "%" : "·"}
-            <br />
-            {misses}
-          </span>
-        </div>
-        <div className="play-exp">
-          <b>{fmt(p.exp)}</b>
-          <span
-            data-counts={best ? true : undefined}
-            title={p.places.map((x) => "#" + x.place + " " + shortCategory(x.category)).join(", ") || undefined}
-          >
-            {best ? "#" + best.place + " " + shortCategory(best.category) : "EXP"}
-            {p.places.length > 1 ? " +" + (p.places.length - 1) : null}
-          </span>
-        </div>
+      </div>
+      <div className="play-exp">
+        <b>{fmt(p.exp)}</b>
+        <span
+          data-counts={best ? true : undefined}
+          title={p.places.map((x) => "#" + x.place + " " + shortCategory(x.category)).join(", ") || undefined}
+        >
+          {best ? "#" + best.place + " " + shortCategory(best.category) : "EXP"}
+          {p.places.length > 1 ? " +" + (p.places.length - 1) : null}
+        </span>
       </div>
     </article>
   );

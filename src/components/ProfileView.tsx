@@ -13,6 +13,7 @@ import { LevelBar, SkillRadar } from "@/components/LevelView";
 import { LevelUp, type EarnedPlay } from "@/components/LevelUp";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { PlayList } from "@/components/PlayList";
+import { PlayTabs } from "@/components/PlayTabs";
 import type { PlayView } from "@/components/PlayRow";
 import { timeAgo } from "@/lib/time";
 import { SyncButton } from "@/components/SyncButton";
@@ -61,6 +62,7 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
     .flatMap((p) => (p.fresh ? [{ ...p, fresh: p.fresh }] : []))
     .sort((a, b) => b.exp - a.exp);
 
+  const freshCount = views.filter((v) => v.fresh).length;
   const clears = packRows.reduce((n, p) => n + p.entriesCleared, 0);
   const packsTouched = packRows.filter((p) => p.entriesCleared > 0).length;
   const hardest = tierByOrder(plays.reduce((m, p) => Math.max(m, p.tierOrder), 0));
@@ -252,34 +254,39 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
         </div>
       </section>
 
-      <div className="pf-lists">
-        <section className="stack">
-          <div className="section-head">
-            <h2>Top plays</h2>
-            <p className="small">
-              Ranked by EXP. The ones counting toward a level show their place in it.
-            </p>
-          </div>
-          <PlayList
-            plays={top}
-            userId={userId}
-            list="top"
-            empty={owner ? "No plays yet. Play any map from the bank." : "No plays yet."}
-          />
-        </section>
-        <section className="stack">
-          <div className="section-head">
-            <h2>Recent plays</h2>
-            <p className="small">Picked up from osu! within a minute of being set.</p>
-          </div>
-          <PlayList
-            plays={views}
-            userId={userId}
-            list="recent"
-            empty={owner ? "Nothing yet. Scores show up here a minute after you set them." : "Nothing yet."}
-          />
-        </section>
-      </div>
+      <section className="stack">
+        <PlayTabs
+          tabs={[
+            {
+              label: "Top plays",
+              note: "Ranked by EXP. The ones counting toward a level show their place in it.",
+              content: (
+                <PlayList
+                  plays={top}
+                  userId={userId}
+                  list="top"
+                  empty={owner ? "No plays yet. Play any map from the bank." : "No plays yet."}
+                />
+              ),
+            },
+            {
+              label: "Recent plays",
+              note: "Picked up from osu! within a minute of being set.",
+              badge: freshCount ? freshCount + " new" : undefined,
+              content: (
+                <PlayList
+                  plays={views}
+                  userId={userId}
+                  list="recent"
+                  empty={
+                    owner ? "Nothing yet. Scores show up here a minute after you set them." : "Nothing yet."
+                  }
+                />
+              ),
+            },
+          ]}
+        />
+      </section>
 
       <section className="stack-lg">
         <div className="section-head">

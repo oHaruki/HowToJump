@@ -87,20 +87,22 @@ export function PlayMore({
         <PlayRow key={p.scoreId} play={p} rank={list === "top" ? offset + i + 1 : undefined} />
       ))}
       <div className="more" ref={bar}>
-        {left > 0 ? (
-          <button type="button" className="more-btn" disabled={busy} onClick={() => void more()}>
-            {busy ? "Loading" : "Show " + Math.min(PAGE, left) + " more"}
-          </button>
-        ) : null}
-        {shown > 0 ? (
-          <button type="button" className="more-btn" onClick={less}>
-            Show less
-          </button>
-        ) : null}
-        {failed ? <span className="small">Could not load more. Try again.</span> : null}
+        <div className="more-btns">
+          {left > 0 ? (
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void more()}>
+              {busy ? "Loading" : "Show " + Math.min(PAGE, left) + " more"}
+            </button>
+          ) : null}
+          {shown > 0 ? (
+            <button type="button" className="btn btn-sm" onClick={less}>
+              Show less
+            </button>
+          ) : null}
+        </div>
         <span className="more-count">
           {offset + shown} of {offset + total}
         </span>
+        {failed ? <span className="small more-fail">Could not load more. Try again.</span> : null}
       </div>
     </>
   );

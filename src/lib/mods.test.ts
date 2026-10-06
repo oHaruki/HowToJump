@@ -5,7 +5,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { modsAsPlayed, modsFromApi, modsText, refusedMod } from "./mods";
+import { OSU_MODS, modParts, modsAsPlayed, modsFromApi, modsText, refusedMod } from "./mods";
 
 test("a play with No Fail, Relax, Autopilot or Difficulty Adjust doesn't count", () => {
   assert.equal(refusedMod([{ acronym: "HD" }, { acronym: "NF" }]), "No Fail");
@@ -36,4 +36,13 @@ test("a score's mods as played keep what the bank folds away, less the classic m
   assert.equal(modsAsPlayed(null), "NM");
   // The bank's key for the same score folds Hidden away.
   assert.equal(modsFromApi([{ acronym: "HD" }, { acronym: "DT" }]), "DT");
+});
+
+test("a mod string splits into one known acronym per mod", () => {
+  assert.deepEqual(modParts("HRDT"), ["HR", "DT"]);
+  assert.deepEqual(modParts("HDDT"), ["HD", "DT"]);
+  assert.deepEqual(modParts("NM"), ["NM"]);
+  assert.deepEqual(modParts(""), ["NM"]);
+  assert.deepEqual(modParts("HDSV2"), ["HD", "SV2"]);
+  for (const m of ["NM", "HR", "DT", "HT", "EZ", "FL", "HD", "NC"]) assert.ok(OSU_MODS[m], m);
 });

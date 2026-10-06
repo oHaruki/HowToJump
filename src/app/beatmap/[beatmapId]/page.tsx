@@ -15,7 +15,7 @@ import { NO_VOTES, type VoteTally } from "@/lib/votes";
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import {
-  Flag, GradeLetter, ModChip, PacingChips, SpecialChip, StaffVoteLink, mapHref,
+  Flag, GradeLetter, ModChip, ModIcons, PacingChips, SpecialChip, StaffVoteLink, mapHref,
 } from "@/components/ui";
 import { ScoreDelete } from "@/components/ScoreDelete";
 import { CopyBeatmapId } from "@/components/CopyBeatmapId";
@@ -429,7 +429,7 @@ function ScoreCard({
           <div>
             <dt>Mods</dt>
             <dd>
-              <ModChip mod={s.mods} />
+              <ModIcons mod={s.mods} />
             </dd>
           </div>
           <div>
@@ -498,7 +498,7 @@ function Scoreboard({
           <span role="cell" className="c sb-num sb-exp sb-end">{fmt(expOf(s))}</span>
           <span role="cell" className="r small sb-opt">{timeAgo(s.playedAt)}</span>
           <span role="cell" className="r sb-opt">
-            <ModChip mod={s.mods} />
+            {s.mods !== "NM" ? <ModIcons mod={s.mods} /> : null}
           </span>
         </div>
       ))}

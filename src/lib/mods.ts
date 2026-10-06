@@ -87,6 +87,51 @@ export function modLabel(m: string): string {
   return MOD_NAMES[m] ?? m;
 }
 
+export type ModType = "increase" | "reduction" | "conversion" | "automation" | "system";
+
+/**
+ * osu!standard's mods by acronym, with the type that colours their icon.
+ * Each has its mark at /mods/<acronym>.svg. Fun mods are left out.
+ */
+export const OSU_MODS: Record<string, { name: string; type: ModType }> = {
+  NM: { name: "No Mod", type: "system" },
+  EZ: { name: "Easy", type: "reduction" },
+  NF: { name: "No Fail", type: "reduction" },
+  HT: { name: "Half Time", type: "reduction" },
+  DC: { name: "Daycore", type: "reduction" },
+  HR: { name: "Hard Rock", type: "increase" },
+  SD: { name: "Sudden Death", type: "increase" },
+  PF: { name: "Perfect", type: "increase" },
+  DT: { name: "Double Time", type: "increase" },
+  NC: { name: "Nightcore", type: "increase" },
+  HD: { name: "Hidden", type: "increase" },
+  TC: { name: "Traceable", type: "increase" },
+  FL: { name: "Flashlight", type: "increase" },
+  BL: { name: "Blinds", type: "increase" },
+  ST: { name: "Strict Tracking", type: "increase" },
+  AC: { name: "Accuracy Challenge", type: "increase" },
+  TP: { name: "Target Practice", type: "conversion" },
+  DA: { name: "Difficulty Adjust", type: "conversion" },
+  CL: { name: "Classic", type: "conversion" },
+  RD: { name: "Random", type: "conversion" },
+  MR: { name: "Mirror", type: "conversion" },
+  AL: { name: "Alternate", type: "conversion" },
+  SG: { name: "Single Tap", type: "conversion" },
+  AT: { name: "Autoplay", type: "automation" },
+  CN: { name: "Cinema", type: "automation" },
+  RX: { name: "Relax", type: "automation" },
+  AP: { name: "Autopilot", type: "automation" },
+  SO: { name: "Spun Out", type: "automation" },
+  TD: { name: "Touch Device", type: "system" },
+  SV2: { name: "Score V2", type: "system" },
+};
+
+/** A mod string as one acronym per mod: "HDDT" into HD and DT, "" into NM. */
+export function modParts(mod: string | null | undefined): string[] {
+  const raw = String(mod ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return raw.match(/SV2|[A-Z0-9]{2}/g) ?? ["NM"];
+}
+
 /** Canonical mod strings as words: "nomod", "nomod and +HR", "nomod, +HR and +DT". */
 export function modsText(mods: string[]): string {
   const one = (m: string) => (m === "NM" ? "nomod" : "+" + m);

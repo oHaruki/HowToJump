@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { TIERS, tierByName, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
 import type { SpecialPack } from "@/lib/packs";
-import { modLabel } from "@/lib/mods";
+import { OSU_MODS, modLabel, modParts } from "@/lib/mods";
 import { Cover } from "@/components/Cover";
 
 /** Middot stands in for an empty cell so a lone dash never reads as a minus. */
@@ -28,6 +28,34 @@ export function ModChip({ mod }: { mod: string }) {
   return (
     <span className="chip chip-mod" data-nm={String(m === "NM")} title={modLabel(m)}>
       {m}
+    </span>
+  );
+}
+
+/**
+ * Mods as osu! draws them: a hexagon per mod in its type's colour, with the
+ * mod's mark on it, or its letters for a mod without one.
+ */
+export function ModIcons({ mod }: { mod: string }) {
+  return (
+    <span className="mods">
+      {modParts(mod).map((a, i) => {
+        const known = OSU_MODS[a];
+        return (
+          <span
+            key={a + i}
+            className="mod"
+            role="img"
+            aria-label={known?.name ?? a}
+            title={known?.name ?? a}
+            data-type={known?.type}
+            data-mark={known ? true : undefined}
+            style={known ? ({ "--mark": "url(/mods/" + a + ".svg)" } as CSSProperties) : undefined}
+          >
+            {known ? null : a}
+          </span>
+        );
+      })}
     </span>
   );
 }
