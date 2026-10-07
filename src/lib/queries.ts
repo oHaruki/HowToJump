@@ -1,7 +1,8 @@
 import {
-  and, arrayContained, arrayContains, arrayOverlaps, asc, desc, eq, ilike, inArray, isNull, not,
-  or, sql as raw,
+  and, arrayContained, arrayOverlaps, asc, desc, eq, ilike, inArray, isNull, not, notInArray,
+  or, sql as raw, type SQL,
 } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import {
   beatmaps, deletedScores, entries, entryVotes, packs, roles, scores, siteConfig, spotlights,
@@ -13,7 +14,10 @@ import {
 } from "@/lib/roles";
 import { byWorth, playExp } from "@/lib/levels";
 import { packStandings, type PackStanding, type SpecialPack } from "@/lib/packs";
-import { CATEGORIES, LENGTHS, SPEEDS, normalizeCategory, orderByScale } from "@/lib/tiers";
+import { MODS } from "@/lib/mods";
+import {
+  CATEGORIES, LENGTHS, SPEEDS, categoryKeys, normalizeCategories, normalizeCategory, orderByScale,
+} from "@/lib/tiers";
 import type { PackVote, StayTally, VoteTally } from "@/lib/votes";
 
 /** On the ladder rather than in a special pack. */
@@ -59,18 +63,21 @@ export type BankStatus = "listed" | "removed" | "all";
 /** How the bank is ordered: by pack, or by when an entry was added. */
 export type BankSort = "pack" | "newest" | "oldest";
 
+/** Values a filter shows only, and values it hides. */
+export type Facet<T = string> = { only?: readonly T[]; not?: readonly T[] };
+
 export type BankFilters = {
   q?: string;
-  /** A ladder pack's order. */
-  pack?: number;
-  /** A special pack's ID. */
-  specialPack?: number;
+  /** Ladder packs by order. */
+  packs?: Facet<number>;
+  /** Special packs by ID. */
+  specialPacks?: Facet<number>;
   /** Staff only: special packs' maps beside the ladder's when no pack is picked. */
   everyPack?: boolean;
-  category?: string;
-  mod?: string;
-  length?: string;
-  speed?: string;
+  category?: Facet;
+  mod?: Facet;
+  length?: Facet;
+  speed?: Facet;
   /** Staff only. Defaults to "listed" everywhere else. */
   status?: BankStatus;
   /** Staff only: entries carrying a dropped category, or none at all. */
@@ -151,13 +158,12 @@ function bankWhere(filters: BankFilters) {
       )!,
     );
   }
-  if (filters.specialPack) where.push(eq(entries.packId, filters.specialPack));
-  else if (!filters.everyPack) where.push(onLadder);
-  if (filters.pack) where.push(eq(entries.tierOrder, filters.pack));
-  if (filters.category) where.push(arrayContains(entries.categories, [filters.category]));
-  if (filters.mod) where.push(eq(entries.mod, filters.mod));
-  if (filters.length) where.push(eq(entries.lengthBucket, filters.length));
-  if (filters.speed) where.push(eq(entries.speedBucket, filters.speed));
+  where.push(...packWhere(filters));
+  if (filters.category?.only?.length) where.push(hasCategory(filters.category.only));
+  if (filters.category?.not?.length) where.push(not(hasCategory(filters.category.not)));
+  where.push(...columnWhere(entries.mod, filters.mod));
+  where.push(...columnWhere(entries.lengthBucket, filters.length));
+  where.push(...columnWhere(entries.speedBucket, filters.speed));
   if (filters.q) {
     const like = "%" + filters.q + "%";
     where.push(
@@ -170,6 +176,44 @@ function bankWhere(filters: BankFilters) {
     );
   }
   return and(...where);
+}
+
+/** Picked packs, ladder and special. With none picked, the ladder unless `everyPack`. */
+function packWhere(filters: BankFilters): SQL[] {
+  const ladder = filters.packs ?? {};
+  const special = filters.specialPacks ?? {};
+  const where: SQL[] = [];
+
+  const shown = [
+    ladder.only?.length ? and(onLadder, inArray(entries.tierOrder, [...ladder.only])) : undefined,
+    special.only?.length ? inArray(entries.packId, [...special.only]) : undefined,
+  ].filter((c) => c !== undefined);
+  if (shown.length) where.push(or(...shown)!);
+  else if (!filters.everyPack) where.push(onLadder);
+
+  if (ladder.not?.length) {
+    where.push(not(and(onLadder, inArray(entries.tierOrder, [...ladder.not]))!));
+  }
+  if (special.not?.length) {
+    where.push(or(isNull(entries.packId), notInArray(entries.packId, [...special.not]))!);
+  }
+  return where;
+}
+
+/** A one-value column held to a facet. An empty column is never hidden. */
+function columnWhere(column: AnyPgColumn, facet: Facet | undefined): SQL[] {
+  const where: SQL[] = [];
+  if (facet?.only?.length) where.push(inArray(column, [...facet.only]));
+  if (facet?.not?.length) where.push(or(isNull(column), notInArray(column, [...facet.not]))!);
+  return where;
+}
+
+/** Entries carrying any spelling of these categories, folded the way normalizeCategory folds. */
+function hasCategory(categories: readonly string[]): SQL {
+  const keys = [...new Set(categories.flatMap(categoryKeys))];
+  if (!keys.length) return raw`false`;
+  return raw`exists (select 1 from unnest(${entries.categories}) as c(label)
+    where regexp_replace(lower(c.label), '[^a-z0-9+]', '', 'g') in ${keys})`;
 }
 
 /* The ladder, then each special pack. Hardest pack first, hardest map
@@ -300,31 +344,50 @@ export async function getBankStats() {
   return { total: row?.total ?? 0, hardest: row?.hardest ?? null };
 }
 
+/** One value a filter offers, and how many entries carry it. */
+export type FacetOption = { value: string; n: number };
+
+export type Facets = {
+  categories: FacetOption[];
+  mods: FacetOption[];
+  lengths: FacetOption[];
+  speeds: FacetOption[];
+};
+
 /**
- * Distinct values present in the bank, for the filter dropdowns. Distinct
- * in SQL, so this stays a few dozen rows however big the bank gets.
- * `everyPack` reads special packs' maps too.
+ * Values present in the bank with their counts, for the filters. Grouped in
+ * SQL, so this stays a few dozen rows however big the bank gets. Old
+ * category spellings count under their current name. `everyPack` reads
+ * special packs' maps too.
  */
-export async function getFacets(status: BankStatus = "listed", everyPack = false) {
+export async function getFacets(status: BankStatus = "listed", everyPack = false): Promise<Facets> {
   const rows = await db
-    .selectDistinct({
+    .select({
       categories: entries.categories,
       mod: entries.mod,
       lengthBucket: entries.lengthBucket,
       speedBucket: entries.speedBucket,
+      n: raw<number>`count(*)::int`,
     })
     .from(entries)
-    .where(and(statusWhere(status), everyPack ? undefined : onLadder));
-
-  const uniq = (xs: Array<string | null>) =>
-    Array.from(new Set(xs.filter((x): x is string => Boolean(x)))).sort();
+    .where(and(statusWhere(status), everyPack ? undefined : onLadder))
+    .groupBy(entries.categories, entries.mod, entries.lengthBucket, entries.speedBucket);
 
   // Each filter in its own scale's order, with unknown values last.
+  const tally = (pairs: Array<[string | null, number]>, order: string[]): FacetOption[] => {
+    const counts = new Map<string, number>();
+    for (const [v, n] of pairs) if (v) counts.set(v, (counts.get(v) ?? 0) + n);
+    return orderByScale([...counts.keys()], order).map((value) => ({ value, n: counts.get(value)! }));
+  };
+
   return {
-    categories: orderByScale(uniq(rows.flatMap((r) => r.categories)), CATEGORIES),
-    mods: uniq(rows.map((r) => r.mod)),
-    lengths: orderByScale(uniq(rows.map((r) => r.lengthBucket)), LENGTHS),
-    speeds: orderByScale(uniq(rows.map((r) => r.speedBucket)), SPEEDS),
+    categories: tally(
+      rows.flatMap((r) => normalizeCategories(r.categories).map((c): [string, number] => [c, r.n])),
+      CATEGORIES,
+    ),
+    mods: tally(rows.map((r) => [r.mod, r.n]), MODS),
+    lengths: tally(rows.map((r) => [r.lengthBucket, r.n]), LENGTHS),
+    speeds: tally(rows.map((r) => [r.speedBucket, r.n]), SPEEDS),
   };
 }
 

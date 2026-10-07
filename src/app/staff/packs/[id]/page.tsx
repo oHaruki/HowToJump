@@ -26,7 +26,7 @@ export default async function SpecialPackAdminPage({
   const all = await getSpecialPacks();
   const pack = all.find((p) => p.id === id);
   if (!pack) notFound();
-  const maps = await getBank({ specialPack: pack.id });
+  const maps = await getBank({ specialPacks: { only: [pack.id] } });
   const special = all.map(({ id, name, color }) => ({ id, name, color }));
 
   return (

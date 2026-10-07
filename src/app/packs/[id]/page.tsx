@@ -49,7 +49,7 @@ export default async function SpecialPackPage({
   const board = sp.view === "board";
   const session = await auth();
   const [maps, mine] = await Promise.all([
-    getBank({ specialPack: pack.id }),
+    getBank({ specialPacks: { only: [pack.id] } }),
     session?.userId ? getPackScoresOf(pack.id, session.userId) : null,
   ]);
   const cleared = mine ? maps.filter((m) => mine.has(m.entryId)).length : 0;

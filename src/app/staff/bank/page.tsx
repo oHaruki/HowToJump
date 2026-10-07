@@ -6,9 +6,7 @@ import { can } from "@/lib/roles";
 import {
   getBankPage, getFacets, getSpecialPacks, getTierCounts, type BankPage,
 } from "@/lib/queries";
-import {
-  bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
-} from "@/lib/bank-params";
+import { bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search } from "@/lib/bank-params";
 import type { SpecialPack } from "@/lib/packs";
 import { TIERS } from "@/lib/tiers";
 import { Loading, SectionHead } from "@/components/ui";
@@ -37,7 +35,7 @@ export default async function StaffBankPage({
   // Not awaited, so the bar is on screen while the rows are still coming.
   const bank = getBankPage(filters, page);
 
-  // The dropdowns and the pack counts read the same side of the ladder the
+  // The filters and the pack counts read the same side of the ladder the
   // list does, so switching to removed entries cannot offer a category or a
   // pack that has nothing in it.
   const [facets, tierCounts, specialRows] = await Promise.all([
@@ -66,11 +64,7 @@ export default async function StaffBankPage({
         basePath={BASE}
         staff
         packCounts={packCounts}
-        categories={facets.categories}
-        mods={facets.mods}
-        lengths={facets.lengths}
-        speeds={facets.speeds}
-        current={bankCurrentFrom(sp)}
+        facets={facets}
         count={<Suspense fallback="…"><BankCount bank={bank} /></Suspense>}
         special={special}
       />

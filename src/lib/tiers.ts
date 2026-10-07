@@ -176,6 +176,13 @@ export function normalizeCategory(input: string | null | undefined): string {
   return canonical(CATEGORIES, CATEGORY_ALIASES, input);
 }
 
+/** A category's folded spellings, its own and its old names', for matching stored labels. */
+export function categoryKeys(category: string): string[] {
+  const keys = new Set([bucketKey(category)]);
+  for (const [k, v] of Object.entries(CATEGORY_ALIASES)) if (v === category) keys.add(k);
+  return [...keys].filter(Boolean);
+}
+
 /**
  * A map's categories, from a list or from one cell holding several. Each is
  * normalised, repeats dropped, returned in the scale's order. Hyphens are

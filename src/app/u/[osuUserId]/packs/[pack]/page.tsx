@@ -50,7 +50,7 @@ export default async function PackPage({ params }: { params: Params }) {
 
   const [session, maps, plays, counts] = await Promise.all([
     auth(),
-    getBank({ pack: tier.order }),
+    getBank({ packs: { only: [tier.order] } }),
     getProfilePlays(player.id),
     getTierCounts(),
   ]);

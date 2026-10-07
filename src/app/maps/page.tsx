@@ -5,9 +5,7 @@ import { can } from "@/lib/roles";
 import {
   getBankPage, getFacets, getPackVotes, getTierCounts, type BankPage,
 } from "@/lib/queries";
-import {
-  bankCurrentFrom, bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search,
-} from "@/lib/bank-params";
+import { bankFiltersFrom, bankPageFrom, bankQueryFrom, type Search } from "@/lib/bank-params";
 import { TIERS } from "@/lib/tiers";
 import { Loading, SectionHead } from "@/components/ui";
 import { MapList } from "@/components/MapList";
@@ -50,11 +48,7 @@ export default async function MapsPage({
 
       <BankFilters
         packCounts={packCounts}
-        categories={facets.categories}
-        mods={facets.mods}
-        lengths={facets.lengths}
-        speeds={facets.speeds}
-        current={bankCurrentFrom(sp)}
+        facets={facets}
         count={<Suspense fallback="…"><BankCount bank={bank} /></Suspense>}
       />
 

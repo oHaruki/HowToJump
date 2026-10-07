@@ -325,8 +325,8 @@ input[type="checkbox"] { accent-color: var(--text-focus); width: 15px; height: 1
  */
 /* 50 clears the importer's bulk bar (40), which would otherwise cover a popup
    opened in the link box above it. */
-.box:has(.packgrid-pop) { overflow: visible; z-index: 50; }
-.box > *:has(.packgrid-pop) { z-index: 50; }
+.box:has(.packgrid-pop, .fmenu-pop) { overflow: visible; z-index: 50; }
+.box > *:has(.packgrid-pop, .fmenu-pop) { z-index: 50; }
 /* Kept for boxes that should never clip, popup open or not. */
 .box-open { overflow: visible; z-index: 30; }
 
@@ -1539,71 +1539,290 @@ footer {
 /* --------------------------------------------------------------- bank bar */
 
 /*
- * The filter bar sticks below the nav, so the controls and the entry count
- * stay a click away down a long list. Above the cards but below the nav, so
- * the pack popup drops over the list and the nav passes over the bar.
+ * The filter bar sticks below the nav. Above the cards but below the nav,
+ * so a filter's panel drops over the list and the nav passes over the bar.
  */
 .bankbar {
   position: sticky; top: var(--nav-height); z-index: 30;
   display: flex; flex-direction: column; gap: 12px;
 }
+.bankbar-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bankbar-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .bankbar-toggle { display: none; }
-@media (max-width: 720px) {
-  .bankbar { position: static; }
-  .bankbar-controls { flex-wrap: wrap; }
-  .bankbar-controls > .field { display: none; flex: 1 1 calc(50% - 10px) !important; }
-  .bankbar-controls > .field-search { display: flex; flex: 1 1 0 !important; }
-  .bankbar[data-open] .bankbar-controls > .field { display: flex; }
-  .bankbar-toggle { display: inline-flex; flex: none; min-width: 0; }
-  .bankbar-toggle[aria-expanded="true"] { background: var(--bg-d); }
-}
 .bankbar-state {
-  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
-  padding-top: 11px;
+  display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap;
+  padding-top: 12px;
   border-top: var(--border-width) solid var(--border-soft);
 }
+.bankbar-count { font-size: var(--font-size-small); color: var(--text-focus); white-space: nowrap; }
+.bankbar-sort { margin-left: auto; }
+.bankbar-sort .fpill {
+  height: 32px; padding: 0 10px 0 12px; font-size: var(--font-size-small);
+  background: transparent; border-color: transparent;
+}
+.bankbar-sort .fpill:hover, .bankbar-sort .fpill[aria-expanded="true"] {
+  background: var(--bg-c); border-color: var(--border);
+}
+/* A light running along the rule while the list loads. */
+.bankbar-state[data-pending]::before {
+  content: ""; position: absolute; left: 0; top: calc(-1 * var(--border-width));
+  width: 30%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--text-focus), transparent);
+  animation: bankbar-busy 1.1s var(--ease-out) infinite;
+}
+@keyframes bankbar-busy {
+  from { transform: translateX(0); opacity: 0; }
+  30% { opacity: 1; }
+  to { transform: translateX(233%); opacity: 0; }
+}
+
+.ficon { width: 16px; height: 16px; flex: none; }
+
+.fsearch { position: relative; flex: 999 1 280px; min-width: 0; }
+.fsearch input { padding-inline: 38px 40px; font-size: 16px; }
+.fsearch input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.fsearch-icon {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--text-dark); pointer-events: none;
+  transition: color var(--dur-fast);
+}
+.fsearch:focus-within .fsearch-icon { color: var(--text-focus); }
+.fsearch-clear {
+  appearance: none; cursor: pointer; font: inherit;
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; display: grid; place-items: center;
+  font-size: 19px; line-height: 1; color: var(--text-dark);
+  background: transparent; border: 0;
+  border-radius: 7px; corner-shape: var(--corner-shape);
+}
+.fsearch-clear:hover { color: var(--text-focus); background: var(--bg-c); }
+
+@media (max-width: 720px) {
+  .bankbar { position: static; }
+  .fsearch { flex: 1 1 0; }
+  .bankbar-toggle { display: inline-flex; flex: none; min-width: 0; padding-inline: 13px 11px; }
+  .bankbar-toggle[aria-expanded="true"] { background: var(--bg-d); }
+  .bankbar-pills {
+    display: none; position: relative; flex: 1 1 100%;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  }
+  .bankbar[data-open] .bankbar-pills { display: grid; }
+  .bankbar-pills .fmenu { position: static; }
+  .bankbar-pills .fpill { width: 100%; }
+  .bankbar-pills .fmenu-pop[data-align] { left: 0; right: 0; width: auto; max-width: none; }
+  /* The count and the sort on one line, the chips under them. */
+  .bankbar-state > .fchips { order: 1; flex: 1 1 100%; }
+  .bankbar-none { display: none; }
+}
+
+/* ------------------------------------------------------------ filter menus */
+
+/* A pill naming its filter, with how many values it shows only and hides. */
+.fmenu { position: relative; }
+.fpill {
+  appearance: none; cursor: pointer; font: inherit;
+  height: var(--control-height); padding: 0 11px 0 14px;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 15px; color: var(--text); white-space: nowrap;
+  background: var(--bg-b);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--control-radius); corner-shape: var(--corner-shape);
+  transition: color var(--dur-fast), background var(--dur-fast), border-color var(--dur-fast);
+}
+.fpill .caret { margin-left: auto; transition: transform var(--dur-fast); }
+.fpill:hover { color: var(--text-focus); border-color: color-mix(in srgb, var(--text-focus) 26%, var(--border)); }
+.fpill[data-active], .fpill[aria-expanded="true"] {
+  color: var(--text-focus); background: var(--bg-c);
+  border-color: color-mix(in srgb, var(--text-focus) 32%, var(--border));
+}
+.fpill[aria-expanded="true"] .caret { transform: rotate(180deg); }
+.fpill-key { color: var(--text-dark); }
+.fpill-val { color: var(--text-focus); }
+.fpill-n {
+  display: inline-grid; place-items: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--main-bg); background: var(--text-focus);
+  border-radius: 6px; corner-shape: var(--corner-shape);
+}
+.fpill-n[data-not] { color: var(--danger); background: color-mix(in srgb, var(--danger) 20%, var(--bg-c)); }
+
+.fmenu-pop {
+  --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --dash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' stroke='black' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  position: absolute; left: 0; top: calc(100% + 8px); z-index: 60;
+  width: max-content; min-width: 240px; max-width: min(92vw, 560px);
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--bg-b);
+  border: var(--border-width) solid var(--border);
+  border-radius: 14px; corner-shape: var(--corner-shape);
+  box-shadow: inset 0 1px 0 #ffffff0a, 0 24px 48px #00000080, 0 2px 8px #00000059;
+  animation: fmenu-in var(--dur-fast) var(--ease-out);
+}
+.fmenu-pop[data-align="end"] { left: auto; right: 0; }
+@keyframes fmenu-in { from { opacity: 0; transform: translateY(-4px); } }
+.fmenu-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 30px; padding: 4px 8px 2px 10px;
+}
+.fmenu-reset {
+  appearance: none; cursor: pointer; font: inherit;
+  font-size: var(--font-size-small); color: var(--text-dark);
+  background: transparent; border: 0; padding: 2px 4px;
+  text-decoration: underline; text-decoration-color: var(--link-underline); text-underline-offset: 2px;
+}
+.fmenu-reset:hover { color: var(--text-focus); text-decoration-color: currentColor; }
+.fmenu-group { display: flex; flex-direction: column; gap: 2px; }
+.fmenu-sub { padding: 8px 10px 2px; }
+.fmenu-foot {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin: 2px 4px 0; padding: 9px 6px 4px;
+  border-top: var(--border-width) solid var(--border-soft);
+  font-size: 12.5px; color: var(--text-dark);
+}
+.fmenu-foot .fopt-box { width: 14px; height: 14px; border-radius: 4px; }
+.fmenu-foot .ficon { width: 15px; height: 15px; }
+.fmenu-foot-gap { width: 8px; }
+
+/* Values down the rows, in columns when the list is long. */
+.fopts { display: flex; flex-direction: column; gap: 1px; }
+.fopts[data-columns] {
+  display: grid; grid-auto-flow: column; column-gap: 4px;
+  grid-template-rows: repeat(var(--rows), auto); grid-auto-columns: minmax(0, 1fr);
+}
+.fopt {
+  display: flex; align-items: center;
+  border-radius: 8px; corner-shape: var(--corner-shape);
+  transition: background var(--dur-fast);
+}
+.fopt:hover { background: var(--bg-c); }
+.fopt[data-state="only"] { background: color-mix(in srgb, var(--text-focus) 7%, transparent); }
+.fopt[data-state="not"] { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.fopt-main {
+  appearance: none; cursor: pointer; font: inherit;
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 6px 7px 10px; text-align: left;
+  font-size: 15px; color: var(--text);
+  background: transparent; border: 0;
+  border-radius: 8px; corner-shape: var(--corner-shape);
+}
+.fopt[data-state="only"] .fopt-main { color: var(--text-focus); }
+.fopt[data-empty] .fopt-main { color: var(--text-dark); }
+.fopt-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fopt[data-state="not"] .fopt-name {
+  color: color-mix(in srgb, var(--danger) 70%, var(--text-focus));
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.fopt-hint {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-dark); white-space: nowrap;
+}
+.fopt-n {
+  margin-left: auto; padding-left: 14px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+.fopt-gem {
+  width: 14px; height: 14px; flex: none;
+  border-radius: 4px; corner-shape: var(--corner-shape);
+  outline: var(--border-width) solid var(--scrim);
+}
+
+/* Empty, ticked, or a minus for a hidden value. */
+.fopt-box {
+  position: relative; flex: none; width: 16px; height: 16px;
+  border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
+  border-radius: 5px; corner-shape: var(--corner-shape);
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.fopt-box::after {
+  content: ""; position: absolute; inset: 0; opacity: 0;
+  background: var(--main-bg);
+  mask: var(--tick) center / 12px no-repeat;
+}
+.fopt[data-state="only"] .fopt-box, .fopt-box[data-demo="only"] {
+  background: var(--text-focus); border-color: var(--text-focus);
+}
+.fopt[data-state="not"] .fopt-box {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+.fopt[data-state="not"] .fopt-box::after { background: var(--danger); mask-image: var(--dash); }
+.fopt[data-state] .fopt-box::after, .fopt-box[data-demo]::after { opacity: 1; }
+
+.fopt-not {
+  appearance: none; cursor: pointer; flex: none;
+  width: 32px; height: 32px; margin-right: 2px;
+  display: grid; place-items: center;
+  color: var(--text-dark); background: transparent; border: 0;
+  border-radius: 7px; corner-shape: var(--corner-shape);
+  opacity: 0.5;
+  transition: opacity var(--dur-fast), color var(--dur-fast), background var(--dur-fast);
+}
+.fopt:hover .fopt-not, .fopt-not:focus-visible { opacity: 1; }
+.fopt-not:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.fopt-not[aria-pressed="true"] {
+  opacity: 1; color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+@media (hover: none) { .fopt-not { opacity: 0.85; } }
+
+/* One value at a time, ticked. */
+.fchoices { display: flex; flex-direction: column; gap: 1px; min-width: 190px; }
+.fchoice {
+  appearance: none; cursor: pointer; font: inherit; text-align: left;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 10px;
+  font-size: 15px; color: var(--text);
+  background: transparent; border: 0;
+  border-radius: 8px; corner-shape: var(--corner-shape);
+}
+.fchoice::before {
+  content: ""; width: 16px; height: 16px; flex: none; opacity: 0;
+  background: currentColor; mask: var(--tick) center / 14px no-repeat;
+}
+.fchoice:hover { color: var(--text-focus); background: var(--bg-c); }
+.fchoice[aria-pressed="true"] { color: var(--text-focus); }
+.fchoice[aria-pressed="true"]::before { opacity: 1; }
 
 /* ------------------------------------------------------- applied filters */
 
+/* One chip per filter, each value in it a button removing just that value. */
 .fchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-/*
- * What is actually narrowing the list, since a dropdown on its placeholder
- * looks like one with nothing set. Each chip is a button removing its own
- * filter, so the target is the size of the label.
- */
 .fchip {
-  appearance: none; cursor: pointer; font: inherit;
-  display: inline-flex; align-items: center; gap: 0; flex: none;
-  overflow: hidden; padding: 0;
+  display: inline-flex; align-items: stretch; flex: none; overflow: hidden;
   font-size: var(--font-size-small);
   border-radius: var(--control-radius); corner-shape: var(--corner-shape);
   border: var(--border-width) solid var(--border);
   background: var(--bg-c); color: var(--text);
-  transition: border-color var(--dur-fast), background var(--dur-fast);
 }
-.fchip .dot { margin-left: 8px; }
 .fchip i {
   font-style: normal; font-family: var(--font-mono);
   font-size: 11px; color: var(--text);
   text-transform: uppercase; letter-spacing: var(--letter-label);
-  align-self: stretch; display: inline-flex; align-items: center;
-  padding: 0 7px; background: var(--bg-d);
-  border-right: var(--border-width) solid var(--border);
+  display: inline-flex; align-items: center;
+  padding: 0 8px; background: var(--bg-d);
 }
-/* The dot belongs to the pack, so the key cell starts after it. */
-.fchip:has(.dot) i { margin-left: 8px; }
-.fchip b { font-weight: 400; color: var(--text-focus); padding: 3px 8px; }
-.fchip-x {
-  align-self: stretch; display: inline-flex; align-items: center;
-  padding: 0 8px 1px; font-size: 15px; line-height: 1;
-  color: var(--text-dark);
+.fchip-v {
+  appearance: none; cursor: pointer; font: inherit;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 7px 3px 9px;
+  color: var(--text-focus); background: transparent; border: 0;
   border-left: var(--border-width) solid var(--border);
+  transition: background var(--dur-fast);
 }
-.fchip:hover {
-  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
-  background: color-mix(in srgb, var(--danger) 10%, var(--bg-c));
+.fchip-v b { font-weight: 400; }
+.fchip-v em {
+  font-style: normal; font-family: var(--font-mono);
+  font-size: 11px; text-transform: uppercase; letter-spacing: var(--letter-label);
+  color: var(--danger);
 }
-.fchip:hover .fchip-x { color: var(--danger); }
+.fchip-x { font-size: 15px; line-height: 1; color: var(--text-dark); padding-bottom: 1px; }
+.fchip-v:hover { background: color-mix(in srgb, var(--danger) 10%, var(--bg-c)); }
+.fchip-v:hover .fchip-x { color: var(--danger); }
 
 .fchip-clear {
   appearance: none; cursor: pointer; font: inherit;
