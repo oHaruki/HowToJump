@@ -510,13 +510,17 @@ main { padding-block: 40px 72px; min-height: calc(100vh - var(--nav-height) - 80
   font-style: normal; font-family: var(--font-mono);
   font-size: 11px; color: var(--text);
   text-transform: uppercase; letter-spacing: var(--letter-label);
-  align-self: stretch; display: inline-flex; align-items: center;
+  align-self: stretch; display: inline-flex; align-items: center; gap: 6px;
   padding: 0 7px; background: var(--bg-d);
   border-right: var(--border-width) solid var(--border);
 }
 .chip-keyed b {
   font-weight: 400; color: var(--text-focus); padding: 3px 9px;
 }
+/* Line icons on a map's tags. */
+.ticon { width: 15px; height: 15px; flex: none; }
+.chip > .ticon { margin-left: -2px; color: var(--text-focus); }
+.chip-keyed i .ticon { width: 14px; height: 14px; color: var(--text-focus); }
 .chip.ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 32%, var(--border)); background: color-mix(in srgb, var(--success) 9%, var(--bg-c)); }
 .chip.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 32%, var(--border)); background: color-mix(in srgb, var(--warning) 9%, var(--bg-c)); }
 .chip.bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, var(--border)); background: color-mix(in srgb, var(--danger) 9%, var(--bg-c)); }
@@ -1199,7 +1203,7 @@ footer {
 }
 .pvote-btn {
   appearance: none; cursor: pointer; font: inherit;
-  display: inline-flex; align-items: baseline; gap: 6px;
+  display: inline-flex; align-items: center; gap: 6px;
   padding: 1px 9px; min-height: 26px; border: 0; background: none; color: var(--text);
   font-size: var(--font-size-small);
   border-radius: 8px; corner-shape: var(--corner-shape);
@@ -1211,7 +1215,8 @@ footer {
   box-shadow: inset 0 0 0 var(--border-width) var(--border);
 }
 .pvote-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.pvote-sym { font-family: var(--font-mono); font-weight: 600; color: var(--text-focus); }
+.pvote-sym { display: inline-flex; color: var(--text-focus); }
+.pvote-sym .ticon { width: 14px; height: 14px; }
 .pvote-btn b {
   font-family: var(--font-mono); font-weight: 400;
   font-variant-numeric: tabular-nums;

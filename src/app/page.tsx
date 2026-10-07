@@ -3,7 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getBankStats, getRecentEntries, getTierCounts } from "@/lib/queries";
 import {
-  CategoryChips, LadderGrid, ModChip, NONE, Stat, TierChip, beatmapUrl,
+  CategoryChips, LadderGrid, ModIcons, NONE, Stat, TierChip, beatmapUrl,
 } from "@/components/ui";
 import { Cover } from "@/components/Cover";
 import { CountUp } from "@/components/CountUp";
@@ -120,7 +120,7 @@ export default async function OverviewPage() {
                   </div>
                   <div className="row-tight">
                     <TierChip tier={m.tierOrder} />
-                    <ModChip mod={m.mod} />
+                    <ModIcons mod={m.mod} />
                     <CategoryChips categories={m.categories} />
                   </div>
                   <div className="statline">

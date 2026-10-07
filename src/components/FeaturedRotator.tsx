@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { Cover } from "@/components/Cover";
-import { CategoryChips, ModChip, NONE, TierChip } from "@/components/ui";
+import { CategoryChips, ModIcons, NONE, TierChip } from "@/components/ui";
 import type { BankRow } from "@/lib/queries";
 import { tierByOrder } from "@/lib/tiers";
 
@@ -99,7 +99,7 @@ export function FeaturedRotator({
           </span>
           <div className="row-tight" style={{ marginTop: 2 }}>
             <TierChip tier={m.tierOrder} />
-            <ModChip mod={m.mod} />
+            <ModIcons mod={m.mod} />
             <CategoryChips categories={m.categories} />
           </div>
           <div className="statline">

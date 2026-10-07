@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackVote } from "@/components/PackVote";
-import { CategoryChips, ModChip, PacingChips, StaffVoteLink, mapHref } from "@/components/ui";
+import { CategoryChips, ModIcons, PacingChips, StaffVoteLink, mapHref } from "@/components/ui";
 import type { BankRow } from "@/lib/queries";
 import { timeAgo } from "@/lib/time";
 import { NO_VOTES, type VoteTally } from "@/lib/votes";
@@ -79,7 +79,7 @@ export function BankCard({
       pack={<PackTile tierOrder={m.tierOrder} />}
       tags={
         <>
-          <ModChip mod={m.mod} />
+          <ModIcons mod={m.mod} />
           <CategoryChips categories={m.categories} />
           <PacingChips length={m.lengthBucket} speed={m.speedBucket} />
           {added ? <span className="small">Added {timeAgo(added)}</span> : null}

@@ -10,7 +10,7 @@ import {
 import { MODS, modsText } from "@/lib/mods";
 import { specialPackId, type SpecialPack } from "@/lib/packs";
 import { timeAgo } from "@/lib/time";
-import { CategoryChips, ModChip, PacingChips, PickSelect, SpecialChip } from "@/components/ui";
+import { CategoryChips, ModIcons, PacingChips, PickSelect, SpecialChip } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
 import { CategoryPicker } from "@/components/CategoryPicker";
@@ -204,7 +204,7 @@ export function BankAdminTable({
                   </>
                 ) : (
                   <>
-                    <ModChip mod={r.mod} />
+                    <ModIcons mod={r.mod} />
                     <CategoryChips categories={r.categories} />
                     <PacingChips length={r.lengthBucket} speed={r.speedBucket} />
                     {r.judgedByName || showAdded ? (

@@ -7,7 +7,7 @@ import type { BankRow, Spotlight } from "@/lib/queries";
 import { tierByOrder } from "@/lib/tiers";
 import { stayLean, votedPack, withStay, type StayTally, type VoteTally } from "@/lib/votes";
 import { MapCard, PackTile } from "@/components/MapCard";
-import { CategoryChips, ModChip, SpecialChip, mapHref } from "@/components/ui";
+import { CategoryChips, ModIcons, SpecialChip, mapHref } from "@/components/ui";
 
 type Mode = null | "spotlight" | "stay" | "remove";
 
@@ -190,7 +190,7 @@ export function VoteCard({
       }
       tags={
         <>
-          <ModChip mod={map.mod} />
+          <ModIcons mod={map.mod} />
           <CategoryChips categories={map.categories} />
         </>
       }

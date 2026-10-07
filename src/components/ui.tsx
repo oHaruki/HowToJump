@@ -1,9 +1,10 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { TIERS, tierByName, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
 import type { SpecialPack } from "@/lib/packs";
-import { OSU_MODS, modLabel, modParts } from "@/lib/mods";
+import { OSU_MODS, modParts } from "@/lib/mods";
 import { Cover } from "@/components/Cover";
+import { CategoryIcon, LengthIcon, SpeedIcon } from "@/components/TagIcons";
 
 /** Middot stands in for an empty cell so a lone dash never reads as a minus. */
 export const NONE = "·";
@@ -19,15 +20,6 @@ export function TierChip({ tier }: { tier: Tier | string | number | null }) {
     <span className="chip chip-tier">
       <span className="dot" style={{ background: tierFill(t) }} />
       {t ? t.name : "unassigned"}
-    </span>
-  );
-}
-
-export function ModChip({ mod }: { mod: string }) {
-  const m = mod || "NM";
-  return (
-    <span className="chip chip-mod" data-nm={String(m === "NM")} title={modLabel(m)}>
-      {m}
     </span>
   );
 }
@@ -62,7 +54,8 @@ export function ModIcons({ mod }: { mod: string }) {
 
 /**
  * Length and speed, one keyed chip each, on a line of their own. Both are
- * graded words, so each carries its key in a recessed cell.
+ * graded words, so each carries its key in a recessed cell, with a dial
+ * showing where the value sits on its scale.
  */
 export function PacingChips({
   length,
@@ -74,16 +67,16 @@ export function PacingChips({
   if (!length && !speed) return null;
   return (
     <span className="pacing">
-      {length ? <KeyedChip label="Length" value={length} /> : null}
-      {speed ? <KeyedChip label="Speed" value={speed} /> : null}
+      {length ? <KeyedChip label="Length" icon={<LengthIcon value={length} />} value={length} /> : null}
+      {speed ? <KeyedChip label="Speed" icon={<SpeedIcon value={speed} />} value={speed} /> : null}
     </span>
   );
 }
 
-function KeyedChip({ label, value }: { label: string; value: string }) {
+function KeyedChip({ label, icon, value }: { label: string; icon: ReactNode; value: string }) {
   return (
     <span className="chip chip-keyed">
-      <i>{label}</i>
+      <i>{icon}{label}</i>
       <b>{value}</b>
     </span>
   );
@@ -99,12 +92,12 @@ export function SpecialChip({ pack }: { pack: SpecialPack }) {
   );
 }
 
-/** A map's categories, one chip each, written as stored. */
+/** A map's categories, one chip each, written as stored, each with its icon. */
 export function CategoryChips({ categories }: { categories: readonly string[] }) {
   return (
     <>
       {categories.map((c) => (
-        <span key={c} className="chip">{c}</span>
+        <span key={c} className="chip"><CategoryIcon category={c} />{c}</span>
       ))}
     </>
   );

@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { approveSuggestions, rejectSuggestions, setSuggestionTier } from "@/lib/actions";
 import { tierByOrder, tierBySlug } from "@/lib/tiers";
-import { CategoryChips, ModChip, NONE, PacingChips } from "@/components/ui";
+import { CategoryChips, ModIcons, NONE, PacingChips } from "@/components/ui";
 import { MapCard, PackTile } from "@/components/MapCard";
 import { PackPicker } from "@/components/PackPicker";
 import { secondsToDrain } from "@/lib/import/parse";
@@ -176,7 +176,7 @@ export function QueueTable({
             }
             tags={
               <>
-                <ModChip mod={r.mod} />
+                <ModIcons mod={r.mod} />
                 {r.categories.length ? (
                   <CategoryChips categories={r.categories} />
                 ) : (

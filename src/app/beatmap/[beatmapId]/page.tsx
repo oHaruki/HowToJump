@@ -15,11 +15,12 @@ import { NO_VOTES, type VoteTally } from "@/lib/votes";
 import { secondsToDrain } from "@/lib/import/parse";
 import { shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import {
-  Flag, GradeLetter, ModChip, ModIcons, PacingChips, SpecialChip, StaffVoteLink, mapHref,
+  Flag, GradeLetter, ModIcons, PacingChips, SpecialChip, StaffVoteLink, mapHref,
 } from "@/components/ui";
 import { ScoreDelete } from "@/components/ScoreDelete";
 import { CopyBeatmapId } from "@/components/CopyBeatmapId";
 import { PackVote } from "@/components/PackVote";
+import { CategoryIcon } from "@/components/TagIcons";
 import { timeAgo } from "@/lib/time";
 import { SITE_NAME } from "@/lib/site";
 
@@ -266,9 +267,9 @@ function Header({
                 <span className="dot" style={{ background: tierFill(tier) }} />
                 {tier ? tier.name : "unassigned"}
               </span>
-              <ModChip mod={map.mod} />
+              <ModIcons mod={map.mod} />
               {map.categories.map((c) => (
-                <span key={c} className="chip">{shortCategory(c)}</span>
+                <span key={c} className="chip"><CategoryIcon category={c} />{shortCategory(c)}</span>
               ))}
               <PacingChips length={map.lengthBucket} speed={map.speedBucket} />
             </div>

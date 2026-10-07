@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { VoteIcon } from "@/components/TagIcons";
 import { votePack } from "@/lib/actions";
 import { tierByOrder } from "@/lib/tiers";
 import { votedPack, withVote, type PackVote as Vote, type VoteTally } from "@/lib/votes";
 
-const CHOICES: Array<{ vote: Vote; symbol: string; key: "down" | "par" | "up"; says: string }> = [
-  { vote: -1, symbol: "−", key: "down", says: "A pack lower" },
-  { vote: 0, symbol: "=", key: "par", says: "On par" },
-  { vote: 1, symbol: "+", key: "up", says: "A pack higher" },
+const CHOICES: Array<{ vote: Vote; key: "down" | "par" | "up"; says: string }> = [
+  { vote: -1, key: "down", says: "A pack lower" },
+  { vote: 0, key: "par", says: "On par" },
+  { vote: 1, key: "up", says: "A pack higher" },
 ];
 
 /**
@@ -77,7 +78,7 @@ export function PackVote({
               aria-label={title + ", " + shown[c.key] + (shown[c.key] === 1 ? " vote" : " votes")}
               onClick={() => cast(c.vote)}
             >
-              <span className="pvote-sym">{c.symbol}</span>
+              <span className="pvote-sym"><VoteIcon vote={c.vote} /></span>
               {named && pack ? <span className="pvote-pack">{pack.name}</span> : null}
               <b>{shown[c.key]}</b>
             </button>
