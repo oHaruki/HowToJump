@@ -59,6 +59,18 @@ test("scaled misses keep their fraction, and a miss never counts as less than on
   assert.equal(scaledMisses(30, 60_000), 24);
 });
 
+test("a pack's weight scales misses on top of the map's length", () => {
+  assert.equal(scaledMisses(40, 1500, 0.75), 30);
+  near(scaledMisses(4, 250, 0.75), 6); // 4 × 2 × 0.75
+  near(scaledMisses(40, 6000, 0.75), 24); // 40 × 0.8 × 0.75
+  // Never below one, whatever the weight.
+  assert.equal(scaledMisses(1, 1500, 0.75), 1);
+  assert.equal(scaledMisses(1, 6000, 0.75), 1);
+  assert.equal(scaledMisses(0, 1500, 0.75), 0);
+  // A weight of one leaves the count as it was.
+  assert.equal(scaledMisses(7, 719, 1), scaledMisses(7, 719));
+});
+
 test("misses earn the share of what they count as", () => {
   const at = (m: number) => shareForMisses(m);
   near(expShare("A+", 1, 150), at(Math.sqrt(1000 / 150))); // counts as 2.58
@@ -449,15 +461,39 @@ test("the steps behind a share are the ones the share is worked from", () => {
   assert.ok(fc.kind === "fc" && fc.base === 100 && fc.credit === accuracyCredit(99));
 });
 
+test("a pack's weight is a step of its own, after the map's length", () => {
+  // Forty misses on a 1,500 note map, on a pack that counts a miss as 0.75.
+  const weighted = explainShare("D+", 40, 1500, null, 0.75);
+  assert.equal(weighted.kind, "misses");
+  if (weighted.kind !== "misses") return;
+  assert.equal(weighted.factor, 1);
+  assert.equal(weighted.weight, 0.75);
+  assert.equal(weighted.counted, 30);
+  assert.equal(weighted.share, shareForMisses(30));
+
+  // Accuracy wins back part of the last miss as it counts there.
+  const accurate = explainShare("D+", 40, 1500, 99, 0.75);
+  assert.ok(accurate.kind === "misses");
+  if (accurate.kind !== "misses") return;
+  near(accurate.wonBack, 0.75 * accuracyCredit(99));
+
+  // Full combos, 100% runs and clean passes are not weighted.
+  assert.equal(expShare("SSS", 0, 1500, null, 0.75), 120);
+  assert.equal(expShare("SS", 0, 1500, null, 0.75), 100);
+  assert.equal(expShare("S", 0, 1500, null, 0.75), CLEAN_SHARE);
+});
+
 test("every explained share is the share the levels are paid", () => {
   for (const grade of ["SSS", "SS", "S", "A+", "A", "B", "C-", "Pass"]) {
     for (const misses of [0, 1, 2, 5, 24, 150]) {
       for (const notes of [null, 190, 719, 1500, 6000]) {
         for (const acc of [null, 88.5, 96.7, 99.9, 100]) {
-          assert.equal(
-            explainShare(grade, misses, notes, acc).share,
-            expShare(grade, misses, notes, acc),
-          );
+          for (const weight of [1, 0.75]) {
+            assert.equal(
+              explainShare(grade, misses, notes, acc, weight).share,
+              expShare(grade, misses, notes, acc, weight),
+            );
+          }
         }
       }
     }

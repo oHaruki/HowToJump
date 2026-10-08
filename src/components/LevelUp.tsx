@@ -666,7 +666,7 @@ function ScorePage({
 
 function EarnedCard({ play: p }: { play: EarnedPlay }) {
   const tier = tierByOrder(p.tierOrder);
-  const steps = explainShare(p.grade, p.missCount, p.noteCount, p.accuracy);
+  const steps = explainShare(p.grade, p.missCount, p.noteCount, p.accuracy, tier?.missWeight);
   const tiles = stepTiles(steps, p);
   const places = new Map(p.places.map((x) => [x.category, x.place]));
   const skills = Array.from(new Set(p.categories.map((c) => normalizeCategory(c))));
@@ -754,13 +754,23 @@ function stepTiles(s: ShareSteps, p: EarnedPlay): Tile[] {
     ];
   }
   const left = s.counted - s.wonBack;
+  // A pack that weighs misses gets a step of its own.
+  const weighted = s.weight !== 1;
+  const sized = weighted ? Math.max(1, s.misses * s.factor) : s.counted;
   return [
     { label: "Misses", value: String(s.misses), note: "as played" },
     {
       label: "Length",
       value: "×" + num(s.factor),
-      note: (p.noteCount ? fmt(p.noteCount) + " notes" : "not known yet") + " → " + num(s.counted),
+      note: (p.noteCount ? fmt(p.noteCount) + " notes" : "not known yet") + " → " + num(sized),
     },
+    ...(weighted
+      ? [{
+          label: "Pack",
+          value: "×" + num(s.weight),
+          note: (tierByOrder(p.tierOrder)?.name ?? "this pack") + " → " + num(s.counted),
+        }]
+      : []),
     { label: "Accuracy", value: "−" + num(s.wonBack), note: acc + " → " + num(left), kind: "gain" },
     { label: "Share", value: pct(s.share), note: "of the pack", kind: "share" },
   ];

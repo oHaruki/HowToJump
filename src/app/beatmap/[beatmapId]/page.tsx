@@ -334,7 +334,7 @@ function Header({
                 It counts on the {map.pack.name} board, not toward your level
               </p>
             ) : null}
-            {map.noteCount ? <MissNote notes={map.noteCount} /> : null}
+            {map.noteCount ? <MissNote notes={map.noteCount} tierOrder={map.tierOrder} /> : null}
           </aside>
         </div>
       </div>
@@ -361,13 +361,15 @@ function Player({ s, avatar }: { s: BoardScore; avatar?: boolean }) {
 
 /**
  * What a miss costs here: more on short maps, less on long ones, once in
- * between. The grade itself stays the real count.
+ * between, then weighted by the pack. The grade itself stays the real count.
  */
-function MissNote({ notes }: { notes: number }) {
-  const f = missFactor(notes);
+function MissNote({ notes, tierOrder }: { notes: number; tierOrder: number }) {
+  const tier = tierByOrder(tierOrder);
+  const weight = tier?.missWeight ?? 1;
+  const f = missFactor(notes) * weight;
   return (
     <p className="bm-misses">
-      {fmt(notes)} notes, so each miss counts as{" "}
+      {fmt(notes)} notes{weight !== 1 ? " on " + tier?.name : ""}, so each miss counts as{" "}
       <b>×{f >= 1 ? f.toFixed(1) : f.toFixed(2)}</b> in EXP
     </p>
   );

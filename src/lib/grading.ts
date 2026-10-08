@@ -148,10 +148,17 @@ export function missFactor(noteCount: number | null | undefined): number {
   return Math.max(MIN_MISS_FACTOR, Math.pow(edge / noteCount, MISS_CURVE));
 }
 
-/** Misses as they count on a map this size, never below one. */
-export function scaledMisses(missCount: number, noteCount: number | null | undefined): number {
+/**
+ * Misses as they count on a map this size, never below one. `weight` is how
+ * many misses one counts as on the map's pack.
+ */
+export function scaledMisses(
+  missCount: number,
+  noteCount: number | null | undefined,
+  weight = 1,
+): number {
   if (missCount <= 0) return 0;
-  return Math.max(1, missCount * missFactor(noteCount));
+  return Math.max(1, missCount * missFactor(noteCount) * weight);
 }
 
 /* ------------------------------------------------ what accuracy wins back */
@@ -183,8 +190,10 @@ export type ShareSteps =
   | {
       kind: "misses";
       misses: number;
-      /** How many misses one counts as on this map. */
+      /** How many misses one counts as on a map this size. */
       factor: number;
+      /** How many misses one counts as on the map's pack. */
+      weight: number;
       /** The misses once scaled, 0 for none. */
       counted: number;
       /** The part of a miss the accuracy won back. */
@@ -201,13 +210,15 @@ const climb = <K extends "fc" | "clean">(kind: K, base: number, top: number, cre
  * run keeps its own share. A full combo climbs toward it with accuracy, and
  * a pass with no misses climbs toward a full combo. Any other play reads the
  * curve at its scaled misses, less the part of one miss its accuracy wins
- * back, at most its last real miss.
+ * back, at most its last real miss. `weight` is how many misses one counts
+ * as on the map's pack.
  */
 export function explainShare(
   grade: string,
   missCount: number,
   noteCount: number | null | undefined,
   accuracy: number | null | undefined = null,
+  weight = 1,
   rules: GradeRule[] = GRADE_RULES,
 ): ShareSteps {
   const perfect = rules.find((r) => r.requiresPerfect);
@@ -216,13 +227,14 @@ export function explainShare(
   const fc = rules.find((r) => r.requiresFc);
   const full = fc?.expPercent ?? 100;
   if (fc && grade === fc.grade) return climb("fc", full, perfect?.expPercent ?? full, credit);
-  const counted = scaledMisses(missCount, noteCount);
+  const counted = scaledMisses(missCount, noteCount, weight);
   if (counted === 0) return climb("clean", shareForMisses(0), full, credit);
-  const room = Math.min(1, counted - scaledMisses(missCount - 1, noteCount));
+  const room = Math.min(1, counted - scaledMisses(missCount - 1, noteCount, weight));
   return {
     kind: "misses",
     misses: missCount,
     factor: missFactor(noteCount),
+    weight,
     counted,
     wonBack: room * credit,
     share: shareForMisses(counted - room * credit),
@@ -235,7 +247,8 @@ export function expShare(
   missCount: number,
   noteCount: number | null | undefined,
   accuracy: number | null | undefined = null,
+  weight = 1,
   rules: GradeRule[] = GRADE_RULES,
 ): number {
-  return explainShare(grade, missCount, noteCount, accuracy, rules).share;
+  return explainShare(grade, missCount, noteCount, accuracy, weight, rules).share;
 }

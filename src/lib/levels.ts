@@ -23,7 +23,7 @@ export const MAIN_LEVEL = "main";
 export const MAIN_BEST = 5;
 
 /** Bump when the shape of the formula changes. Changed numbers are noticed without it. */
-export const LEVEL_RULES_VERSION = 7;
+export const LEVEL_RULES_VERSION = 8;
 
 /** A pack is reached at BEST_PLAYS plays worth this share of it each. */
 export const THRESHOLD_SHARE = 75;
@@ -41,6 +41,7 @@ export function levelRules(): string {
     categories: CATEGORIES,
     mainBest: MAIN_BEST,
     packs: TIERS.map((t) => [t.order, t.exp]),
+    packMisses: TIERS.map((t) => [t.order, t.missWeight ?? 1]),
     grades: GRADE_RULES.map((g) => [g.grade, g.expPercent]),
     missScaling: [SHORT_NOTES, LONG_NOTES, MISS_CURVE, MIN_MISS_FACTOR],
     missShape: [CLEAN_SHARE, MISS_SPREAD, MISS_POWER],
@@ -75,8 +76,8 @@ export type LevelPlay = {
 
 /**
  * EXP for one play: the pack's value times the share the play earns. The
- * misscount sets the share and accuracy lifts it; the grade only says
- * whether this is a 100% run or a full combo.
+ * misscount sets the share, weighted by the pack, and accuracy lifts it; the
+ * grade only says whether this is a 100% run or a full combo.
  */
 export function playExp(
   tierOrder: number,
@@ -86,7 +87,8 @@ export function playExp(
   accuracy: number | null = null,
 ): number {
   const tier = tierByOrder(tierOrder);
-  return tier ? (tier.exp * expShare(grade, missCount, noteCount, accuracy)) / 100 : 0;
+  if (!tier) return 0;
+  return (tier.exp * expShare(grade, missCount, noteCount, accuracy, tier.missWeight)) / 100;
 }
 
 const expOf = (p: Omit<LevelPlay, "categories">) =>

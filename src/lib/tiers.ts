@@ -9,6 +9,8 @@ export type Tier = {
   aliases?: string[];
   /** EXP for a full combo on this pack: ~1.7x the pack below to Platinum, ~1.63x above. */
   exp: number;
+  /** How many misses one miss counts as on this pack, before the map's length; 1 when absent. */
+  missWeight?: number;
 };
 
 export const TIERS: Tier[] = [
@@ -40,6 +42,7 @@ export const TIERS: Tier[] = [
     slug: "goat",
     color: "#c7e9e4",
     exp: 2000000,
+    missWeight: 0.75,
     gradient:
       "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",
   },

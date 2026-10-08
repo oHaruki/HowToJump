@@ -19,6 +19,7 @@ const packLine = (name: string) => {
   const t = tierByName(name);
   return t ? fmt(threshold(t.order)) + " for " + t.name : "";
 };
+const goat = tierByName("GOAT");
 
 export default function InfoPage() {
   return (
@@ -57,7 +58,15 @@ export default function InfoPage() {
                 counts more: on a 150 note map ×{missFactor(150).toFixed(1)}. A long
                 map forgives, but only so far, never under{" "}
                 ×{MIN_MISS_FACTOR.toFixed(1)}, so a marathon is not a way around the
-                curve. The grade always shows your real misses.
+                curve.
+                {goat?.missWeight ? (
+                  <>
+                    {" "}GOAT has no pack above it, so every map harder than Diamond
+                    lands there, and on it each miss counts ×{goat.missWeight} on top
+                    of its length.
+                  </>
+                ) : null}{" "}
+                The grade always shows your real misses.
               </p>
             </div>
             <div className="grade-grid">

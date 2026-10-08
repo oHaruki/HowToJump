@@ -12,7 +12,7 @@ import {
 } from "./levels";
 import {
   ACC_EXPONENT, CLEAN_SHARE, GRADE_RULES, LONG_NOTES, MIN_MISS_FACTOR, MISS_CURVE, MISS_POWER,
-  MISS_SPREAD, SHORT_NOTES, gradeFor,
+  MISS_SPREAD, SHORT_NOTES, explainShare, gradeFor, shareForMisses,
 } from "./grading";
 import { CATEGORIES, TIERS, tierByName } from "./tiers";
 
@@ -489,6 +489,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
   const rules = JSON.parse(levelRules()) as {
     grades: Array<[string, number]>;
     packs: Array<[number, number]>;
+    packMisses: Array<[number, number]>;
     bestPlays: number;
     mainBest: number;
     thresholdShare: number;
@@ -502,6 +503,9 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
   }
   assert.equal(rules.packs.length, TIERS.length);
   assert.deepEqual(rules.packs.find(([o]) => o === order("GOAT")), [order("GOAT"), 2_000_000]);
+  assert.equal(rules.packMisses.length, TIERS.length);
+  assert.deepEqual(rules.packMisses.find(([o]) => o === order("GOAT")), [order("GOAT"), 0.75]);
+  assert.deepEqual(rules.packMisses.find(([o]) => o === order("Diamond")), [order("Diamond"), 1]);
   assert.equal(rules.bestPlays, BEST_PLAYS);
   assert.equal(rules.mainBest, MAIN_BEST);
   assert.equal(rules.thresholdShare, THRESHOLD_SHARE);
@@ -521,9 +525,35 @@ test("sandbagging a pack is worth far less than playing the one you are on", () 
     Array.from({ length: BEST_PLAYS }, () => graded(1, "Titanium", 0, 1500)),
   );
   assert.ok(sandbag < honest, sandbag + " beats ten clean Titanium full combos");
-  assert.equal(Math.round(sandbag), 20_935);
-  assert.equal(levelFromExp(sandbag).tierOrder, order("Copper"), "ten of them should stop at Copper");
+  assert.equal(Math.round(sandbag), 55_347);
+  assert.equal(levelFromExp(sandbag).tierOrder, order("Bronze"), "ten of them should stop at Bronze");
   assert.equal(levelFromExp(honest).tierOrder, order("Titanium"));
+});
+
+test("a miss on GOAT counts three quarters, on every other pack once", () => {
+  const goat = tierByName("GOAT")!;
+  assert.equal(goat.missWeight, 0.75);
+  for (const t of TIERS) {
+    if (t !== goat) assert.equal(t.missWeight, undefined, t.name + " weighs its misses");
+  }
+  // Forty misses on a 1,500 note map: GOAT pays for thirty, Diamond for forty.
+  assert.equal(playExp(goat.order, "D+", 40, 1500), (goat.exp * shareForMisses(30)) / 100);
+  assert.equal(playExp(order("Diamond"), "D+", 40, 1500), (1_225_000 * shareForMisses(40)) / 100);
+  // Full combos and 100% runs on GOAT pay what they always did.
+  assert.equal(playExp(goat.order, "SS", 0), 2_000_000);
+  assert.equal(playExp(goat.order, "SSS", 0), 2_400_000);
+  assert.equal(threshold(goat.order), 15_000_000);
+});
+
+test("the steps a level up shows come to the EXP the play is paid", () => {
+  for (const t of TIERS) {
+    for (const [grade, misses] of [["A", 2], ["C-", 24], ["F+", 70]] as const) {
+      for (const notes of [null, 719, 1839]) {
+        const steps = explainShare(grade, misses, notes, 95, t.missWeight);
+        assert.equal((t.exp * steps.share) / 100, playExp(t.order, grade, misses, notes, 95));
+      }
+    }
+  }
 });
 
 /* --------------------------------------------------------- reading it out */
