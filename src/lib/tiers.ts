@@ -42,7 +42,7 @@ export const TIERS: Tier[] = [
     slug: "goat",
     color: "#c7e9e4",
     exp: 2000000,
-    missWeight: 0.75,
+    missWeight: 0.85,
     gradient:
       "linear-gradient(140deg,#9FE2D0,#C7B8F0 45%,#FFD8E4 70%,#BFF0E4)",
   },

@@ -504,7 +504,7 @@ test("the rules string carries the grade shares, so a retune rebuilds levels", (
   assert.equal(rules.packs.length, TIERS.length);
   assert.deepEqual(rules.packs.find(([o]) => o === order("GOAT")), [order("GOAT"), 2_000_000]);
   assert.equal(rules.packMisses.length, TIERS.length);
-  assert.deepEqual(rules.packMisses.find(([o]) => o === order("GOAT")), [order("GOAT"), 0.75]);
+  assert.deepEqual(rules.packMisses.find(([o]) => o === order("GOAT")), [order("GOAT"), 0.85]);
   assert.deepEqual(rules.packMisses.find(([o]) => o === order("Diamond")), [order("Diamond"), 1]);
   assert.equal(rules.bestPlays, BEST_PLAYS);
   assert.equal(rules.mainBest, MAIN_BEST);
@@ -525,19 +525,19 @@ test("sandbagging a pack is worth far less than playing the one you are on", () 
     Array.from({ length: BEST_PLAYS }, () => graded(1, "Titanium", 0, 1500)),
   );
   assert.ok(sandbag < honest, sandbag + " beats ten clean Titanium full combos");
-  assert.equal(Math.round(sandbag), 55_347);
-  assert.equal(levelFromExp(sandbag).tierOrder, order("Bronze"), "ten of them should stop at Bronze");
+  assert.equal(Math.round(sandbag), 36_570);
+  assert.equal(levelFromExp(sandbag).tierOrder, order("Iron"), "ten of them should stop at Iron");
   assert.equal(levelFromExp(honest).tierOrder, order("Titanium"));
 });
 
-test("a miss on GOAT counts three quarters, on every other pack once", () => {
+test("a miss on GOAT counts 0.85, on every other pack once", () => {
   const goat = tierByName("GOAT")!;
-  assert.equal(goat.missWeight, 0.75);
+  assert.equal(goat.missWeight, 0.85);
   for (const t of TIERS) {
     if (t !== goat) assert.equal(t.missWeight, undefined, t.name + " weighs its misses");
   }
-  // Forty misses on a 1,500 note map: GOAT pays for thirty, Diamond for forty.
-  assert.equal(playExp(goat.order, "D+", 40, 1500), (goat.exp * shareForMisses(30)) / 100);
+  // Forty misses on a 1,500 note map: GOAT pays for thirty-four, Diamond for forty.
+  assert.equal(playExp(goat.order, "D+", 40, 1500), (goat.exp * shareForMisses(34)) / 100);
   assert.equal(playExp(order("Diamond"), "D+", 40, 1500), (1_225_000 * shareForMisses(40)) / 100);
   // Full combos and 100% runs on GOAT pay what they always did.
   assert.equal(playExp(goat.order, "SS", 0), 2_000_000);
