@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { PlayRow, type PlayView } from "@/components/PlayRow";
+import { categorySlug } from "@/lib/tiers";
 
 /**
  * The rest of a list, a page at a time. Pages already fetched are kept, so
@@ -17,11 +18,14 @@ type Wire = Omit<PlayView, "playedAt"> & { playedAt: string | null };
 export function PlayMore({
   userId,
   list,
+  category,
   count,
   offset,
 }: {
   userId: number;
   list: "top" | "recent";
+  /** The one category the list is narrowed to, if any. */
+  category?: string | null;
   /** How many rows are past the ones the page drew. */
   count: number;
   /** How many rows the page drew. */
@@ -54,6 +58,7 @@ export function PlayMore({
       const limit = want - rows.length;
       const res = await fetch(
         "/api/plays?user=" + userId + "&list=" + list +
+          (category ? "&category=" + categorySlug(category) : "") +
           "&offset=" + (offset + rows.length) + "&limit=" + limit,
       );
       if (!res.ok) throw new Error("plays: " + res.status);
@@ -84,7 +89,12 @@ export function PlayMore({
   return (
     <>
       {rows.slice(0, shown).map((p, i) => (
-        <PlayRow key={p.scoreId} play={p} rank={list === "top" ? offset + i + 1 : undefined} />
+        <PlayRow
+          key={p.scoreId}
+          play={p}
+          rank={list === "top" ? offset + i + 1 : undefined}
+          category={category}
+        />
       ))}
       <div className="more" ref={bar}>
         <div className="more-btns">

@@ -37,11 +37,22 @@ export type PlayView = {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 
-/** `rank` is the play's place in its list, shown first. */
-export function PlayRow({ play: p, rank }: { play: PlayView; rank?: number }) {
+/**
+ * `rank` is the play's place in its list, shown first. With a `category`,
+ * the place under the EXP is the one in that category.
+ */
+export function PlayRow({
+  play: p,
+  rank,
+  category,
+}: {
+  play: PlayView;
+  rank?: number;
+  category?: string | null;
+}) {
   const tier = tierByOrder(p.tierOrder);
   const colour = tier ? tier.color : "#777";
-  const best = p.places[0];
+  const shown = category ? p.places.find((x) => x.category === category) : p.places[0];
 
   return (
     <article
@@ -96,11 +107,11 @@ export function PlayRow({ play: p, rank }: { play: PlayView; rank?: number }) {
       <div className="play-exp">
         <b>{fmt(p.exp)}</b>
         <span
-          data-counts={best ? true : undefined}
+          data-counts={shown ? true : undefined}
           title={p.places.map((x) => "#" + x.place + " " + shortCategory(x.category)).join(", ") || undefined}
         >
-          {best ? "#" + best.place + " " + shortCategory(best.category) : "EXP"}
-          {p.places.length > 1 ? " +" + (p.places.length - 1) : null}
+          {shown ? "#" + shown.place + " " + shortCategory(shown.category) : "EXP"}
+          {!category && p.places.length > 1 ? " +" + (p.places.length - 1) : null}
         </span>
       </div>
     </article>

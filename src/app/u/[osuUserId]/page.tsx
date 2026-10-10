@@ -8,12 +8,15 @@ import { userLevels, users } from "@/lib/schema";
 import { MAIN_LEVEL } from "@/lib/levels";
 import { snapshotOf } from "@/lib/progress";
 import { SITE_NAME } from "@/lib/site";
-import { tierByOrder } from "@/lib/tiers";
+import { categoryBySlug, categorySlug, tierByOrder } from "@/lib/tiers";
 import { ProfileView } from "@/components/ProfileView";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ osuUserId: string }> };
+type Props = {
+  params: Promise<{ osuUserId: string }>;
+  searchParams: Promise<{ category?: string }>;
+};
 
 /** A player who is not banned, by osu! user ID, with their main level's pack. */
 const findPlayer = cache(async (osuUserId: number) => {
@@ -64,9 +67,12 @@ export async function generateViewport(props: Props): Promise<Viewport> {
 export default async function PlayerPage(props: Props) {
   const player = await playerFor(props);
   if (!player) notFound();
+  const category = categoryBySlug((await props.searchParams).category);
 
   const session = await auth();
-  if (session?.userId === player.id) redirect("/me");
+  if (session?.userId === player.id) {
+    redirect(category ? "/me?category=" + categorySlug(category) : "/me");
+  }
 
-  return <ProfileView userId={player.id} owner={false} />;
+  return <ProfileView userId={player.id} owner={false} category={category} />;
 }

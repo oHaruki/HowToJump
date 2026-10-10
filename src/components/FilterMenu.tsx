@@ -229,8 +229,8 @@ export function ChoiceMenu({
 }: {
   label: string;
   value: string;
-  /** The first is what an empty value means. */
-  options: Array<{ value: string; label: string }>;
+  /** The first is what an empty value means. `n` is a count drawn beside it. */
+  options: Array<{ value: string; label: string; n?: number }>;
   onChange: (v: string) => void;
   align?: "start" | "end";
   /** Shows the pick on the pill even when it is the first. */
@@ -262,12 +262,14 @@ export function ChoiceMenu({
               type="button"
               className="fchoice"
               aria-pressed={o === current}
+              data-empty={o.n === 0 || undefined}
               onClick={() => {
                 onChange(o.value);
                 close();
               }}
             >
               {o.label}
+              {o.n != null ? <span className="fopt-n">{o.n}</span> : null}
             </button>
           ))}
         </div>

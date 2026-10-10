@@ -1789,6 +1789,7 @@ footer {
   content: ""; width: 16px; height: 16px; flex: none; opacity: 0;
   background: currentColor; mask: var(--tick) center / 14px no-repeat;
 }
+.fchoice[data-empty] { color: var(--text-dark); }
 .fchoice:hover { color: var(--text-focus); background: var(--bg-c); }
 .fchoice[aria-pressed="true"] { color: var(--text-focus); }
 .fchoice[aria-pressed="true"]::before { opacity: 1; }
@@ -2112,11 +2113,33 @@ a.pager-page:hover, a.pager-step:hover {
 .tabs.plays-tabs { font-size: var(--h2-size); }
 .plays-tabs button { display: inline-flex; align-items: center; gap: 10px; }
 .plays-tabs .chip.fresh { --pack: var(--text-dark); font-weight: 400; font-stretch: normal; }
+/* The tabs, with the open list's filter at their right end. */
+.plays-head { max-width: none; }
+.plays-head > p { max-width: 68ch; }
+.plays-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 20px;
+}
+.play-filter .fpill {
+  height: 32px; padding: 0 10px 0 12px; font-size: var(--font-size-small);
+  background: transparent; border-color: transparent;
+}
+.play-filter .fpill:hover, .play-filter .fpill[aria-expanded="true"] {
+  background: var(--bg-c); border-color: var(--border);
+}
+.play-filter .fpill[data-active] {
+  background: var(--bg-c); border-color: color-mix(in srgb, var(--text-focus) 32%, var(--border));
+}
 .plays {
   --play-cols: 56px minmax(0, 1fr) 64px 84px 64px 150px;
   display: flex; flex-direction: column; gap: 4px;
+  transition: opacity var(--dur-fast);
 }
 .plays[data-ranked] { --play-cols: 36px 56px minmax(0, 1fr) 64px 84px 64px 150px; }
+/* A list fades while the filter's pick loads. */
+section:has(.play-filter[data-pending]) .plays {
+  opacity: 0.5; transition: opacity var(--dur-fast) var(--dur-fast);
+}
 .play, .play-cols {
   display: grid; align-items: center; column-gap: 14px;
   grid-template-columns: var(--play-cols);

@@ -4,7 +4,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { getProfilePlays } from "@/lib/queries";
-import { profileLists } from "@/lib/progress";
+import { playsIn, profileLists } from "@/lib/progress";
+import { categoryBySlug } from "@/lib/tiers";
 import type { PlayView } from "@/components/PlayRow";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +13,9 @@ export const dynamic = "force-dynamic";
 /**
  * A page of a profile's plays, past the handful its lists draw up front.
  * Both orders come from the same functions the page uses; `list` picks
- * which one is sliced. Public, like profiles: banned players 404, and
- * freshness is worked out only for the owner. Sends only the fields a row
- * draws.
+ * which one is sliced, and `category` narrows it to one category's plays.
+ * Public, like profiles: banned players 404, and freshness is worked out
+ * only for the owner. Sends only the fields a row draws.
  */
 
 const LISTS = new Set(["top", "recent"]);
@@ -32,9 +33,12 @@ export async function GET(req: Request) {
   const list = q.get("list") ?? "";
   const offset = Number(q.get("offset") ?? "0");
   const limit = Number(q.get("limit") ?? String(MAX_LIMIT));
+  const slug = q.get("category");
+  const category = slug ? categoryBySlug(slug) : null;
 
   if (!Number.isSafeInteger(userId) || userId <= 0) return bad();
   if (!LISTS.has(list)) return bad();
+  if (slug && !category) return bad();
   if (!Number.isSafeInteger(offset) || offset < 0) return bad();
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_LIMIT) return bad();
 
@@ -49,7 +53,8 @@ export async function GET(req: Request) {
 
   const plays = await getProfilePlays(userId);
   const lists = profileLists(plays, seenAt);
-  const rows = (list === "top" ? lists.top : lists.recent).slice(offset, offset + limit);
+  const shown = playsIn(list === "top" ? lists.top : lists.recent, category);
+  const rows = shown.slice(offset, offset + limit);
 
   return NextResponse.json({
     plays: rows.map(

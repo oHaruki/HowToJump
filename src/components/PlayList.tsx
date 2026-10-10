@@ -15,12 +15,15 @@ export function PlayList({
   empty,
   userId,
   list,
+  category,
 }: {
   plays: PlayView[];
   empty: string;
   /** Whose plays these are, for the fold to ask for the rest of them. */
   userId: number;
   list: "top" | "recent";
+  /** The one category the plays are from, when the list is narrowed to it. */
+  category?: string | null;
 }) {
   if (!plays.length) return <p className="small">{empty}</p>;
   const ranked = list === "top";
@@ -37,10 +40,10 @@ export function PlayList({
         <span className="r">EXP</span>
       </div>
       {plays.slice(0, SHOWN).map((p, i) => (
-        <PlayRow key={p.scoreId} play={p} rank={ranked ? i + 1 : undefined} />
+        <PlayRow key={p.scoreId} play={p} rank={ranked ? i + 1 : undefined} category={category} />
       ))}
       {rest > 0 ? (
-        <PlayMore userId={userId} list={list} count={rest} offset={SHOWN} />
+        <PlayMore userId={userId} list={list} category={category} count={rest} offset={SHOWN} />
       ) : null}
     </div>
   );

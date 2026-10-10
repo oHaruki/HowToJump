@@ -6,12 +6,13 @@ import { userLevels, userTierProgress, users } from "@/lib/schema";
 import { RANKING_PAGE_SIZE, getProfilePlays, getRankOf, getTierCounts } from "@/lib/queries";
 import { GRADE_RULES } from "@/lib/grading";
 import { BEST_PLAYS, MAIN_BEST, MAIN_LEVEL, levelValue } from "@/lib/levels";
-import { PROFILE_SCOPES, profileLists, readSnapshot, snapshotOf } from "@/lib/progress";
+import { PROFILE_SCOPES, playsIn, profileLists, readSnapshot, snapshotOf } from "@/lib/progress";
 import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/tiers";
 import { Flag, GradeLetter, packHref } from "@/components/ui";
 import { LevelBar, SkillRadar } from "@/components/LevelView";
 import { LevelUp, type EarnedPlay } from "@/components/LevelUp";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { PlayFilter } from "@/components/PlayFilter";
 import { PlayList } from "@/components/PlayList";
 import { PlayTabs } from "@/components/PlayTabs";
 import type { PlayView } from "@/components/PlayRow";
@@ -31,9 +32,18 @@ const GRADE_TALLY = [
  * A player's profile, osu! style. The owner's own view, at /me, adds what
  * only makes sense to them: the level up popup, Sync now, the page keeping
  * itself fresh, and scores marked new since they last looked. Everyone else,
- * arriving from a leaderboard, sees the same page without those.
+ * arriving from a leaderboard, sees the same page without those. A
+ * `category` narrows the top plays to that category's.
  */
-export async function ProfileView({ userId, owner }: { userId: number; owner: boolean }) {
+export async function ProfileView({
+  userId,
+  owner,
+  category = null,
+}: {
+  userId: number;
+  owner: boolean;
+  category?: string | null;
+}) {
   const renderedAt = new Date();
   // One round trip: nothing in the batch needs the player's own row.
   const [[me], packRows, plays, levelRows, standing, packSizes] = await Promise.all([
@@ -56,6 +66,9 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
   // the second under the same order their places are numbered in.
   const lists = profileLists(plays, seenAt);
   const { recent: views, top }: { recent: PlayView[]; top: PlayView[] } = lists;
+  const topShown = playsIn(top, category);
+  const perCategory = Object.fromEntries(CATEGORIES.map((c) => [c, playsIn(top, c).length]));
+  const kind = category ? shortCategory(category) + " " : "";
 
   // What the level up popup explains: every score since the last look.
   const earned: EarnedPlay[] = lists.recent
@@ -259,13 +272,23 @@ export async function ProfileView({ userId, owner }: { userId: number; owner: bo
           tabs={[
             {
               label: "Top plays",
-              note: "Ranked by EXP. The ones counting toward a level show their place in it.",
+              note: category
+                ? "Ranked by EXP. The best " + BEST_PLAYS + " make up the " +
+                  shortCategory(category) + " level."
+                : "Ranked by EXP. The ones counting toward a level show their place in it.",
+              aside: <PlayFilter category={category} total={top.length} counts={perCategory} />,
               content: (
                 <PlayList
-                  plays={top}
+                  key={category ?? ""}
+                  plays={topShown}
                   userId={userId}
                   list="top"
-                  empty={owner ? "No plays yet. Play any map from the bank." : "No plays yet."}
+                  category={category}
+                  empty={
+                    owner
+                      ? "No " + kind + "plays yet. Play any " + kind + "map from the bank."
+                      : "No " + kind + "plays yet."
+                  }
                 />
               ),
             },

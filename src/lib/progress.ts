@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAIN_LEVEL, byWorth, countingPlaces, playExp, type Place } from "@/lib/levels";
-import { CATEGORIES } from "@/lib/tiers";
+import { CATEGORIES, normalizeCategory } from "@/lib/tiers";
 
 /**
  * What a profile remembers between visits: every level as the player last
@@ -121,4 +121,17 @@ export function profileLists<T extends PlayForProfile>(
     fresh: freshness(p, seenAt),
   }));
   return { recent, top: recent.slice().sort(byWorth) };
+}
+
+/**
+ * The plays on maps in a category, old spellings included, in the order
+ * given; every play for null. Taken from `top`, a play's position is its
+ * place in the category.
+ */
+export function playsIn<T extends { categories: readonly string[] }>(
+  plays: readonly T[],
+  category: string | null,
+): T[] {
+  if (!category) return plays.slice();
+  return plays.filter((p) => p.categories.some((c) => normalizeCategory(c) === category));
 }

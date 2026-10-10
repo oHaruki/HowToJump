@@ -8,7 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  PROFILE_SCOPES, UNRANKED, changesSince, freshness, profileLists, readSnapshot, seenBody,
+  PROFILE_SCOPES, UNRANKED, changesSince, freshness, playsIn, profileLists, readSnapshot, seenBody,
   snapshotOf, type LevelSnapshot,
 } from "./progress";
 import { MAIN_LEVEL, countingPlaces, levelValue } from "./levels";
@@ -206,6 +206,24 @@ test("a play on a dropped label counts nowhere but still shows", () => {
   const { recent, top } = profileLists([play(1, 0, { categories: ["Flow Aim"] })], null);
   assert.equal(recent.length, 1);
   assert.deepEqual(top[0].places, []);
+});
+
+test("a category's top plays are the plays on its maps, numbered by their place in it", () => {
+  const plays = newestFirst([
+    ...Array.from({ length: 11 }, (_, i) => play(i + 1, i + 1)),
+    play(20, 0, { categories: ["Raw aim"] }),
+    play(21, 0, { categories: [PRECISION] }),
+  ]);
+  const { top } = profileLists(plays, null);
+  const raw = playsIn(top, RAW);
+  // The old spelling counts, the Precision map doesn't.
+  assert.deepEqual(raw.map((p) => p.scoreId), [20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  // The best ten carry places 1 to 10 in the order they're drawn, the rest none.
+  assert.deepEqual(
+    raw.map((p) => p.places.find((x) => x.category === RAW)?.place ?? null),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, null, null],
+  );
+  assert.deepEqual(playsIn(top, null), top);
 });
 
 test("each list says what is worth what, and what landed since the last look", () => {
