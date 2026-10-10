@@ -24,7 +24,7 @@ import {
 import {
   CATEGORIES, normalizeCategories, normalizeLength, normalizeSpeed, tierByName, tierByOrder,
 } from "@/lib/tiers";
-import { packColor, packDescription, packNameProblem } from "@/lib/packs";
+import { deletedPackName, packColor, packDescription, packNameProblem } from "@/lib/packs";
 import { applyMod, lengthBucketFor, speedGuessFor } from "@/lib/osu/modmath";
 import {
   classify, parsePaste, rowFromLink, secondsToDrain, type ParsedRow,
@@ -550,20 +550,11 @@ export async function updateEntry(
 
 export async function removeEntry(entryId: number) {
   const staff = await requirePermission("bank.edit");
-  await takeOffBank(staff, entryId);
-}
-
-/** Clears an entry's listed flag, logged with `detail`, and refreshes the pages showing it. */
-async function takeOffBank(
-  staff: { id: number; name: string | null },
-  entryId: number,
-  detail?: unknown,
-) {
   await db
     .update(entries)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(entries.id, entryId));
-  await record(staff.id, staff.name ?? undefined, "entry.remove", "entry", entryId, detail);
+  await record(staff.id, staff.name ?? undefined, "entry.remove", "entry", entryId);
   await refreshEntryPlayers(entryId);
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
@@ -1062,9 +1053,9 @@ export async function unspotlightEntry(entryId: number) {
 }
 
 /**
- * Closes the vote on an entry: "stay" leaves it where it is, "remove" takes
- * it out of the bank. Either way its votes and pin are cleared, and the log
- * keeps who voted which way.
+ * Closes the vote on an entry: "stay" leaves it where it is, "remove" moves
+ * it to its pack's Deleted special pack. Either way its votes and pin are
+ * cleared, and the log keeps who voted which way.
  */
 export async function settleStay(entryId: number, outcome: "stay" | "remove") {
   const staff = await requirePermission("bank.edit");
@@ -1073,11 +1064,66 @@ export async function settleStay(entryId: number, outcome: "stay" | "remove") {
 
   const tally = (await getStayVotes([entryId], null)).get(entryId) ?? NO_STAY;
   const detail = { stay: tally.stay, delete: tally.drop };
+  if (outcome === "remove") await moveToDeleted(staff, entryId, detail);
+  else await record(staff.id, staff.name ?? undefined, "entry.keep", "entry", entryId, detail);
   await db.delete(stayVotes).where(eq(stayVotes.entryId, entryId));
   await db.delete(spotlights).where(eq(spotlights.entryId, entryId));
-  if (outcome === "remove") await takeOffBank(staff, entryId, detail);
-  else await record(staff.id, staff.name ?? undefined, "entry.keep", "entry", entryId, detail);
   revalidatePath("/staff", "layout");
+}
+
+/**
+ * Moves an entry to the special pack named for its ladder pack, "Deleted
+ * Ruby" for a Ruby map, made in the pack's colour when there is none.
+ */
+async function moveToDeleted(
+  staff: { id: number; name: string | null },
+  entryId: number,
+  detail: object,
+) {
+  const [entry] = await db
+    .select({ tierOrder: entries.tierOrder, packId: entries.packId })
+    .from(entries)
+    .where(eq(entries.id, entryId));
+  const tier = tierByOrder(entry?.tierOrder);
+  if (!entry || !tier) throw new Error("That map isn't in a pack");
+
+  const name = deletedPackName(tier);
+  const packId = await packCalled(staff, name, packColor(tier.color) ?? "#777777");
+  await db
+    .update(entries)
+    .set({ packId, updatedAt: new Date() })
+    .where(eq(entries.id, entryId));
+  await record(staff.id, staff.name ?? undefined, "entry.drop", "entry", entryId, {
+    ...detail,
+    pack: name,
+  });
+  // A map off the ladder stops counting toward levels.
+  if (entry.packId !== packId) await refreshEntryPlayers(entryId);
+  revalidatePath("/staff/bank");
+  revalidatePath("/maps");
+  revalidatePath("/");
+  revalidatePacks();
+}
+
+/** The special pack with this name in any case, made in `color` when missing. */
+async function packCalled(
+  staff: { id: number; name: string | null },
+  name: string,
+  color: string,
+): Promise<number> {
+  const called = rawSql`lower(${packs.name}) = ${name.toLowerCase()}`;
+  const [found] = await db.select({ id: packs.id }).from(packs).where(called);
+  if (found) return found.id;
+
+  const [made] = await db
+    .insert(packs)
+    .values({ name, color })
+    .onConflictDoNothing()
+    .returning({ id: packs.id });
+  // Another request made it first.
+  if (!made) return (await db.select({ id: packs.id }).from(packs).where(called))[0].id;
+  await record(staff.id, staff.name ?? undefined, "pack.create", "pack", made.id, { name, color });
+  return made.id;
 }
 
 /* ------------------------------------------------------------------- team */

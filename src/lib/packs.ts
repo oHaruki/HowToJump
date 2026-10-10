@@ -1,5 +1,5 @@
 import { playExp } from "@/lib/levels";
-import { tierByName } from "@/lib/tiers";
+import { tierByName, type Tier } from "@/lib/tiers";
 
 /**
  * Special packs: packs an admin makes beside the ladder. A map in one is
@@ -14,6 +14,11 @@ export type SpecialPack = { id: number; name: string; color: string };
 /** The special pack a picker or URL key names, or null for a ladder pack's slug. */
 export function specialPackId(key: string | null | undefined): number | null {
   return key && /^\d+$/.test(key) ? Number(key) : null;
+}
+
+/** The special pack a ladder pack's maps move to when staff vote them out: "Deleted Ruby". */
+export function deletedPackName(tier: Tier): string {
+  return "Deleted " + tier.name;
 }
 
 /* ------------------------------------------------------------ the board */

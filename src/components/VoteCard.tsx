@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { settleStay, spotlightEntry, unspotlightEntry, voteStay } from "@/lib/actions";
+import { deletedPackName } from "@/lib/packs";
 import type { BankRow, Spotlight } from "@/lib/queries";
 import { tierByOrder } from "@/lib/tiers";
 import { stayLean, votedPack, withStay, type StayTally, type VoteTally } from "@/lib/votes";
@@ -41,7 +42,9 @@ export function VoteCard({
   const [mode, setMode] = useState<Mode>(null);
   const [why, setWhy] = useState(spotlight?.note ?? "");
   const [pending, start] = useTransition();
-  const pack = tierByOrder(map.tierOrder)?.name ?? "this pack";
+  const tier = tierByOrder(map.tierOrder);
+  const pack = tier?.name ?? "this pack";
+  const deletedPack = tier ? deletedPackName(tier) : "its Deleted pack";
   const lean = stayLean(shown);
 
   function cast(vote: boolean) {
@@ -109,7 +112,7 @@ export function VoteCard({
         <span className="small">
           {mode === "stay"
             ? "Keep it in " + pack + " and clear the votes?"
-            : "Take it out of the bank and clear the votes?"}
+            : "Move it to " + deletedPack + " and clear the votes?"}
         </span>
         <button
           className={"btn btn-sm " + (mode === "stay" ? "btn-ok" : "btn-no")}
@@ -155,7 +158,7 @@ export function VoteCard({
               className="linkbtn"
               type="button"
               data-tone="bad"
-              title="Close the vote and take the map out of the bank"
+              title={"Close the vote and move the map to " + deletedPack}
               onClick={() => setMode("remove")}
             >
               Remove it

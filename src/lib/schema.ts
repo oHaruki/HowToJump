@@ -181,7 +181,7 @@ export const entryVotes = pgTable(
 
 /* ------------------------------------------------------------- stay votes */
 
-/** Staff calls on whether an entry stays in its pack or leaves the bank. */
+/** Staff calls on whether an entry stays in its pack or moves to its Deleted pack. */
 export const stayVotes = pgTable(
   "stay_votes",
   {

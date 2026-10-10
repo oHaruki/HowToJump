@@ -7,9 +7,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  packColor, packDescription, packNameProblem, packStandings, specialPackId, type PackPlay,
+  deletedPackName, packColor, packDescription, packNameProblem, packStandings, specialPackId,
+  type PackPlay,
 } from "./packs";
 import { playExp } from "./levels";
+import { TIERS, tierByName } from "./tiers";
 
 const play = (userId: number, over: Partial<PackPlay> = {}): PackPlay => ({
   userId,
@@ -72,4 +74,12 @@ test("a filter key names a special pack by ID, and a ladder pack by slug", () =>
   assert.equal(specialPackId("12"), 12);
   assert.equal(specialPackId("gold"), null);
   assert.equal(specialPackId(""), null);
+});
+
+test("every ladder pack's Deleted pack has a name and colour an admin could have picked", () => {
+  assert.equal(deletedPackName(tierByName("Ruby")!), "Deleted Ruby");
+  for (const t of TIERS) {
+    assert.equal(packNameProblem(deletedPackName(t), []), null, t.name);
+    assert.ok(packColor(t.color), t.name);
+  }
 });
