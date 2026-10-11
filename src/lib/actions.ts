@@ -34,6 +34,7 @@ import {
   getStayVotes, gradeText,
 } from "@/lib/queries";
 import { NO_STAY, NO_VOTES, voteFor, type StayTally, type VoteTally } from "@/lib/votes";
+import type { ChangeDetail } from "@/lib/changes";
 import { announceEntries } from "@/lib/discord";
 
 async function record(
@@ -456,7 +457,10 @@ export async function updateEntry(
       id: entries.id,
       beatmapId: entries.beatmapId,
       mod: entries.mod,
+      tierOrder: entries.tierOrder,
+      categories: entries.categories,
       packId: entries.packId,
+      packName: packs.name,
       osuBeatmapId: beatmaps.osuBeatmapId,
       baseCs: beatmaps.cs,
       baseAr: beatmaps.ar,
@@ -466,27 +470,41 @@ export async function updateEntry(
     })
     .from(entries)
     .innerJoin(beatmaps, eq(entries.beatmapId, beatmaps.id))
+    .leftJoin(packs, eq(entries.packId, packs.id))
     .where(eq(entries.id, entryId));
   if (!current) throw new Error("That entry no longer exists");
 
   const set: Record<string, unknown> = { updatedAt: new Date() };
+  // What players whose levels move are told happened to the map.
+  const detail: ChangeDetail = {};
 
   if (patch.tier) {
     const t = tierByName(patch.tier);
     if (!t) throw new Error("Unknown pack: " + patch.tier);
     set.tierOrder = t.order;
+    if (t.order !== current.tierOrder) detail.tier = [current.tierOrder, t.order];
   }
   const movesPack = patch.pack !== undefined && patch.pack !== current.packId;
+  let packName: string | null = null;
   if (movesPack && patch.pack != null) {
     if (!Number.isSafeInteger(patch.pack)) throw new Error("That isn't a special pack");
-    const [pack] = await db.select({ id: packs.id }).from(packs).where(eq(packs.id, patch.pack));
+    const [pack] = await db
+      .select({ id: packs.id, name: packs.name })
+      .from(packs)
+      .where(eq(packs.id, patch.pack));
     if (!pack) throw new Error("That special pack no longer exists");
+    packName = pack.name;
   }
-  if (movesPack) set.packId = patch.pack;
+  if (movesPack) {
+    set.packId = patch.pack;
+    detail.pack = [current.packName, packName];
+  }
   if (patch.categories) {
     const categories = normalizeCategories(patch.categories);
     if (!categories.length) throw new Error("Pick at least one category");
     set.categories = categories;
+    const was = normalizeCategories(current.categories);
+    if (was.join("|") !== categories.join("|")) detail.categories = [was, categories];
   }
   if (patch.length !== undefined) set.lengthBucket = normalizeLength(patch.length) || null;
   if (patch.speed !== undefined) set.speedBucket = normalizeSpeed(patch.speed) || null;
@@ -497,6 +515,7 @@ export async function updateEntry(
       where: and(eq(entries.beatmapId, current.beatmapId), eq(entries.mod, nextMod)),
     });
     if (clash) throw new Error("This map is already in the bank under " + nextMod);
+    detail.mod = [current.mod, nextMod];
 
     const adjusted = applyMod(
       {
@@ -537,8 +556,9 @@ export async function updateEntry(
     cleared.length ? { ...patch, cleared } : patch,
   );
   // A new pack or category changes what every play on the map is worth.
-  if (patch.tier || patch.categories || movesPack) await refreshEntryPlayers(entryId);
-  for (const userId of new Set(cleared.map((s) => s.userId))) await refreshProgress(userId);
+  const cause = { kind: "entry" as const, entryId, detail };
+  if (patch.tier || patch.categories || movesPack) await refreshEntryPlayers(entryId, cause);
+  for (const userId of new Set(cleared.map((s) => s.userId))) await refreshProgress(userId, cause);
 
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
@@ -555,7 +575,7 @@ export async function removeEntry(entryId: number) {
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(entries.id, entryId));
   await record(staff.id, staff.name ?? undefined, "entry.remove", "entry", entryId);
-  await refreshEntryPlayers(entryId);
+  await refreshEntryPlayers(entryId, { kind: "entry", entryId, detail: { removed: true } });
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
@@ -570,7 +590,7 @@ export async function restoreEntry(entryId: number) {
     .set({ isActive: true, updatedAt: new Date() })
     .where(eq(entries.id, entryId));
   await record(staff.id, staff.name ?? undefined, "entry.restore", "entry", entryId);
-  await refreshEntryPlayers(entryId);
+  await refreshEntryPlayers(entryId, { kind: "entry", entryId, detail: { restored: true } });
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/ladder");
@@ -932,7 +952,7 @@ export async function deleteScore(scoreId: number) {
     missCount: gone.missCount,
     accuracy: gone.accuracy,
   });
-  await refreshProgress(gone.userId);
+  await refreshProgress(gone.userId, { kind: "score", entryId: gone.entryId });
 }
 
 /* ------------------------------------------------------------- pack votes */
@@ -1081,8 +1101,9 @@ async function moveToDeleted(
   detail: object,
 ) {
   const [entry] = await db
-    .select({ tierOrder: entries.tierOrder, packId: entries.packId })
+    .select({ tierOrder: entries.tierOrder, packId: entries.packId, packName: packs.name })
     .from(entries)
+    .leftJoin(packs, eq(entries.packId, packs.id))
     .where(eq(entries.id, entryId));
   const tier = tierByOrder(entry?.tierOrder);
   if (!entry || !tier) throw new Error("That map isn't in a pack");
@@ -1098,7 +1119,13 @@ async function moveToDeleted(
     pack: name,
   });
   // A map off the ladder stops counting toward levels.
-  if (entry.packId !== packId) await refreshEntryPlayers(entryId);
+  if (entry.packId !== packId) {
+    await refreshEntryPlayers(entryId, {
+      kind: "entry",
+      entryId,
+      detail: { pack: [entry.packName, name] },
+    });
+  }
   revalidatePath("/staff/bank");
   revalidatePath("/maps");
   revalidatePath("/");
@@ -1149,6 +1176,15 @@ export async function setMyLinks(given: string[]): Promise<{ error?: string }> {
     .where(eq(users.id, staff.id));
   revalidatePath("/team");
   return {};
+}
+
+/* ------------------------------------------------------------------- bell */
+
+/** Marks the signed in player's level changes read, up to now. */
+export async function markChangesSeen() {
+  const session = await auth();
+  if (!session?.userId) return;
+  await db.update(users).set({ changesSeenAt: new Date() }).where(eq(users.id, session.userId));
 }
 
 /* ------------------------------------------------------------------- sync */

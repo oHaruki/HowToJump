@@ -5,14 +5,16 @@ import {
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db";
 import {
-  beatmaps, deletedScores, entries, entryVotes, packs, roles, scores, siteConfig, spotlights,
-  stayVotes, suggestions, userLevels, users,
+  beatmaps, deletedScores, entries, entryVotes, levelChanges, packs, roles, scores, siteConfig,
+  spotlights, stayVotes, suggestions, userLevels, users,
 } from "@/lib/schema";
 import { secondsToDrain } from "@/lib/import/parse";
 import {
   BUILT_IN_ROLES, PLAYER, customRoleId, customRoleKey, isPermission, orderRoles, type RoleView,
 } from "@/lib/roles";
-import { byWorth, playExp } from "@/lib/levels";
+import { MAIN_LEVEL, byWorth, playExp } from "@/lib/levels";
+import { packMoves, readSnapshot, snapshotOf } from "@/lib/progress";
+import { changeText, type ChangeDetail, type ChangeKind, type ChangeView } from "@/lib/changes";
 import { packStandings, type PackStanding, type SpecialPack } from "@/lib/packs";
 import { MODS } from "@/lib/mods";
 import {
@@ -554,6 +556,98 @@ export async function getProfilePlays(userId: number) {
 }
 
 export type ProfilePlay = Awaited<ReturnType<typeof getProfilePlays>>[number];
+
+/* ---------------------------------------------------------- level changes */
+
+const changeSelection = {
+  id: levelChanges.id,
+  kind: levelChanges.kind,
+  detail: levelChanges.detail,
+  before: levelChanges.before,
+  after: levelChanges.after,
+  createdAt: levelChanges.createdAt,
+  osuBeatmapId: beatmaps.osuBeatmapId,
+  setId: beatmaps.osuBeatmapsetId,
+  title: beatmaps.title,
+  version: beatmaps.version,
+  mod: entries.mod,
+  tierOrder: entries.tierOrder,
+};
+
+const changesFrom = () =>
+  db
+    .select(changeSelection)
+    .from(levelChanges)
+    .leftJoin(entries, eq(levelChanges.entryId, entries.id))
+    .leftJoin(beatmaps, eq(entries.beatmapId, beatmaps.id));
+
+type ChangeRow = Awaited<ReturnType<ReturnType<typeof changesFrom>["execute"]>>[number];
+
+function changeView(r: ChangeRow): ChangeView {
+  const before = readSnapshot(r.before) ?? snapshotOf([]);
+  const after = readSnapshot(r.after) ?? snapshotOf([]);
+  const kind = r.kind as ChangeKind;
+  const detail = (r.detail ?? null) as ChangeDetail | null;
+  return {
+    id: r.id,
+    at: r.createdAt.toISOString(),
+    kind,
+    text: changeText(kind, detail),
+    exp: (after[MAIN_LEVEL]?.exp ?? 0) - (before[MAIN_LEVEL]?.exp ?? 0),
+    tier: detail?.tier ?? null,
+    levels: packMoves(before, after),
+    map:
+      r.osuBeatmapId != null && r.title != null && r.mod != null && r.tierOrder != null
+        ? {
+            osuBeatmapId: r.osuBeatmapId,
+            setId: r.setId,
+            title: r.title,
+            version: r.version,
+            mod: r.mod,
+            tierOrder: r.tierOrder,
+          }
+        : null,
+  };
+}
+
+/**
+ * A player's newest level changes for the bell, and when they last saw
+ * them: on opening the bell or on closing their profile's popup.
+ */
+export async function getBell(
+  userId: number,
+  limit = 30,
+): Promise<{ changes: ChangeView[]; seenAt: Date | null }> {
+  const [rows, [me]] = await Promise.all([
+    changesFrom()
+      .where(eq(levelChanges.userId, userId))
+      .orderBy(desc(levelChanges.createdAt), desc(levelChanges.id))
+      .limit(limit),
+    db
+      .select({ changes: users.changesSeenAt, progress: users.progressSeenAt })
+      .from(users)
+      .where(eq(users.id, userId)),
+  ]);
+  const seen = [me?.changes, me?.progress].filter((d): d is Date => d != null);
+  return {
+    changes: rows.map(changeView),
+    seenAt: seen.length ? new Date(Math.max(...seen.map((d) => d.getTime()))) : null,
+  };
+}
+
+/** The level changes since the player last looked at their profile, oldest first. */
+export async function getChangesSinceSeen(userId: number): Promise<ChangeView[]> {
+  const rows = await changesFrom()
+    .where(
+      and(
+        eq(levelChanges.userId, userId),
+        raw`${levelChanges.createdAt} > (select ${users.progressSeenAt} from ${users} where ${users.id} = ${userId})`,
+      ),
+    )
+    .orderBy(asc(levelChanges.createdAt), asc(levelChanges.id))
+    .limit(200);
+  return rows.map(changeView);
+}
 
 export type ScoreLine = {
   entryId: number;

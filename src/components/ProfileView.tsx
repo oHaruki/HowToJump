@@ -3,7 +3,9 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userLevels, userTierProgress, users } from "@/lib/schema";
-import { RANKING_PAGE_SIZE, getProfilePlays, getRankOf, getTierCounts } from "@/lib/queries";
+import {
+  RANKING_PAGE_SIZE, getChangesSinceSeen, getProfilePlays, getRankOf, getTierCounts,
+} from "@/lib/queries";
 import { GRADE_RULES } from "@/lib/grading";
 import { BEST_PLAYS, MAIN_BEST, MAIN_LEVEL, levelValue } from "@/lib/levels";
 import { PROFILE_SCOPES, playsIn, profileLists, readSnapshot, snapshotOf } from "@/lib/progress";
@@ -46,13 +48,14 @@ export async function ProfileView({
 }) {
   const renderedAt = new Date();
   // One round trip: nothing in the batch needs the player's own row.
-  const [[me], packRows, plays, levelRows, standing, packSizes] = await Promise.all([
+  const [[me], packRows, plays, levelRows, standing, packSizes, readjusted] = await Promise.all([
     db.select().from(users).where(eq(users.id, userId)),
     db.select().from(userTierProgress).where(eq(userTierProgress.userId, userId)),
     getProfilePlays(userId),
     db.select().from(userLevels).where(eq(userLevels.userId, userId)),
     getRankOf(userId, MAIN_LEVEL),
     getTierCounts(),
+    owner ? getChangesSinceSeen(userId) : [],
   ]);
 
   // Where the player is, and, for the owner, where they were when they last looked.
@@ -99,6 +102,7 @@ export async function ProfileView({
             newScores={views.filter((v) => v.fresh === "new").length}
             improved={views.filter((v) => v.fresh === "improved").length}
             earned={earned}
+            readjusted={previous ? readjusted : []}
             firstLook={!previous}
             renderedAt={renderedAt.toISOString()}
           />

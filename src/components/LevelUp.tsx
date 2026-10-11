@@ -4,15 +4,18 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { explainShare, type ShareSteps } from "@/lib/grading";
 import { levelValue, progressText, type Place } from "@/lib/levels";
 import { normalizeCategory, shortCategory, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
+import { signedExp, splitGain, type ChangeView } from "@/lib/changes";
 import { ladderPosition } from "@/components/LevelView";
 import { GradeLetter } from "@/components/ui";
 import { CountUp } from "@/components/CountUp";
+import { ChangeRow, signOf } from "@/components/ChangeRow";
 
 /**
  * The level up popup, shown when a player returns to their profile having
- * gained EXP or reached a pack. Waits for the tab to be showing and focused
- * before it offers anything, and plays only when the button is pressed.
- * Marked as seen on close, so leaving it unopened keeps it waiting.
+ * gained EXP, reached a pack, or had their levels readjusted. Waits for the
+ * tab to be showing and focused before it offers anything, and plays only
+ * when the button is pressed. Marked as seen on close, so leaving it
+ * unopened keeps it waiting.
  */
 
 type Level = { exp: number; tierOrder: number | null; progress: number | null };
@@ -42,7 +45,15 @@ const UNRANKED: Level = { exp: 0, tierOrder: null, progress: 0 };
 /** Slow start, quick middle, soft landing: a fill you can watch. */
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
-type Change = { scope: string; label: string; from: Level; to: Level; gain: number; rankedUp: boolean };
+type Change = {
+  scope: string;
+  label: string;
+  from: Level;
+  to: Level;
+  gain: number;
+  rankedUp: boolean;
+  rankedDown: boolean;
+};
 
 function changesBetween(
   before: Snapshot,
@@ -59,9 +70,13 @@ function changesBetween(
       to,
       gain: to.exp - from.exp,
       rankedUp: (to.tierOrder ?? 0) > (from.tierOrder ?? 0),
+      rankedDown: (to.tierOrder ?? 0) < (from.tierOrder ?? 0),
     };
   });
 }
+
+/** The categories worth a line: any that gained, lost or changed pack. */
+const movedOf = (cats: Change[]) => cats.filter((c) => c.gain !== 0 || c.rankedUp || c.rankedDown);
 
 /** "Topaz 7/100%", or "GOAT" at the top pack. */
 function describe(level: Level): string {
@@ -83,6 +98,7 @@ export function LevelUp({
   newScores,
   improved,
   earned,
+  readjusted,
   firstLook,
   renderedAt,
 }: {
@@ -95,6 +111,8 @@ export function LevelUp({
   improved: number;
   /** The new and improved scores, most EXP first. */
   earned: EarnedPlay[];
+  /** Changes to the levels since the last look that plays didn't make, oldest first. */
+  readjusted: ChangeView[];
   firstLook: boolean;
   renderedAt: string;
 }) {
@@ -114,8 +132,12 @@ export function LevelUp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseKey, afterKey],
   );
+  // Readjustments closed here, which the server may not have caught up with.
+  const [acked, setAcked] = useState<ReadonlySet<number>>(() => new Set());
+  const adjusted = readjusted.filter((c) => !acked.has(c.id));
+
   const main = changes[0];
-  const noteworthy = main.gain > 0 || changes.some((c) => c.rankedUp);
+  const noteworthy = main.gain > 0 || changes.some((c) => c.rankedUp) || adjusted.length > 0;
 
   const [open, setOpen] = useState(false);
   // Frozen when the player presses play, so a refresh mid-animation cannot
@@ -125,6 +147,7 @@ export function LevelUp({
     after: Snapshot;
     renderedAt: string;
     earned: EarnedPlay[];
+    adjusted: ChangeView[];
   } | null>(null);
 
   // Open once the player is actually looking: tab showing, window focused.
@@ -176,9 +199,10 @@ export function LevelUp({
   }, [open]);
 
   const close = () => {
-    const seen = playing ?? { after, renderedAt };
+    const seen = playing ?? { after, renderedAt, adjusted };
     send(seen.after, seen.renderedAt, false);
     setLocal(seen.after);
+    setAcked(new Set([...acked, ...seen.adjusted.map((c) => c.id)]));
     setPlaying(null);
     setOpen(false);
   };
@@ -210,10 +234,12 @@ export function LevelUp({
         ) : (
           <Summary
             changes={changes}
+            adjusted={adjusted}
             firstLook={firstLook}
             newScores={newScores}
             improved={improved}
-            onPlay={() => setPlaying({ changes, after, renderedAt, earned })}
+            canPlay={main.gain > 0 || changes.some((c) => c.rankedUp) || earned.length > 0}
+            onPlay={() => setPlaying({ changes, after, renderedAt, earned, adjusted })}
             onSkip={close}
           />
         )}
@@ -232,28 +258,45 @@ function Gem({ tier, size = 18 }: { tier: Tier | null; size?: number }) {
   );
 }
 
+/** How many readjustments the summary lists before pointing to the bell. */
+const ADJUSTED_SHOWN = 3;
+
 /** What changed, before anything moves. */
 function Summary({
   changes,
+  adjusted,
   firstLook,
   newScores,
   improved,
+  canPlay,
   onPlay,
   onSkip,
 }: {
   changes: Change[];
+  adjusted: ChangeView[];
   firstLook: boolean;
   newScores: number;
   improved: number;
+  /** Whether there is anything to play, or only a close button. */
+  canPlay: boolean;
   onPlay: () => void;
   onSkip: () => void;
 }) {
   const [main, ...cats] = changes;
-  const moved = cats.filter((c) => c.gain > 0 || c.rankedUp);
+  const moved = movedOf(cats);
   const counts = [
     newScores ? newScores + (newScores === 1 ? " new score" : " new scores") : "",
     improved ? improved + " improved" : "",
   ].filter(Boolean);
+  const onlyAdjusted = adjusted.length > 0 && !counts.length;
+  const { played, readjusted } = splitGain(main.gain, adjusted);
+  const sub = onlyAdjusted
+    ? "Since you last looked"
+    : adjusted.length
+      ? signedExp(played) + " from " + counts.join(", ") + " · " + signedExp(readjusted) + " readjusted"
+      : main.gain < 0
+        ? [...counts, "some maps you've played were re-judged"].join(" · ")
+        : counts.join(" · ");
   const sameTier = main.from.tierOrder === main.to.tierOrder;
   // "Topaz 7/100% → 93/100%" within a pack; at the top there is no way to
   // go, so just the pack.
@@ -263,12 +306,14 @@ function Summary({
 
   return (
     <>
-      <span className="lu-kicker">{firstLook ? "Your levels are in" : "Since you last looked"}</span>
-      <h2 id="lu-title" className="lu-headline">
-        +{fmt(main.gain)}
+      <span className="lu-kicker">
+        {firstLook ? "Your levels are in" : onlyAdjusted ? "Readjusted" : "Since you last looked"}
+      </span>
+      <h2 id="lu-title" className="lu-headline" data-sign={signOf(main.gain)}>
+        {signedExp(main.gain)}
         <small>EXP</small>
       </h2>
-      {!firstLook && counts.length ? <p className="lu-sub">{counts.join(" · ")}</p> : null}
+      {!firstLook && sub ? <p className="lu-sub">{sub}</p> : null}
       <ul className="lu-list">
         <li
           data-up={main.rankedUp || undefined}
@@ -297,25 +342,53 @@ function Summary({
               <Gem tier={tier} />
               <b>{c.label}</b>
               <span>
-                {c.rankedUp ? (
+                {c.rankedUp || c.rankedDown ? (
                   <>
-                    {tierByOrder(c.from.tierOrder)?.name ?? "Unranked"} → <em>{tier?.name}</em>
+                    {tierByOrder(c.from.tierOrder)?.name ?? "Unranked"} → <em>{tier?.name ?? "Unranked"}</em>
                   </>
                 ) : (
-                  "+" + fmt(c.gain) + " EXP"
+                  signedExp(c.gain) + " EXP"
                 )}
               </span>
             </li>
           );
         })}
       </ul>
+      {adjusted.length ? (
+        <div className="lu-adj">
+          {onlyAdjusted ? null : <span className="lu-adj-head">Readjusted</span>}
+          <ul>
+            {adjusted
+              .slice(-ADJUSTED_SHOWN)
+              .reverse()
+              .map((c, i) => (
+                <li key={c.id} style={{ animationDelay: 200 + i * 70 + "ms" }}>
+                  <ChangeRow change={c} />
+                </li>
+              ))}
+          </ul>
+          {adjusted.length > ADJUSTED_SHOWN ? (
+            <p className="lu-adj-more">
+              And {adjusted.length - ADJUSTED_SHOWN} more under the bell at the top of the page
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="lu-actions">
-        <button className="btn lu-go" type="button" autoFocus onClick={onPlay}>
-          Show me
-        </button>
-        <button className="btn btn-ghost" type="button" onClick={onSkip}>
-          Skip
-        </button>
+        {canPlay ? (
+          <>
+            <button className="btn lu-go" type="button" autoFocus onClick={onPlay}>
+              Show me
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={onSkip}>
+              Skip
+            </button>
+          </>
+        ) : (
+          <button className="btn lu-go" type="button" autoFocus onClick={onSkip}>
+            Got it
+          </button>
+        )}
       </div>
     </>
   );
@@ -427,7 +500,7 @@ function Celebration({
   onClose: () => void;
 }) {
   const [main, ...cats] = changes;
-  const moved = cats.filter((c) => c.gain > 0 || c.rankedUp);
+  const moved = movedOf(cats);
   const [skip, setSkip] = useState(false);
   const [mainDone, setMainDone] = useState(false);
   const [catsDone, setCatsDone] = useState(0);
@@ -466,7 +539,7 @@ function Celebration({
             autoFocus
             onClick={earned.length ? () => setPage(0) : onClose}
           >
-            {earned.length ? "Next" : "Nice"}
+            {earned.length ? "Next" : main.gain < 0 ? "Got it" : "Nice"}
           </button>
         ) : (
           <button className="btn btn-ghost" type="button" onClick={() => setSkip(true)}>
@@ -527,8 +600,8 @@ function MainFill({ change, skip, onDone }: { change: Change; skip: boolean; onD
             </span>
           ) : null}
         </span>
-        <span className="lu-exp">
-          <b>+{fmt(exp - change.from.exp)}</b>
+        <span className="lu-exp" data-sign={signOf(change.gain)}>
+          <b>{signedExp(exp - change.from.exp)}</b>
           <small>EXP</small>
         </span>
       </div>
@@ -614,7 +687,9 @@ function CategoryFill({
       <span className="lu-cat-bar">
         <i style={{ width: into + "%" }} />
       </span>
-      <span className="lu-cat-exp">+{fmt(exp - change.from.exp)}</span>
+      <span className="lu-cat-exp" data-sign={signOf(change.gain)}>
+        {signedExp(exp - change.from.exp)}
+      </span>
     </div>
   );
 }

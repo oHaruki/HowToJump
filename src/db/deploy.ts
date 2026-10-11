@@ -231,7 +231,7 @@ async function main() {
           .where(inArray(entries.beatmapId, filled))
       : [];
     const players = new Set([...onFilled.map((p) => p.userId), ...moved]);
-    for (const userId of players) await refreshProgress(userId);
+    for (const userId of players) await refreshProgress(userId, { kind: "recheck" });
     console.log("Recomputed " + players.size + " players on those maps");
   }
 

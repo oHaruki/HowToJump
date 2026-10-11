@@ -75,7 +75,7 @@ export function BankCard({
       ar={m.ar}
       od={m.od}
       href={mapHref(m.osuBeatmapId, m.mod)}
-      copyId
+      links
       pack={<PackTile tierOrder={m.tierOrder} />}
       tags={
         <>

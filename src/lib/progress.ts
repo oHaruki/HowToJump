@@ -66,6 +66,27 @@ export function changesSince(
   return { expGain, rankUps };
 }
 
+/** Whether any level a profile shows differs between two snapshots. */
+export function levelsMoved(before: LevelSnapshot, after: LevelSnapshot): boolean {
+  return PROFILE_SCOPES.some((scope) => {
+    const a = before[scope] ?? UNRANKED;
+    const b = after[scope] ?? UNRANKED;
+    return a.exp !== b.exp || a.tierOrder !== b.tierOrder || a.progress !== b.progress;
+  });
+}
+
+/** Every level that ended up in another pack, up or down, main first. */
+export function packMoves(
+  before: LevelSnapshot,
+  after: LevelSnapshot,
+): Array<{ scope: string; from: number | null; to: number | null }> {
+  return PROFILE_SCOPES.flatMap((scope) => {
+    const from = before[scope]?.tierOrder ?? null;
+    const to = after[scope]?.tierOrder ?? null;
+    return from === to ? [] : [{ scope, from, to }];
+  });
+}
+
 /**
  * Whether a score landed since the player last looked: "new" for a map they
  * had no score on, "improved" for a better result. Nothing is new on a

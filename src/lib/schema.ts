@@ -29,6 +29,8 @@ export const users = pgTable(
     /** The levels as the player last saw them, and when. */
     progressSeen: jsonb("progress_seen").$type<Record<string, unknown>>(),
     progressSeenAt: timestamp("progress_seen_at", { withTimezone: true }),
+    /** When the player last opened the bell. */
+    changesSeenAt: timestamp("changes_seen_at", { withTimezone: true }),
     bannedAt: timestamp("banned_at", { withTimezone: true }),
     /** The links a staff member shows on the team page, beside their osu! profile. */
     socialLinks: text("social_links").array().notNull().default(sql`'{}'`),
@@ -347,6 +349,28 @@ export const userLevels = pgTable(
        Descending, since every reader wants the top. */
     index("user_levels_rank_idx").on(t.scope, t.exp.desc()),
   ],
+);
+
+/**
+ * A player's levels moved by something other than their own play: staff
+ * re-judging a map they played, a score taken off, or new EXP rules. Holds
+ * the levels before and after.
+ */
+export const levelChanges = pgTable(
+  "level_changes",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    entryId: integer("entry_id").references(() => entries.id, { onDelete: "set null" }),
+    /** entry | score | rules | recheck */
+    kind: varchar("kind", { length: 16 }).notNull(),
+    /** What changed on the map, as a ChangeDetail. */
+    detail: jsonb("detail").$type<Record<string, unknown>>(),
+    before: jsonb("before").notNull().$type<Record<string, unknown>>(),
+    after: jsonb("after").notNull().$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("level_changes_user_idx").on(t.userId, t.createdAt)],
 );
 
 /* ------------------------------------------------------------------ config */

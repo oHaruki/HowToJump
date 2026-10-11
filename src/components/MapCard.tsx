@@ -33,7 +33,7 @@ export function MapCard({
   score,
   linkTitle = true,
   href,
-  copyId,
+  links,
   footer,
 }: {
   osuBeatmapId: number;
@@ -62,8 +62,8 @@ export function MapCard({
   linkTitle?: boolean;
   /** The map's page on this site; the title links to osu! when there is none. */
   href?: string;
-  /** Adds a line under the map that copies its beatmap ID. */
-  copyId?: boolean;
+  /** Adds a line under the map: osu!direct, its osu! page and a button that copies its ID. */
+  links?: boolean;
   /** A full width strip along the bottom of the card. */
   footer?: ReactNode;
 }) {
@@ -106,7 +106,20 @@ export function MapCard({
               <span className="mapcard-title">{title || "beatmap " + osuBeatmapId}</span>
             )}
             <span className="mapcard-sub">{sub}</span>
-            {copyId ? <CopyBeatmapId id={osuBeatmapId} compact /> : null}
+            {links ? (
+              <span className="mapcard-links">
+                <a href={"osu://b/" + osuBeatmapId} title="Open in osu! with osu!direct">
+                  <svg viewBox="0 0 16 16" aria-hidden>
+                    <path d="M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M3 13.5h10" />
+                  </svg>
+                  osu!direct
+                </a>
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                  osu! page ↗
+                </a>
+                <CopyBeatmapId id={osuBeatmapId} compact />
+              </span>
+            ) : null}
           </div>
 
           {tags ? <div className="mapcard-tags">{tags}</div> : null}

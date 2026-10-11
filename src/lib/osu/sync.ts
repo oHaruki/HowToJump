@@ -1,9 +1,11 @@
 import { and, asc, eq, inArray, isNull, lt, ne, notInArray, or, sql as raw } from "drizzle-orm";
 import { db, sql } from "@/lib/db";
 import {
-  beatmaps, entries, scores, siteConfig, syncRuns, userLevels, userTierProgress, users,
+  beatmaps, entries, levelChanges, scores, siteConfig, syncRuns, userLevels, userTierProgress, users,
 } from "@/lib/schema";
 import { MAIN_LEVEL, categoryLevels, levelRules, mainLevel, totalExp } from "@/lib/levels";
+import { levelsMoved, snapshotOf } from "@/lib/progress";
+import type { ChangeCause } from "@/lib/changes";
 import {
   fetchPlayCounts, fetchRecentPlays, fetchScore, toPlay, type OsuScore, type PlayFacts,
 } from "@/lib/osu/client";
@@ -168,9 +170,14 @@ async function refreshWithTop(userId: number): Promise<RecordTaken | null> {
 /**
  * Recomputes the per pack rollup and the skill levels a profile reads, from
  * visible scores on listed ladder entries valued at the entry's current
- * pack. Special packs count toward neither.
+ * pack. Special packs count toward neither. With a `cause`, a move in the
+ * player's levels is logged to level_changes.
  */
-export async function refreshProgress(userId: number): Promise<void> {
+export async function refreshProgress(userId: number, cause?: ChangeCause): Promise<void> {
+  const before = cause
+    ? snapshotOf(await db.select().from(userLevels).where(eq(userLevels.userId, userId)))
+    : null;
+
   const counted = and(
     eq(scores.userId, userId),
     eq(scores.isHidden, false),
@@ -235,21 +242,20 @@ export async function refreshProgress(userId: number): Promise<void> {
     { scope: MAIN_LEVEL, ...mainLevel(Object.values(byCategory), totalExp(plays)) },
   ];
   const now = new Date();
+  const rows = levels.map((l) => ({
+    userId,
+    scope: l.scope,
+    exp: Math.round(l.exp),
+    tierOrder: l.tierOrder,
+    progress: l.progress,
+    updatedAt: now,
+  }));
 
   // Upserted rather than cleared and refilled, so the worker and a Sync now
   // landing on the same player at once cannot trip over each other's rows.
   await db
     .insert(userLevels)
-    .values(
-      levels.map((l) => ({
-        userId,
-        scope: l.scope,
-        exp: Math.round(l.exp),
-        tierOrder: l.tierOrder,
-        progress: l.progress,
-        updatedAt: now,
-      })),
-    )
+    .values(rows)
     .onConflictDoUpdate({
       target: [userLevels.userId, userLevels.scope],
       set: {
@@ -268,15 +274,27 @@ export async function refreshProgress(userId: number): Promise<void> {
         notInArray(userLevels.scope, levels.map((l) => l.scope)),
       ),
     );
+
+  const after = snapshotOf(rows);
+  if (cause && before && levelsMoved(before, after)) {
+    await db.insert(levelChanges).values({
+      userId,
+      entryId: cause.entryId ?? null,
+      kind: cause.kind,
+      detail: cause.detail ?? null,
+      before,
+      after,
+    });
+  }
 }
 
 /** Recomputes everyone holding a score on an entry. For re-judging or pulling it. */
-export async function refreshEntryPlayers(entryId: number): Promise<number> {
+export async function refreshEntryPlayers(entryId: number, cause?: ChangeCause): Promise<number> {
   const players = await db
     .selectDistinct({ userId: scores.userId })
     .from(scores)
     .where(eq(scores.entryId, entryId));
-  for (const p of players) await refreshProgress(p.userId);
+  for (const p of players) await refreshProgress(p.userId, cause);
   return players.length;
 }
 
@@ -362,8 +380,9 @@ export async function rebuildLevelsIfRulesChanged(
     .where(eq(siteConfig.key, LEVEL_RULES_KEY));
   if (!force && stored?.value === rules) return { rebuilt: false, players: 0 };
 
+  const kind = stored?.value === rules ? "recheck" : "rules";
   const players = await db.selectDistinct({ userId: scores.userId }).from(scores);
-  for (const p of players) await refreshProgress(p.userId);
+  for (const p of players) await refreshProgress(p.userId, { kind });
 
   await db
     .insert(siteConfig)

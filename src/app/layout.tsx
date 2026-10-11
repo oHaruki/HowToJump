@@ -4,7 +4,9 @@ import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { auth } from "@/lib/auth";
 import { PLAYER, canUseStaffArea } from "@/lib/roles";
+import { getBell } from "@/lib/queries";
 import { AuthButton } from "@/components/AuthButton";
+import { ChangesBell } from "@/components/ChangesBell";
 import { NavLinks } from "@/components/NavLinks";
 import { SITE_NAME } from "@/lib/site";
 
@@ -34,6 +36,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
+  const bell = session?.userId ? await getBell(session.userId) : null;
 
   // Public destinations only. Personal and staff links live in the avatar menu.
   const links = [
@@ -56,6 +59,9 @@ export default async function RootLayout({
             </Link>
             <NavLinks links={links} />
             <div className="nav-tools">
+              {bell ? (
+                <ChangesBell changes={bell.changes} seenAt={bell.seenAt?.toISOString() ?? null} />
+              ) : null}
               <AuthButton
                 isStaff={canUseStaffArea(session)}
                 user={

@@ -183,7 +183,7 @@ export function VoteCard({
       ar={map.ar}
       od={map.od}
       href={mapHref(map.osuBeatmapId, map.mod)}
-      copyId
+      links
       tone={focus ? "attention" : undefined}
       pack={
         <>
