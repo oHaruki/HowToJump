@@ -8,6 +8,7 @@ import {
 import { Cover } from "@/components/Cover";
 import { CountUp } from "@/components/CountUp";
 import { FeaturedRotator } from "@/components/FeaturedRotator";
+import { GuideTeaser } from "@/components/HowToPlay";
 import { GRADE_RULES } from "@/lib/grading";
 import { TIERS, tierByOrder } from "@/lib/tiers";
 
@@ -46,7 +47,10 @@ export default async function OverviewPage() {
             up specific aim skills and climb the leaderboards.
           </p>
           <div className="row hero-cta">
-            <Link className="btn btn-primary" href="/ladder">
+            <Link className="btn btn-primary" href="/how-to-play">
+              How to play
+            </Link>
+            <Link className="btn" href="/ladder">
               See the packs
             </Link>
             <Link className="btn" href="/maps">
@@ -66,6 +70,8 @@ export default async function OverviewPage() {
 
         <FeaturedRotator entries={newest} />
       </div>
+
+      <GuideTeaser />
 
       <div className="stack-lg">
         <div className="section-head">

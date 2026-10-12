@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { GradeLetter, ModIcons } from "@/components/ui";
-import { BEST_PLAYS } from "@/lib/levels";
-import { TIERS, tierByOrder, tierFill } from "@/lib/tiers";
+import { BEST_PLAYS, type Level } from "@/lib/levels";
+import { TIERS, tierByName, tierByOrder, tierFill } from "@/lib/tiers";
 
 /**
  * The how to play page's pictures: small scenes drawn from the site's own
@@ -26,7 +26,15 @@ export type GuideMap = {
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 
 /** A map's cover from osu!, or nothing when the set has none. */
-function Art({ setId, kind, className }: { setId: number | null; kind: "cover" | "card"; className: string }) {
+function Art({
+  setId,
+  kind,
+  className,
+}: {
+  setId: number | null;
+  kind: "cover" | "cover@2x" | "card";
+  className: string;
+}) {
   return (
     <span className={className}>
       {setId ? (
@@ -173,49 +181,96 @@ export function BankScene({ maps, pick }: { maps: GuideMap[]; pick: number }) {
   );
 }
 
-/**
- * A five point star jump, one circle every half second. The delays put
- * each circle's hit on its half second of the loop; the fourth is missed.
- */
-const CIRCLES = [
-  { x: 50, y: 15, delay: "-0.9s" },
-  { x: 65, y: 51, delay: "-0.4s" },
-  { x: 25, y: 29, delay: "-2.4s" },
-  { x: 75, y: 29, delay: "-1.9s", miss: true },
-  { x: 35, y: 51, delay: "-1.4s" },
+/** The star the circles jump around, in the order they are hit. */
+const STAR = [
+  { x: 50, y: 15 },
+  { x: 65, y: 51 },
+  { x: 25, y: 29 },
+  { x: 75, y: 29 },
+  { x: 35, y: 51 },
 ];
+/** Seconds between hits, and how long a circle shows before its hit. */
+const BEAT = 0.5;
+const APPROACH = 0.9;
+/** Three times around the star, the fourth circle of the third missed. */
+const CIRCLES = STAR.length * 3;
+const MISSED = 13;
+const LOOP = CIRCLES * BEAT;
+/** A colour for each time around the star, as osu! cycles combo colours. */
+const ROUND_COLOURS = ["Emerald", "Sapphire", "Rhodonite"].map((n) => tierByName(n)?.color ?? "#777");
 
-/** The map being played in osu!, with its mods on the HUD. */
-export function PlayScene({ map, accuracy, combo }: { map: GuideMap; accuracy: number; combo: number }) {
+/** The negative delay that puts second `t` of the loop at an animation's start. */
+const delayAt = (t: number) => ((t % LOOP) + LOOP) % LOOP - LOOP + "s";
+
+/** The combo after each circle, once the loop has gone round: up one per hit, back to 0 on the miss. */
+function combos(): number[] {
+  const out: number[] = [];
+  let combo = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let k = 0; k < CIRCLES; k++) {
+      combo = k === MISSED ? 0 : combo + 1;
+      if (pass) out.push(combo);
+    }
+  }
+  return out;
+}
+
+/** The map being played in osu!: the combo builds circle by circle until a miss breaks it. */
+export function PlayScene({ map, accuracy }: { map: GuideMap; accuracy: number }) {
+  const path = Object.fromEntries(
+    STAR.flatMap((at, i) => [["--x" + i, at.x + "cqw"], ["--y" + i, at.y + "cqw"]]),
+  ) as CSSProperties;
   return (
-    <div className="sc sc-play" role="img" aria-label={"Playing " + map.title + " in osu!, one miss in five"}>
-      <Art setId={map.setId} kind="cover" className="scp-bg" />
+    <div
+      className="sc sc-play"
+      role="img"
+      aria-label={"Playing " + map.title + " in osu!: the combo builds, then one miss breaks it"}
+    >
+      <Art setId={map.setId} kind="cover@2x" className="scp-bg" />
       <span className="scp-hp" aria-hidden="true">
         <i />
       </span>
       <div className="scp-hud" aria-hidden="true">
-        <b className="scp-score">00412880</b>
         <span className="scp-acc">{accuracy.toFixed(2)}%</span>
         {map.mod !== "NM" ? <ModIcons mod={map.mod} /> : null}
       </div>
-      {CIRCLES.map((c, i) => (
-        <span
-          key={i}
-          className="scp-hc"
-          data-miss={c.miss || undefined}
-          aria-hidden="true"
-          style={{ left: c.x + "cqw", top: c.y + "cqw", "--d": c.delay } as CSSProperties}
-        >
-          <i className="scp-ring" />
-          <i className="scp-body">{i + 1}</i>
-          <i className="scp-judge">{c.miss ? "✕" : "300"}</i>
-        </span>
-      ))}
-      <b className="scp-combo" aria-hidden="true">
-        {combo}
-        <small>x</small>
-      </b>
-      <span className="scp-cursor" aria-hidden="true">
+      {Array.from({ length: CIRCLES }, (_, k) => {
+        const at = STAR[k % STAR.length];
+        return (
+          <span
+            key={k}
+            className="scp-hc"
+            data-miss={k === MISSED || undefined}
+            aria-hidden="true"
+            style={
+              {
+                left: at.x + "cqw",
+                top: at.y + "cqw",
+                "--d": delayAt(k * BEAT - APPROACH),
+                "--combo": ROUND_COLOURS[Math.floor(k / STAR.length)],
+              } as CSSProperties
+            }
+          >
+            <i className="scp-ring" />
+            <i className="scp-body">{(k % STAR.length) + 1}</i>
+            <i className="scp-judge">{k === MISSED ? "✕" : "300"}</i>
+          </span>
+        );
+      })}
+      <span className="scp-combo" aria-hidden="true">
+        {combos().map((n, k) => (
+          <b
+            key={k}
+            data-miss={k === MISSED || undefined}
+            data-rest={k === MISSED - 1 || undefined}
+            style={{ "--d": delayAt(k * BEAT) } as CSSProperties}
+          >
+            {n}
+            <small>x</small>
+          </b>
+        ))}
+      </span>
+      <span className="scp-cursor" aria-hidden="true" style={path}>
         <i />
         <i />
         <i />
@@ -226,23 +281,30 @@ export function PlayScene({ map, accuracy, combo }: { map: GuideMap; accuracy: n
   );
 }
 
-/** The score as it lands: its grade and EXP, then a skill reaching the next pack. */
+/**
+ * The score as it lands: its grade and EXP, then the map's skill filling
+ * its bar from `before` and ranking up to where `after` sits.
+ */
 export function ExpScene({
   map,
   grade,
   misses,
   accuracy,
   exp,
+  before,
+  after,
 }: {
   map: GuideMap;
   grade: string;
   misses: number;
   accuracy: number;
   exp: number;
+  before: Level;
+  after: Level;
 }) {
   const skill = map.skill;
-  const to = tierByOrder(map.tierOrder);
-  const from = tierByOrder(map.tierOrder - 1);
+  const from = tierByOrder(before.tierOrder);
+  const to = tierByOrder(after.tierOrder);
   return (
     <div
       className="sc sc-exp"
@@ -251,7 +313,13 @@ export function ExpScene({
         grade + ", " + misses + (misses === 1 ? " miss" : " misses") + " at " + accuracy.toFixed(2) +
         "%, worth " + fmt(exp) + " EXP, and " + skill + " reaching " + (to?.name ?? "the next pack")
       }
-      style={{ "--pack": to?.color ?? "#777" } as CSSProperties}
+      style={
+        {
+          "--pack": to?.color ?? "#777",
+          "--from-p": (before.progress ?? 0) / 100,
+          "--to-p": (after.progress ?? 0) / 100,
+        } as CSSProperties
+      }
     >
       <div className="sce-card" aria-hidden="true">
         <Art setId={map.setId} kind="card" className="sce-art" />
@@ -271,7 +339,10 @@ export function ExpScene({
         </span>
       </div>
       <div className="sce-level" aria-hidden="true">
-        <span className="sce-label">{skill} level</span>
+        <span className="sce-label">
+          <span>{skill} level</span>
+          <b>{fmt(after.exp)} EXP</b>
+        </span>
         <span className="sce-tier">
           <span className="sce-gems">
             <i data-empty={from ? undefined : true} style={from ? { background: tierFill(from) } : undefined} />

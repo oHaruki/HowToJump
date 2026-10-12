@@ -220,7 +220,7 @@ code { font-family: var(--font-mono); font-size: var(--font-size-mono); }
 }
 .nav-panel-link:hover { color: var(--text-focus); }
 .nav-panel-link[data-active="true"] { color: var(--text-focus); background: var(--bg-c); }
-@media (max-width: 1120px) {
+@media (max-width: 860px) {
   .nav-links { display: none; }
   .nav-tools { margin-left: auto; }
   .nav-burger { display: flex; order: 1; }
@@ -371,6 +371,7 @@ main { padding-block: 40px 72px; min-height: calc(100vh - var(--nav-height) - 80
 .hero-facts .stat span { display: block; font-size: 12px; line-height: 1.35; margin-top: 4px; }
 @media (max-width: 640px) {
   .hero-cta .btn { flex: 1 1 0; padding-inline: 12px; }
+  .hero-cta .btn:first-child { flex-basis: 100%; }
   .hero-facts { margin-top: 6px; }
 }
 
@@ -3214,7 +3215,7 @@ input[type="color"] {
  * Four steps down a line, the text on one side and a picture on the other,
  * swapping sides each step. Each step wears a pack's colour.
  */
-.guide { width: 100%; max-width: 1240px; margin-inline: auto; gap: 72px; }
+.guide { width: 100%; max-width: 1320px; margin-inline: auto; gap: 72px; }
 .guide-head { position: relative; display: flex; flex-direction: column; gap: 16px; }
 .guide-head > :not(.guide-art) { position: relative; z-index: 1; }
 .guide-head h1 {
@@ -3266,27 +3267,74 @@ input[type="color"] {
 }
 @media (max-width: 640px) { .guide-index { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.guide-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 96px; }
+/* The guide on the overview: a card for each step, its pack colour along the top. */
+.guide-cards {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.guide-cards a {
+  position: relative; overflow: hidden; height: 100%;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 20px 20px 22px;
+  color: var(--text); text-decoration: none;
+  background: var(--bg-b);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--surface-radius); corner-shape: var(--corner-shape);
+  box-shadow: var(--box-shadow);
+  transition: transform var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
+}
+.guide-cards a::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 3px;
+  background: var(--step-fill);
+}
+.guide-cards a:hover {
+  transform: translateY(-2px); background: var(--bg-c);
+  border-color: color-mix(in srgb, var(--step) 50%, var(--border));
+}
+.guide-card-head { display: flex; align-items: center; gap: 12px; }
+.guide-card-head i {
+  flex: none; display: grid; place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 11px; corner-shape: var(--corner-shape);
+  background: var(--step-fill); color: #111;
+  outline: var(--border-width) solid var(--scrim);
+  font-style: normal; font-family: var(--font-display); font-weight: 800; font-size: 17px;
+}
+.guide-card-head b {
+  font-family: var(--font-display); font-stretch: 112%; font-weight: 700;
+  font-size: 21px; line-height: 1.15; letter-spacing: -0.01em; color: var(--text-focus);
+}
+.guide-card-line { font-size: 15.5px; line-height: 1.5; text-wrap: pretty; }
+@media (max-width: 1100px) { .guide-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .guide-cards { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+
+/* Rows of equal height, each step's number set off to its text's side of the middle. */
+.guide-steps {
+  --gap: 104px; --swing: 72px;
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-auto-rows: 1fr; row-gap: var(--gap);
+}
 .gstep {
-  --gap: 96px;
+  --nx: -1;
   position: relative; scroll-margin-top: calc(var(--nav-height) + 28px);
   display: grid; align-items: center;
-  grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 280px minmax(0, 1fr);
   grid-template-areas: "text node shot";
 }
-.gstep:nth-child(even) { grid-template-areas: "shot node text"; }
-/* The line: each step draws from its top to the next one's, the first from
-   its node and the last only down to its own. */
-.gstep::before {
-  content: ""; position: absolute; z-index: 0;
-  left: 50%; width: 2px; margin-left: -1px;
-  top: 0; bottom: calc(-1 * var(--gap));
-  background: var(--border);
+.gstep:nth-child(even) { --nx: 1; grid-template-areas: "shot node text"; }
+/* The path from each number to the next, curving across the middle column. */
+.gstep-path {
+  position: absolute; z-index: 0; overflow: visible; pointer-events: none;
+  left: calc(50% - var(--swing)); width: calc(2 * var(--swing));
+  top: 50%; height: calc(100% + var(--gap));
 }
-.gstep:first-child::before { top: 50%; }
-.gstep:last-child::before { bottom: 50%; }
+.gstep-path path {
+  fill: none; stroke: var(--border); stroke-width: 2px; stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
 .gstep-node {
   grid-area: node; justify-self: center; position: relative; z-index: 1;
+  translate: calc(var(--nx) * var(--swing)) 0;
   display: grid; place-items: center;
   width: 66px; height: 66px;
   border-radius: 20px; corner-shape: var(--corner-shape);
@@ -3322,20 +3370,32 @@ input[type="color"] {
 .gstep:nth-child(odd) .gstep-shot { justify-self: start; }
 .gstep:nth-child(even) .gstep-shot { justify-self: end; }
 
-/* One column below this: the line down the left, each picture under its text. */
+@media (max-width: 1200px) {
+  .guide-steps { --swing: 48px; }
+  .gstep { grid-template-columns: minmax(0, 1fr) 200px minmax(0, 1fr); }
+}
+
+/* One column below this: the numbers down a straight line on the left, each
+   picture under its text. */
 @media (max-width: 960px) {
   .guide { gap: 56px; }
-  .guide-steps { gap: 72px; }
+  .guide-steps { --gap: 72px; display: flex; flex-direction: column; gap: var(--gap); }
   .gstep, .gstep:nth-child(even) {
-    --gap: 72px;
     grid-template-columns: 56px minmax(0, 1fr);
     grid-template-areas: "node text" ". shot";
     align-items: start; column-gap: 20px; row-gap: 26px;
   }
-  .gstep::before { left: 28px; }
+  .gstep-path { display: none; }
+  /* Each step draws the line from its top to the next one's. */
+  .gstep::before {
+    content: ""; position: absolute; z-index: 0;
+    left: 28px; width: 2px; margin-left: -1px;
+    top: 0; bottom: calc(-1 * var(--gap));
+    background: var(--border);
+  }
   .gstep:first-child::before { top: 28px; }
   .gstep:last-child::before { bottom: auto; height: 28px; }
-  .gstep-node { width: 56px; height: 56px; border-radius: 17px; }
+  .gstep-node { translate: none; width: 56px; height: 56px; border-radius: 17px; }
   .gstep-node b { font-size: 25px; }
   .gstep:nth-child(n) .gstep-text { justify-self: stretch; max-width: 62ch; }
   .gstep:nth-child(n) .gstep-shot { justify-self: start; }
@@ -3676,10 +3736,10 @@ input[type="color"] {
   56%, 100% { transform: scaleX(1); }
 }
 
-/* Play: a star jump over the map's art, one circle every half second and
-   the fourth missed. Two and a half seconds; each circle shows for 0.9s
-   before its hit. */
-.sc-play { --combo: var(--step); background: #0b0b0d; }
+/* Play: three times around a star jump over the map's art, one circle every
+   half second, the combo counting up until a miss breaks it. Seven and a
+   half seconds; each circle shows for 0.9s, so its hit falls at 12%. */
+.sc-play { background: #0b0b0d; }
 .scp-bg { position: absolute; inset: 0; }
 .scp-bg img { filter: brightness(0.32) saturate(0.85); }
 .scp-bg::after {
@@ -3699,14 +3759,18 @@ input[type="color"] {
   display: flex; flex-direction: column; align-items: flex-end; gap: 0.7cqw;
   color: #fff; text-shadow: 0 0.2cqw 0.6cqw #000;
 }
-.scp-score { font-family: var(--font-mono); font-weight: 400; font-size: 4cqw; line-height: 1; letter-spacing: 0.04em; }
-.scp-acc { font-family: var(--font-mono); font-size: 2.5cqw; line-height: 1; }
+.scp-acc { font-family: var(--font-mono); font-size: 3.4cqw; line-height: 1; }
 .scp-hud .mod { height: 3.4cqw; }
-.scp-combo {
-  position: absolute; left: 3cqw; bottom: 2.4cqw; z-index: 2;
+/* The combo: a number for each circle, showing from its hit until the next. */
+.scp-combo { position: absolute; left: 3cqw; bottom: 2.4cqw; z-index: 2; }
+.scp-combo b {
+  position: absolute; left: 0; bottom: 0; white-space: nowrap;
   font-family: var(--font-display); font-style: italic; font-weight: 820; font-size: 6.4cqw; line-height: 1;
-  color: #fff; text-shadow: 0 0.3cqw 1cqw #000; transform-origin: left bottom;
+  color: #fff; text-shadow: 0 0.3cqw 1cqw #000;
+  opacity: 0; transform-origin: left bottom;
 }
+.scp-combo b[data-rest] { opacity: 1; }
+.scp-combo b[data-miss] { color: #ff8a8a; }
 .scp-combo small { font-size: 0.6em; margin-left: 0.1em; }
 .scp-hc { position: absolute; z-index: 1; width: 11cqw; height: 11cqw; margin: -5.5cqw 0 0 -5.5cqw; }
 .scp-hc > i { position: absolute; inset: 0; border-radius: 50%; font-style: normal; }
@@ -3733,7 +3797,7 @@ input[type="color"] {
   position: absolute; left: 0; top: 0;
   width: 4cqw; height: 4cqw; margin: -2cqw 0 0 -2cqw; border-radius: 50%;
   background: radial-gradient(circle, #fff 0 22%, #ffe9a8 30%, #ffb84d 46%, #ffb84d00 70%);
-  transform: translate(50cqw, 15cqw);
+  transform: translate(var(--x0), var(--y0));
 }
 /* The trail: smaller copies a few hundredths of a second behind. */
 .scp-cursor i + i {
@@ -3744,12 +3808,12 @@ input[type="color"] {
 .scp-cursor i:nth-child(3) { opacity: 0.36; }
 .scp-cursor i:nth-child(4) { opacity: 0.24; }
 .scp-cursor i:nth-child(5) { opacity: 0.14; }
-.scp-body { animation: scp-body 2.5s linear var(--d) infinite; }
+.scp-body { animation: scp-body 7.5s linear var(--d) infinite; }
 .scp-hc[data-miss] > .scp-body { animation-name: scp-body-miss; }
-.scp-ring { animation: scp-ring 2.5s linear var(--d) infinite; }
-.scp-hc > .scp-judge { animation: scp-judge 2.5s ease-out var(--d) infinite; }
+.scp-ring { animation: scp-ring 7.5s linear var(--d) infinite; }
+.scp-hc > .scp-judge { animation: scp-judge 7.5s ease-out var(--d) infinite; }
 .scp-hc[data-miss] > .scp-judge { animation-name: scp-judge-miss; }
-.scp-combo { animation: scp-combo 2.5s infinite; }
+.scp-combo b { animation: scp-count 7.5s linear var(--d) infinite; }
 .scp-cursor i { animation: scp-cursor 2.5s backwards infinite; }
 .scp-cursor i:nth-child(2) { animation-delay: 0.025s; }
 .scp-cursor i:nth-child(3) { animation-delay: 0.05s; }
@@ -3757,44 +3821,47 @@ input[type="color"] {
 .scp-cursor i:nth-child(5) { animation-delay: 0.1s; }
 @keyframes scp-body {
   0% { opacity: 0; transform: scale(0.92); }
-  10%, 36% { opacity: 1; transform: none; }
-  44%, 100% { opacity: 0; transform: scale(1.45); }
+  3.3%, 12% { opacity: 1; transform: none; }
+  14.7%, 100% { opacity: 0; transform: scale(1.45); }
 }
 @keyframes scp-body-miss {
   0% { opacity: 0; transform: scale(0.92); }
-  10%, 36% { opacity: 1; transform: none; }
-  42%, 100% { opacity: 0; transform: none; }
+  3.3%, 12% { opacity: 1; transform: none; }
+  14%, 100% { opacity: 0; transform: none; }
 }
 @keyframes scp-ring {
   0% { opacity: 0; transform: scale(3.2); }
-  10% { opacity: 0.95; }
-  36% { opacity: 0.95; transform: scale(1); }
-  36.5%, 100% { opacity: 0; transform: scale(1); }
+  3.3% { opacity: 0.95; }
+  12% { opacity: 0.95; transform: scale(1); }
+  12.2%, 100% { opacity: 0; transform: scale(1); }
 }
 @keyframes scp-judge {
-  0%, 36% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
-  39% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
-  43% { opacity: 1; transform: translate(-50%, -50%); }
-  58% { opacity: 1; transform: translate(-50%, -80%); }
-  66%, 100% { opacity: 0; transform: translate(-50%, -90%); }
+  0%, 12% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  13% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  14.3% { opacity: 1; transform: translate(-50%, -50%); }
+  19.3% { opacity: 1; transform: translate(-50%, -80%); }
+  22%, 100% { opacity: 0; transform: translate(-50%, -90%); }
 }
 @keyframes scp-judge-miss {
-  0%, 36% { opacity: 0; transform: translate(-50%, -50%) scale(1.4) rotate(-10deg); }
-  40% { opacity: 1; transform: translate(-50%, -50%); }
-  60% { opacity: 1; transform: translate(-50%, -15%) rotate(6deg); }
-  70%, 100% { opacity: 0; transform: translate(-50%, 5%) rotate(10deg); }
+  0%, 12% { opacity: 0; transform: translate(-50%, -50%) scale(1.4) rotate(-10deg); }
+  13.3% { opacity: 1; transform: translate(-50%, -50%); }
+  20% { opacity: 1; transform: translate(-50%, -15%) rotate(6deg); }
+  23.3%, 100% { opacity: 0; transform: translate(-50%, 5%) rotate(10deg); }
 }
-@keyframes scp-combo {
-  0%, 20%, 40%, 80% { transform: scale(1.12); }
-  4%, 24%, 44%, 84%, 100% { transform: none; }
+/* A number pops in on its hit and holds for one beat, a fifteenth of the loop. */
+@keyframes scp-count {
+  0% { opacity: 1; transform: scale(1.16); }
+  1.3%, 6.6% { opacity: 1; transform: none; }
+  6.67%, 100% { opacity: 0; transform: none; }
 }
+/* Once round the star every two and a half seconds, through the points the scene sets. */
 @keyframes scp-cursor {
-  0%, 5% { transform: translate(50cqw, 15cqw); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
-  20%, 25% { transform: translate(65cqw, 51cqw); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
-  40%, 45% { transform: translate(25cqw, 29cqw); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
-  60%, 65% { transform: translate(82cqw, 21cqw); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
-  80%, 85% { transform: translate(35cqw, 51cqw); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
-  100% { transform: translate(50cqw, 15cqw); }
+  0%, 5% { transform: translate(var(--x0), var(--y0)); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
+  20%, 25% { transform: translate(var(--x1), var(--y1)); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
+  40%, 45% { transform: translate(var(--x2), var(--y2)); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
+  60%, 65% { transform: translate(var(--x3), var(--y3)); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
+  80%, 85% { transform: translate(var(--x4), var(--y4)); animation-timing-function: cubic-bezier(0.55, 0, 0.25, 1); }
+  100% { transform: translate(var(--x0), var(--y0)); }
 }
 
 /* Get EXP: the score lands, then the skill fills its bar and reaches the next pack. Six seconds. */
@@ -3836,9 +3903,11 @@ input[type="color"] {
   border: var(--border-width) solid var(--border); border-radius: 2.4cqw;
 }
 .sce-label {
+  display: flex; justify-content: space-between; gap: 2cqw;
   font-family: var(--font-mono); font-size: 1.8cqw;
   text-transform: uppercase; letter-spacing: var(--letter-label); color: var(--text-dark);
 }
+.sce-label b { font-weight: 400; color: var(--text); }
 .sce-tier { display: flex; align-items: center; gap: 2.2cqw; }
 .sce-gems { position: relative; flex: none; width: 7cqw; height: 7cqw; }
 .sce-gems i {
@@ -3868,7 +3937,7 @@ input[type="color"] {
   position: relative; overflow: hidden; height: 2.6cqw;
   border-radius: 99px; background: var(--bg-d); box-shadow: inset 0 0.1cqw 0.3cqw #00000088;
 }
-.sce-bar i { position: absolute; inset: 0; border-radius: inherit; transform-origin: left; transform: scaleX(0.12); }
+.sce-bar i { position: absolute; inset: 0; border-radius: inherit; transform-origin: left; transform: scaleX(var(--to-p)); }
 .sce-bar i:first-child { opacity: 0; }
 .sce-bar::after { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; }
 .sce-foot { font-size: 1.8cqw; color: var(--text-dark); }
@@ -3922,14 +3991,14 @@ input[type="color"] {
   65%, 100% { opacity: 1; transform: none; }
 }
 @keyframes sce-fill-from {
-  0%, 18% { opacity: 1; transform: scaleX(0.58); }
+  0%, 18% { opacity: 1; transform: scaleX(var(--from-p)); }
   54% { opacity: 1; transform: scaleX(1); }
   56%, 100% { opacity: 0; transform: scaleX(1); }
 }
 @keyframes sce-fill-to {
   0%, 55% { opacity: 0; transform: scaleX(0); }
   57% { opacity: 1; transform: scaleX(0); }
-  64%, 100% { opacity: 1; transform: scaleX(0.12); }
+  64%, 100% { opacity: 1; transform: scaleX(var(--to-p)); }
 }
 @keyframes sce-flash {
   0%, 54% { opacity: 0; }

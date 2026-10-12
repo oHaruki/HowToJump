@@ -41,7 +41,6 @@ export default async function RootLayout({
   // Public destinations only. Personal and staff links live in the avatar menu.
   const links = [
     { href: "/", label: "Overview" },
-    { href: "/how-to-play", label: "How to play" },
     { href: "/maps", label: "Map bank" },
     { href: "/ladder", label: "Packs" },
     { href: "/leaderboard", label: "Leaderboard" },
