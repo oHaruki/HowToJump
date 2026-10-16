@@ -13,7 +13,7 @@ import { modLabel } from "@/lib/mods";
 import type { SpecialPack } from "@/lib/packs";
 import type { Facets } from "@/lib/queries";
 import {
-  LENGTH_SCALE, SPEED_SCALE, TIERS, isCategory, tierBySlug, tierFill, type Bucket,
+  LENGTH_SCALE, SPEED_SCALE, TIERS, bucketRange, isCategory, tierBySlug, tierFill, type Bucket,
 } from "@/lib/tiers";
 
 const LABELS: Record<FacetKey, string> = {
@@ -47,7 +47,7 @@ const labelOf = (options: Array<{ value: string; label: string }>, v: string) =>
 
 /** A bucket's range, for the dim note beside it. */
 const rangeOf = (scale: Bucket[], v: string, unit = "") => {
-  const r = scale.find((b) => b.name === v)?.range;
+  const r = bucketRange(scale, v);
   return r ? r + unit : undefined;
 };
 

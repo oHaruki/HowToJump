@@ -9,6 +9,8 @@ import { ladderPosition } from "@/components/LevelView";
 import { GradeLetter } from "@/components/ui";
 import { CountUp } from "@/components/CountUp";
 import { ChangeRow, signOf } from "@/components/ChangeRow";
+import { Medal } from "@/components/Medal";
+import type { MedalArt } from "@/lib/achievements";
 
 /**
  * The level up popup, shown when a player returns to their profile having
@@ -41,6 +43,9 @@ export type EarnedPlay = {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
 const UNRANKED: Level = { exp: 0, tierOrder: null, progress: 0 };
+
+/** An achievement reached since the last look, as the popup shows it. */
+export type MedalView = { id: string; name: string; rule: string; art: MedalArt; tierOrder: number };
 
 /** Slow start, quick middle, soft landing: a fill you can watch. */
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
@@ -99,6 +104,7 @@ export function LevelUp({
   improved,
   earned,
   readjusted,
+  medals,
   firstLook,
   renderedAt,
 }: {
@@ -113,6 +119,8 @@ export function LevelUp({
   earned: EarnedPlay[];
   /** Changes to the levels since the last look that plays didn't make, oldest first. */
   readjusted: ChangeView[];
+  /** Achievements reached since the last look, oldest first. */
+  medals: MedalView[];
   firstLook: boolean;
   renderedAt: string;
 }) {
@@ -132,12 +140,14 @@ export function LevelUp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseKey, afterKey],
   );
-  // Readjustments closed here, which the server may not have caught up with.
-  const [acked, setAcked] = useState<ReadonlySet<number>>(() => new Set());
+  // Readjustments and achievements closed here, which the server may not have caught up with.
+  const [acked, setAcked] = useState<ReadonlySet<number | string>>(() => new Set());
   const adjusted = readjusted.filter((c) => !acked.has(c.id));
+  const unlocked = medals.filter((m) => !acked.has(m.id));
 
   const main = changes[0];
-  const noteworthy = main.gain > 0 || changes.some((c) => c.rankedUp) || adjusted.length > 0;
+  const noteworthy =
+    main.gain > 0 || changes.some((c) => c.rankedUp) || adjusted.length > 0 || unlocked.length > 0;
 
   const [open, setOpen] = useState(false);
   // Frozen when the player presses play, so a refresh mid-animation cannot
@@ -148,6 +158,7 @@ export function LevelUp({
     renderedAt: string;
     earned: EarnedPlay[];
     adjusted: ChangeView[];
+    unlocked: MedalView[];
   } | null>(null);
 
   // Open once the player is actually looking: tab showing, window focused.
@@ -199,10 +210,10 @@ export function LevelUp({
   }, [open]);
 
   const close = () => {
-    const seen = playing ?? { after, renderedAt, adjusted };
+    const seen = playing ?? { after, renderedAt, adjusted, unlocked };
     send(seen.after, seen.renderedAt, false);
     setLocal(seen.after);
-    setAcked(new Set([...acked, ...seen.adjusted.map((c) => c.id)]));
+    setAcked(new Set([...acked, ...seen.adjusted.map((c) => c.id), ...seen.unlocked.map((m) => m.id)]));
     setPlaying(null);
     setOpen(false);
   };
@@ -230,16 +241,24 @@ export function LevelUp({
         style={{ "--tier": mainTier ? mainTier.color : "#777" } as CSSProperties}
       >
         {playing ? (
-          <Celebration changes={playing.changes} earned={playing.earned} onClose={close} />
+          <Celebration
+            changes={playing.changes}
+            earned={playing.earned}
+            unlocked={playing.unlocked}
+            onClose={close}
+          />
         ) : (
           <Summary
             changes={changes}
             adjusted={adjusted}
+            unlocked={unlocked}
             firstLook={firstLook}
             newScores={newScores}
             improved={improved}
-            canPlay={main.gain > 0 || changes.some((c) => c.rankedUp) || earned.length > 0}
-            onPlay={() => setPlaying({ changes, after, renderedAt, earned, adjusted })}
+            canPlay={
+              main.gain > 0 || changes.some((c) => c.rankedUp) || earned.length > 0 || unlocked.length > 0
+            }
+            onPlay={() => setPlaying({ changes, after, renderedAt, earned, adjusted, unlocked })}
             onSkip={close}
           />
         )}
@@ -261,10 +280,15 @@ function Gem({ tier, size = 18 }: { tier: Tier | null; size?: number }) {
 /** How many readjustments the summary lists before pointing to the bell. */
 const ADJUSTED_SHOWN = 3;
 
+/** How many new achievements the summary and the unlock page show. */
+const MEDALS_SHOWN = 4;
+const UNLOCKS_SHOWN = 12;
+
 /** What changed, before anything moves. */
 function Summary({
   changes,
   adjusted,
+  unlocked,
   firstLook,
   newScores,
   improved,
@@ -274,6 +298,7 @@ function Summary({
 }: {
   changes: Change[];
   adjusted: ChangeView[];
+  unlocked: MedalView[];
   firstLook: boolean;
   newScores: number;
   improved: number;
@@ -371,6 +396,27 @@ function Summary({
             <p className="lu-adj-more">
               And {adjusted.length - ADJUSTED_SHOWN} more under the bell at the top of the page
             </p>
+          ) : null}
+        </div>
+      ) : null}
+      {unlocked.length ? (
+        <div className="lu-medals">
+          <span className="lu-adj-head">
+            {unlocked.length === 1 ? "New achievement" : unlocked.length + " new achievements"}
+          </span>
+          <ul>
+            {unlocked.slice(0, MEDALS_SHOWN).map((m, i) => (
+              <li key={m.id} style={{ animationDelay: 240 + i * 70 + "ms" }}>
+                <Medal art={m.art} tierOrder={m.tierOrder} earned size={34} />
+                <span>
+                  <b>{m.name}</b>
+                  <small>{m.rule}</small>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {unlocked.length > MEDALS_SHOWN ? (
+            <p className="lu-adj-more">And {unlocked.length - MEDALS_SHOWN} more on your profile</p>
           ) : null}
         </div>
       ) : null}
@@ -493,10 +539,12 @@ function Burst({ small }: { small?: boolean }) {
 function Celebration({
   changes,
   earned,
+  unlocked,
   onClose,
 }: {
   changes: Change[];
   earned: EarnedPlay[];
+  unlocked: MedalView[];
   onClose: () => void;
 }) {
   const [main, ...cats] = changes;
@@ -504,14 +552,22 @@ function Celebration({
   const [skip, setSkip] = useState(false);
   const [mainDone, setMainDone] = useState(false);
   const [catsDone, setCatsDone] = useState(0);
-  // Which score is showing, or -1 while the levels are.
-  const [page, setPage] = useState(-1);
+  // The levels, then the achievements if any, then each score in turn.
+  const pages: Array<"levels" | "medals" | number> = [
+    "levels",
+    ...(unlocked.length ? (["medals"] as const) : []),
+    ...earned.map((_, i) => i),
+  ];
+  const [step, setStep] = useState(0);
+  const page = pages[step];
+  const next = () => (step + 1 < pages.length ? setStep(step + 1) : onClose());
   const done = mainDone && catsDone >= moved.length;
 
-  if (page >= 0) {
-    return (
-      <ScorePage plays={earned} index={page} onNext={() => setPage(page + 1)} onClose={onClose} />
-    );
+  if (page === "medals") {
+    return <UnlockPage medals={unlocked} last={step === pages.length - 1} onNext={next} onClose={onClose} />;
+  }
+  if (typeof page === "number") {
+    return <ScorePage plays={earned} index={page} onNext={next} onClose={onClose} />;
   }
 
   return (
@@ -533,13 +589,8 @@ function Celebration({
       ) : null}
       <div className="lu-actions">
         {done ? (
-          <button
-            className="btn lu-go"
-            type="button"
-            autoFocus
-            onClick={earned.length ? () => setPage(0) : onClose}
-          >
-            {earned.length ? "Next" : main.gain < 0 ? "Got it" : "Nice"}
+          <button className="btn lu-go" type="button" autoFocus onClick={next}>
+            {pages.length > 1 ? "Next" : main.gain < 0 ? "Got it" : "Nice"}
           </button>
         ) : (
           <button className="btn btn-ghost" type="button" onClick={() => setSkip(true)}>
@@ -691,6 +742,56 @@ function CategoryFill({
         {signedExp(exp - change.from.exp)}
       </span>
     </div>
+  );
+}
+
+/** The achievements reached since the last look, popping in one after another. */
+function UnlockPage({
+  medals,
+  last,
+  onNext,
+  onClose,
+}: {
+  medals: MedalView[];
+  last: boolean;
+  onNext: () => void;
+  onClose: () => void;
+}) {
+  const more = medals.length - UNLOCKS_SHOWN;
+  return (
+    <>
+      <span className="lu-kicker">
+        {medals.length === 1 ? "Achievement unlocked" : medals.length + " achievements unlocked"}
+      </span>
+      <ul className="lu-unlocks">
+        {medals.slice(0, UNLOCKS_SHOWN).map((m, i) => (
+          <li
+            key={m.id}
+            style={
+              {
+                "--tint": tierByOrder(m.tierOrder)?.color ?? "#777",
+                animationDelay: 150 + i * 160 + "ms",
+              } as CSSProperties
+            }
+          >
+            <Medal art={m.art} tierOrder={m.tierOrder} earned size={72} />
+            <b>{m.name}</b>
+            <small>{m.rule}</small>
+          </li>
+        ))}
+      </ul>
+      {more > 0 ? <p className="lu-adj-more">And {more} more on your profile</p> : null}
+      <div className="lu-actions">
+        <button className="btn lu-go" type="button" autoFocus onClick={last ? onClose : onNext}>
+          {last ? "Nice" : "Next"}
+        </button>
+        {last ? null : (
+          <button className="btn btn-ghost" type="button" onClick={onClose}>
+            Skip
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 

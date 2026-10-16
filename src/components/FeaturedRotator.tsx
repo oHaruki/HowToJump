@@ -8,8 +8,8 @@ import { tierByOrder } from "@/lib/tiers";
 
 /**
  * Cycles the hero card through the newest entries. Pauses while the pointer
- * or keyboard focus is on it, stops once a dot is picked, and never starts
- * under reduced motion.
+ * or keyboard focus is on it, stops once a dot or an arrow is used, and
+ * never starts under reduced motion.
  */
 export function FeaturedRotator({
   entries,
@@ -48,6 +48,11 @@ export function FeaturedRotator({
       </div>
     );
   }
+
+  const step = (by: number) => {
+    setIndex((i) => (i + by + entries.length) % entries.length);
+    setHeld(true);
+  };
 
   const m = entries[Math.min(index, entries.length - 1)];
   const tier = tierByOrder(m.tierOrder);
@@ -115,6 +120,21 @@ export function FeaturedRotator({
           </div>
         </div>
       </div>
+
+      {entries.length > 1 ? (
+        <div className="rotator-nav">
+          <button type="button" className="rotator-arrow" aria-label="Previous map" onClick={() => step(-1)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14.5 6 8.5 12l6 6" />
+            </svg>
+          </button>
+          <button type="button" className="rotator-arrow" aria-label="Next map" onClick={() => step(1)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9.5 6 6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
 
       {entries.length > 1 ? (
         <div className="rotator-dots">

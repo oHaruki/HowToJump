@@ -113,6 +113,11 @@ export const SPEED_SCALE: Bucket[] = [
 export const LENGTHS = LENGTH_SCALE.map((b) => b.name);
 export const SPEEDS = SPEED_SCALE.map((b) => b.name);
 
+/** A bucket's span as menus and chips print it, "200–239", or nothing for a name off the scale. */
+export function bucketRange(scale: Bucket[], name: string | null | undefined): string | undefined {
+  return scale.find((b) => b.name === name)?.range.replace(" - ", "–");
+}
+
 /** One line spelling out the whole scale, for a dropdown's hover text. */
 export function scaleHint(scale: Bucket[], unit: string): string {
   return unit + ": " + scale.map((b) => b.name + " " + b.range).join(", ");

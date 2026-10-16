@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
-import { TIERS, tierByName, tierByOrder, tierFill, type Tier } from "@/lib/tiers";
+import {
+  LENGTH_SCALE, SPEED_SCALE, TIERS, bucketRange, tierByName, tierByOrder, tierFill, type Tier,
+} from "@/lib/tiers";
 import type { SpecialPack } from "@/lib/packs";
 import { OSU_MODS, modParts } from "@/lib/mods";
 import { Cover } from "@/components/Cover";
@@ -54,8 +56,8 @@ export function ModIcons({ mod }: { mod: string }) {
 
 /**
  * Length and speed, one keyed chip each, on a line of their own. Both are
- * graded words, so each carries its key in a recessed cell, with a dial
- * showing where the value sits on its scale.
+ * graded words, so each carries its key in a recessed cell, a dial showing
+ * where the value sits on its scale, and the span the word stands for.
  */
 export function PacingChips({
   length,
@@ -67,17 +69,44 @@ export function PacingChips({
   if (!length && !speed) return null;
   return (
     <span className="pacing">
-      {length ? <KeyedChip label="Length" icon={<LengthIcon value={length} />} value={length} /> : null}
-      {speed ? <KeyedChip label="Speed" icon={<SpeedIcon value={speed} />} value={speed} /> : null}
+      {length ? (
+        <KeyedChip
+          label="Length"
+          icon={<LengthIcon value={length} />}
+          value={length}
+          range={bucketRange(LENGTH_SCALE, length)}
+        />
+      ) : null}
+      {speed ? (
+        <KeyedChip
+          label="Speed"
+          icon={<SpeedIcon value={speed} />}
+          value={speed}
+          range={bucketRange(SPEED_SCALE, speed)}
+        />
+      ) : null}
     </span>
   );
 }
 
-function KeyedChip({ label, icon, value }: { label: string; icon: ReactNode; value: string }) {
+function KeyedChip({
+  label,
+  icon,
+  value,
+  range,
+}: {
+  label: string;
+  icon: ReactNode;
+  value: string;
+  range?: string;
+}) {
   return (
     <span className="chip chip-keyed">
       <i>{icon}{label}</i>
-      <b>{value}</b>
+      <b>
+        {value}
+        {range ? <small>{range}</small> : null}
+      </b>
     </span>
   );
 }

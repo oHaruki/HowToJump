@@ -13,6 +13,8 @@ import { CATEGORIES, TIERS, shortCategory, tierByOrder, tierFill } from "@/lib/t
 import { Flag, GradeLetter, packHref } from "@/components/ui";
 import { LevelBar, SkillRadar } from "@/components/LevelView";
 import { LevelUp, type EarnedPlay } from "@/components/LevelUp";
+import { Medal } from "@/components/Medal";
+import { achievements, reachedSince, type AchievementState, type PackLevel } from "@/lib/achievements";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { PlayFilter } from "@/components/PlayFilter";
 import { PlayList } from "@/components/PlayList";
@@ -22,6 +24,20 @@ import { timeAgo } from "@/lib/time";
 import { SyncButton } from "@/components/SyncButton";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en");
+
+/** The pack marks spelled out, in the order every pack shows them. */
+const PACK_LEGEND: Array<[PackLevel, string]> = [
+  ["pass", "Pass one"],
+  ["tier", "Pass half"],
+  ["true", "Pass all"],
+  ["plus", "Half at B-"],
+  ["trueplus", "All at B-"],
+  ["perfect", "All full combo"],
+];
+
+/** What a medal's hover says: its name, its rule, and how far along it is. */
+const medalLabel = (m: AchievementState) =>
+  m.name + ": " + m.rule + (m.at ? " (earned)" : " (" + m.have + " of " + m.need + ")");
 
 /** The grades a profile counts, SSS down to B-, one family to a group. */
 const GRADE_TALLY = [
@@ -78,6 +94,13 @@ export async function ProfileView({
     .flatMap((p) => (p.fresh ? [{ ...p, fresh: p.fresh }] : []))
     .sort((a, b) => b.exp - a.exp);
 
+  // Every achievement and where the player stands on it, and for the owner,
+  // the ones reached since the last look.
+  const medals = achievements(plays, packSizes);
+  const medalsWon = medals.filter((m) => m.at).length;
+  const packMedals = (order: number) => medals.filter((m) => m.group === "pack" && m.tierOrder === order);
+  const newMedals = previous && seenAt ? reachedSince(medals, seenAt) : [];
+
   const freshCount = views.filter((v) => v.fresh).length;
   const clears = packRows.reduce((n, p) => n + p.entriesCleared, 0);
   const packsTouched = packRows.filter((p) => p.entriesCleared > 0).length;
@@ -103,6 +126,13 @@ export async function ProfileView({
             improved={views.filter((v) => v.fresh === "improved").length}
             earned={earned}
             readjusted={previous ? readjusted : []}
+            medals={newMedals.map((m) => ({
+              id: m.id,
+              name: m.name,
+              rule: m.rule,
+              art: m.art,
+              tierOrder: m.tierOrder,
+            }))}
             firstLook={!previous}
             renderedAt={renderedAt.toISOString()}
           />
@@ -317,8 +347,39 @@ export async function ProfileView({
 
       <section className="stack-lg">
         <div className="section-head">
+          <h2>Achievements</h2>
+          <p className="small">
+            {medalsWon} of {medals.length} earned. Each pack&apos;s own six are on its tile below.
+          </p>
+        </div>
+        <div className="ach-grid">
+          {medals
+            .filter((m) => m.group !== "pack")
+            .map((m) => (
+              <div className="ach" key={m.id} data-earned={m.at ? true : undefined}>
+                <Medal art={m.art} tierOrder={m.tierOrder} earned={Boolean(m.at)} size={52} />
+                <div className="ach-text">
+                  <b>{m.name}</b>
+                  <span>{m.rule}</span>
+                  <small>{m.at ? "Earned " + timeAgo(m.at) : "Not yet"}</small>
+                </div>
+              </div>
+            ))}
+        </div>
+      </section>
+
+      <section className="stack-lg">
+        <div className="section-head">
           <h2>Through the packs</h2>
           <p className="small">Open a pack to see every map in it and the score on each.</p>
+        </div>
+        <div className="pk-legend">
+          {PACK_LEGEND.map(([level, text]) => (
+            <span key={level}>
+              <Medal art={level} tierOrder={mainTier?.order ?? TIERS[0].order} earned size={18} />
+              {text}
+            </span>
+          ))}
         </div>
         <div className="pf-packs">
           {TIERS.map((t) => {
@@ -342,9 +403,23 @@ export async function ProfileView({
                 <div className="pk-bar">
                   <i style={{ width: (total ? (done / total) * 100 : 0) + "%" }} />
                 </div>
-                <span className="pk-count">
-                  {total ? done + " / " + total + " cleared" : "No maps yet"}
-                </span>
+                <div className="pk-foot">
+                  <span className="pk-count">
+                    {total ? done + " / " + total + " cleared" : "No maps yet"}
+                  </span>
+                  <span className="pk-medals">
+                    {packMedals(t.order).map((m) => (
+                      <Medal
+                        key={m.id}
+                        art={m.art}
+                        tierOrder={m.tierOrder}
+                        earned={Boolean(m.at)}
+                        size={18}
+                        label={medalLabel(m)}
+                      />
+                    ))}
+                  </span>
+                </div>
               </Link>
             );
           })}
