@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type TouchEvent } from "react";
+import Link from "next/link";
 import { Cover } from "@/components/Cover";
-import { CategoryChips, ModIcons, NONE, TierChip } from "@/components/ui";
+import { CategoryChips, ModIcons, NONE, TierChip, mapHref } from "@/components/ui";
 import type { BankRow } from "@/lib/queries";
 import { tierByOrder } from "@/lib/tiers";
 
 /**
  * Cycles the hero card through the newest entries. Pauses while the pointer
- * or keyboard focus is on it, stops once a dot or an arrow is used, and
- * never starts under reduced motion.
+ * or keyboard focus is on it, stops once a dot, an arrow or a swipe is used,
+ * and never starts under reduced motion.
  */
 export function FeaturedRotator({
   entries,
@@ -22,6 +23,7 @@ export function FeaturedRotator({
   const [paused, setPaused] = useState(false);
   const [held, setHeld] = useState(false);
   const [still, setStill] = useState(false);
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const cycling = entries.length > 1 && !held && !still;
 
   useEffect(() => {
@@ -56,9 +58,17 @@ export function FeaturedRotator({
 
   const m = entries[Math.min(index, entries.length - 1)];
   const tier = tierByOrder(m.tierOrder);
-  const url = m.osuBeatmapsetId
-    ? "https://osu.ppy.sh/beatmapsets/" + m.osuBeatmapsetId + "#osu/" + m.osuBeatmapId
-    : "https://osu.ppy.sh/b/" + m.osuBeatmapId;
+
+  // A mostly sideways swipe of 40px or more steps the card.
+  const onTouchEnd = (e: TouchEvent) => {
+    const start = touch.current;
+    touch.current = null;
+    if (!start || entries.length < 2) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    step(dx < 0 ? 1 : -1);
+  };
 
   return (
     <div
@@ -68,6 +78,11 @@ export function FeaturedRotator({
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
+      onTouchStart={(e) => {
+        touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={() => (touch.current = null)}
     >
       {/* How long this card has left, on the same interval as the swap. */}
       {cycling ? (
@@ -93,9 +108,7 @@ export function FeaturedRotator({
         <span className="feat-badge">Newest in the bank</span>
         <div className="feat-body">
           <h2 className="feat-title">
-            <a href={url} target="_blank" rel="noopener noreferrer">
-              {m.title}
-            </a>
+            <Link href={mapHref(m.osuBeatmapId, m.mod)}>{m.title}</Link>
           </h2>
           <span className="t-diff">
             {[m.version ? "[" + m.version + "]" : "", m.mapper]

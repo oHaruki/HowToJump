@@ -3,7 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { getBankStats, getRecentEntries, getTierCounts } from "@/lib/queries";
 import {
-  CategoryChips, LadderGrid, ModIcons, NONE, Stat, TierChip, beatmapUrl,
+  CategoryChips, LadderGrid, ModIcons, NONE, Stat, TierChip, mapHref,
 } from "@/components/ui";
 import { Cover } from "@/components/Cover";
 import { CountUp } from "@/components/CountUp";
@@ -110,14 +110,9 @@ export default async function OverviewPage() {
                 />
                 <div className="feat-body">
                   <div>
-                    <a
-                      className="t-title"
-                      href={beatmapUrl(m)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
+                    <Link className="t-title" href={mapHref(m.osuBeatmapId, m.mod)}>
                       {m.title}
-                    </a>
+                    </Link>
                     <span className="t-diff">
                       {[m.version ? "[" + m.version + "]" : "", m.mapper]
                         .filter(Boolean)
